@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Automation Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --bg-dark: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.9);
+            --bg-input: rgba(15, 23, 42, 0.8);
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.15) 0%, transparent 50%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            font-size: 2rem;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6366f1, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: var(--glass);
+            border-radius: 50px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--secondary);
+            animation: blink 2s infinite;
+        }
+
+        .status-dot.running {
+            background: var(--accent);
+            animation: blink 0.5s infinite;
+        }
+
+        .status-dot.error {
+            background: var(--danger);
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Main Container */
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 30px;
+            padding: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            padding: 25px;
+            height: fit-content;
+            position: sticky;
+            top: 30px;
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Toggle Buttons */
+        .toggle-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border: 1px solid var(--glass-border);
+        }
+
+        .toggle-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 5px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .toggle-btn.character.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-color: #10b981;
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .toggle-btn.info.active {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-color: #f59e0b;
+            box-shadow: 0 5px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        /* Input Fields */
+        .input-field {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            background: var(--bg-input);
+            color: var(--text);
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .input-field::placeholder {
+            color: var(--text-muted);
+        }
+
+        textarea.input-field {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        /* Settings */
+        .settings-group {
+            background: var(--glass);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .setting-value {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .number-input {
+            width: 60px;
+            padding: 8px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--bg-input);
+            color: var(--text);
+            text-align: center;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--glass);
+            color: var(--text);
+            border: 1px solid var(--glass-border);
+        }
+
+        /* Pipeline View */
+        .pipeline-view {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            padding: 25px;
+        }
+
+        .pipeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .pipeline-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .progress-bar-container {
+            background: var(--bg-input);
+            border-radius: 10px;
+            height: 12px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .progress-text {
+            text-align: right;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        /* Pipeline Steps */
+        .pipeline-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .step-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: var(--glass);
+            border-radius: 15px;
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        .step-card.active {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+        }
+
+        .step-card.completed {
+            border-color: var(--secondary);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .step-card.error {
+            border-color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .step-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: var(--bg-input);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .step-card.active .step-icon {
+            background: var(--primary);
+            animation: pulse-icon 1.5s infinite;
+        }
+
+        .step-card.completed .step-icon {
+            background: var(--secondary);
+        }
+
+        @keyframes pulse-icon {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .step-info {
+            flex: 1;
+        }
+
+        .step-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .step-file {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .step-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .step-status.pending {
+            background: var(--bg-input);
+            color: var(--text-muted);
+        }
+
+        .step-status.running {
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--primary);
+        }
+
+        .step-status.completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--secondary);
+        }
+
+        .step-status.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        /* Output Section */
+        .output-section {
+            margin-top: 30px;
+            padding: 25px;
+            background: var(--glass);
+            border-radius: 15px;
+            border: 1px solid var(--glass-border);
+            display: none;
+        }
+
+        .output-section.visible {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .output-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .video-preview {
+            width: 100%;
+            border-radius: 12px;
+            background: #000;
+            aspect-ratio: 16/9;
+        }
+
+        .download-btn {
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        /* Log Console */
+        .log-console {
+            margin-top: 20px;
+            background: var(--bg-input);
+            border-radius: 12px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            gap: 10px;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+        }
+
+        .log-message {
+            color: var(--text);
+        }
+
+        .log-message.error {
+            color: var(--danger);
+        }
+
+        .log-message.success {
+            color: var(--secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel {
+                position: static;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-animation"></div>
+
+    <header>
+        <div class="logo">
+            <span class="logo-icon">🎬</span>
+            <h1>Video Automation Dashboard</h1>
+        </div>
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Ready</span>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- Control Panel -->
+        <aside class="control-panel">
+            <h2 class="panel-title">⚙️ Pipeline Control</h2>
+
+            <!-- Pipeline Type -->
+            <div class="form-group">
+                <label>Pipeline Type</label>
+                <div class="toggle-group">
+                    <button class="toggle-btn character active" onclick="setPipelineType('character')">
+                        🎭 Character
+                    </button>
+                    <button class="toggle-btn info" onclick="setPipelineType('info')">
+                        📊 Info
+                    </button>
+                </div>
+            </div>
+
+            <!-- Niche Type -->
+            <div class="form-group">
+                <label>Niche Selection</label>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" data-niche="manual" onclick="setNicheType('manual')">
+                        ⌨️ Manual
+                    </button>
+                    <button class="toggle-btn" data-niche="url" onclick="setNicheType('url')">
+                        🔗 URL
+                    </button>
+                    <button class="toggle-btn" data-niche="auto" onclick="setNicheType('auto')">
+                        🔮 Auto
+                    </button>
+                </div>
+            </div>
+
+            <!-- Niche Input -->
+            <div class="form-group" id="nicheInputGroup">
+                <label id="nicheLabel">Enter Niche Topic</label>
+                <input type="text" class="input-field" id="nicheInput" placeholder="e.g., AI Technology Explained">
+            </div>
+
+            <!-- Settings -->
+            <div class="form-group">
+                <label>Settings</label>
+                <div class="settings-group">
+                    <div class="setting-row">
+                        <span class="setting-label">Number of Scenes</span>
+                        <div class="setting-value">
+                            <input type="number" class="number-input" id="numScenes" value="5" min="1" max="20">
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Video Duration (sec)</span>
+                        <div class="setting-value">
+                            <input type="number" class="number-input" id="videoDuration" value="60" min="15" max="300">
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Auto Upload</span>
+                        <div class="setting-value">
+                            <input type="checkbox" id="autoUpload">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="startBtn" onclick="startPipeline()">
+                    ▶️ Start Generation
+                </button>
+            </div>
+            <div class="action-buttons" id="stopBtnContainer" style="display: none;">
+                <button class="btn btn-danger" onclick="stopPipeline()">
+                    ⏹️ Stop
+                </button>
+            </div>
+        </aside>
+
+        <!-- Pipeline View -->
+        <section class="pipeline-view">
+            <div class="pipeline-header">
+                <h2 class="pipeline-title">📊 Pipeline Progress</h2>
+                <span id="progressPercent">0%</span>
+            </div>
+
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+
+            <div class="pipeline-steps" id="pipelineSteps">
+                <!-- Steps will be dynamically populated -->
+            </div>
+
+            <!-- Output Section -->
+            <div class="output-section" id="outputSection">
+                <h3 class="output-title">🎉 Video Generated!</h3>
+                <video class="video-preview" id="videoPreview" controls></video>
+                <button class="btn btn-secondary download-btn" onclick="downloadVideo()">
+                    ⬇️ Download Video
+                </button>
+            </div>
+
+            <!-- Log Console -->
+            <div class="log-console" id="logConsole">
+                <div class="log-entry">
+                    <span class="log-time">[System]</span>
+                    <span class="log-message">Dashboard connected. Ready to generate videos.</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // State
+        let pipelineType = 'character';
+        let nicheType = 'manual';
+        let socket = null;
+        let isRunning = false;
+
+        // Pipeline steps
+        const characterSteps = [
+            { id: 'gmail', name: 'Gmail Verification', file: 'gmail_verification.py', icon: '📧' },
+            { id: 'niche', name: 'Niche Analysis', file: 'trend_finder.py', icon: '🔍' },
+            { id: 'video_analyze', name: 'Video Analyzer', file: 'video_analyzer.py', icon: '📊' },
+            { id: 'script', name: 'Script Generation', file: 'script_generator.py', icon: '📝' },
+            { id: 'image', name: 'Image Generation', file: 'image_generator.py', icon: '🎨' },
+            { id: 'video', name: 'Video Generation', file: 'video_generator.py', icon: '🎬' },
+            { id: 'edit', name: 'Video Editing', file: 'enhanced_editor.py', icon: '✂️' },
+            { id: 'retention', name: 'Retention Optimization', file: 'retention_optimizer.py', icon: '📈' },
+            { id: 'thumbnail', name: 'Thumbnail Generation', file: 'thumbnail_generator.py', icon: '🖼️' },
+            { id: 'metadata', name: 'AI Metadata', file: 'ai_metadata_generator.py', icon: '🏷️' },
+            { id: 'upload', name: 'Smart Upload', file: 'smart_uploader.py', icon: '🚀' }
+        ];
+
+        const infoSteps = [
+            { id: 'gmail', name: 'Gmail Verification', file: 'gmail_verification.py', icon: '📧' },
+            { id: 'niche', name: 'Niche Analysis', file: 'trend_finder.py', icon: '🔍' },
+            { id: 'video_analyze', name: 'Video Analyzer', file: 'video_analyzer.py', icon: '📊' },
+            { id: 'script', name: 'Script Generation', file: 'info_script_generator.py', icon: '📝' },
+            { id: 'video', name: 'Hybrid Video Generation', file: 'hybrid_info_video_generator.py', icon: '🎬' },
+            { id: 'voiceover', name: 'Voiceover Generation', file: 'voiceover_generator.py', icon: '🎤' },
+            { id: 'edit', name: 'Video Editing', file: 'enhanced_editor.py', icon: '✂️' },
+            { id: 'retention', name: 'Retention Optimization', file: 'retention_optimizer.py', icon: '📈' },
+            { id: 'thumbnail', name: 'Thumbnail Generation', file: 'info_thumbnail_generator.py', icon: '🖼️' },
+            { id: 'metadata', name: 'AI Metadata', file: 'ai_metadata_generator.py', icon: '🏷️' },
+            { id: 'upload', name: 'Smart Upload', file: 'smart_uploader.py', icon: '🚀' }
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderPipelineSteps();
+            connectWebSocket();
+        });
+
+        function connectWebSocket() {
+            socket = io();
+
+            socket.on('connect', () => {
+                addLog('Connected to server', 'success');
+            });
+
+            socket.on('disconnect', () => {
+                addLog('Disconnected from server', 'error');
+            });
+
+            socket.on('progress_update', (data) => {
+                handleProgressUpdate(data);
+            });
+
+            socket.on('state_update', (data) => {
+                updateState(data);
+            });
+        }
+
+        function setPipelineType(type) {
+            pipelineType = type;
+            document.querySelectorAll('.toggle-btn.character, .toggle-btn.info').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.toggle-btn.${type}`).classList.add('active');
+            renderPipelineSteps();
+        }
+
+        function setNicheType(type) {
+            nicheType = type;
+            document.querySelectorAll('[data-niche]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-niche="${type}"]`).classList.add('active');
+
+            const inputGroup = document.getElementById('nicheInputGroup');
+            const label = document.getElementById('nicheLabel');
+            const input = document.getElementById('nicheInput');
+
+            if (type === 'auto') {
+                inputGroup.style.display = 'none';
+            } else {
+                inputGroup.style.display = 'block';
+                if (type === 'url') {
+                    label.textContent = 'YouTube Video URL';
+                    input.placeholder = 'https://youtube.com/watch?v=...';
+                } else {
+                    label.textContent = 'Enter Niche Topic';
+                    input.placeholder = 'e.g., AI Technology Explained';
+                }
+            }
+        }
+
+        function renderPipelineSteps() {
+            const steps = pipelineType === 'character' ? characterSteps : infoSteps;
+            const container = document.getElementById('pipelineSteps');
+
+            container.innerHTML = steps.map(step => `
+                <div class="step-card" id="step-${step.id}">
+                    <div class="step-icon">${step.icon}</div>
+                    <div class="step-info">
+                        <div class="step-name">${step.name}</div>
+                        <div class="step-file">${step.file}</div>
+                    </div>
+                    <span class="step-status pending">Pending</span>
+                </div>
+            `).join('');
+        }
+
+        function startPipeline() {
+            const nicheValue = document.getElementById('nicheInput').value;
+            const numScenes = document.getElementById('numScenes').value;
+            const videoDuration = document.getElementById('videoDuration').value;
+            const autoUpload = document.getElementById('autoUpload').checked;
+
+            if (nicheType !== 'auto' && !nicheValue) {
+                addLog('Please enter a niche topic or URL', 'error');
+                return;
+            }
+
+            // Reset UI
+            renderPipelineSteps();
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressPercent').textContent = '0%';
+            document.getElementById('outputSection').classList.remove('visible');
+
+            // Update button states
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtnContainer').style.display = 'block';
+            updateStatus('running', 'Pipeline Running...');
+
+            // Send start request
+            fetch('/api/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pipeline_type: pipelineType,
+                    niche_type: nicheType,
+                    niche_value: nicheValue,
+                    settings: {
+                        num_scenes: parseInt(numScenes),
+                        video_duration: parseInt(videoDuration),
+                        auto_upload: autoUpload
+                    }
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        addLog(data.error, 'error');
+                        resetUI();
+                    } else {
+                        addLog(`Started ${pipelineType} pipeline`, 'success');
+                        isRunning = true;
+                    }
+                })
+                .catch(err => {
+                    addLog('Failed to start pipeline: ' + err, 'error');
+                    resetUI();
+                });
+        }
+
+        function stopPipeline() {
+            fetch('/api/stop', { method: 'POST' })
+                .then(() => {
+                    addLog('Pipeline stopped by user', 'error');
+                    resetUI();
+                });
+        }
+
+        function handleProgressUpdate(data) {
+            const { step_id, status, message, progress } = data;
+
+            // Update progress bar
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            document.getElementById('progressPercent').textContent = `${Math.round(progress)}%`;
+
+            // Update step card
+            const stepCard = document.getElementById(`step-${step_id}`);
+            if (stepCard) {
+                stepCard.className = `step-card ${status}`;
+                stepCard.querySelector('.step-status').className = `step-status ${status}`;
+                stepCard.querySelector('.step-status').textContent =
+                    status === 'running' ? 'Running...' :
+                        status === 'completed' ? 'Completed' :
+                            status === 'error' ? 'Error' : 'Pending';
+            }
+
+            // Add log
+            addLog(message, status === 'error' ? 'error' : status === 'completed' ? 'success' : '');
+
+            // Check if complete
+            if (step_id === 'complete' && status === 'success') {
+                pipelineComplete();
+            }
+        }
+
+        function updateState(state) {
+            if (state.running) {
+                updateStatus('running', 'Pipeline Running...');
+            } else if (state.error) {
+                updateStatus('error', 'Error');
+            } else {
+                updateStatus('ready', 'Ready');
+            }
+        }
+
+        function updateStatus(status, text) {
+            const dot = document.getElementById('statusDot');
+            document.getElementById('statusText').textContent = text;
+            dot.className = 'status-dot ' + status;
+        }
+
+        function pipelineComplete() {
+            resetUI();
+            document.getElementById('outputSection').classList.add('visible');
+            addLog('🎉 Video generation complete!', 'success');
+            updateStatus('ready', 'Complete!');
+        }
+
+        function resetUI() {
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtnContainer').style.display = 'none';
+            isRunning = false;
+            updateStatus('ready', 'Ready');
+        }
+
+        function downloadVideo() {
+            window.open('/api/download/output/final_video.mp4');
+        }
+
+        function addLog(message, type = '') {
+            const console = document.getElementById('logConsole');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span class="log-message ${type}">${message}</span>
+            `;
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>

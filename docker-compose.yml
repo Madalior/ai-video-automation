@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  video-pipeline:
+    build: .
+    container_name: video-automation
+    environment:
+      - NICHE=${NICHE:-ASMR}
+      - WORKERS=${WORKERS:-1}
+      - HEADLESS=true
+    volumes:
+      - ./output:/app/output
+      - ./chrome_data:/app/chrome_data
+    networks:
+      - video-net
+    restart: unless-stopped
+
+  # Optional: Add monitoring
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - video-net
+    profiles:
+      - monitoring
+
+networks:
+  video-net:
+    driver: bridge
+
+volumes:
+  output-data:
+  chrome-data:

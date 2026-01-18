@@ -1,0 +1,70 @@
+name: Video Pipeline - GitHub Actions
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      niche:
+        description: 'Video niche (e.g., ASMR, Tech, Cooking)'
+        required: true
+        default: 'ASMR'
+      workers:
+        description: 'Number of workers (1-3 recommended for GitHub)'
+        required: false
+        default: '1'
+  
+  # Scheduled runs (optional)
+  # schedule:
+  #   - cron: '0 */6 * * *'  # Every 6 hours
+
+jobs:
+  generate-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            chromium-browser \
+            chromium-chromedriver \
+            ffmpeg
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run video pipeline
+        env:
+          NICHE: ${{ github.event.inputs.niche || 'ASMR' }}
+          WORKERS: ${{ github.event.inputs.workers || '1' }}
+        run: |
+          python run_on_github.py
+      
+      - name: Upload generated videos
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: generated-videos-${{ github.run_number }}
+          path: |
+            output/final/*.mp4
+            output/final/*.png
+          retention-days: 30
+      
+      - name: Upload all outputs
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: all-outputs-${{ github.run_number }}
+          path: output/
+          retention-days: 7
