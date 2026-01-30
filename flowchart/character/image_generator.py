@@ -7,13 +7,31 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from flowchart.common.browser_utils import start_browser, universal_shadow_click, get_new_email, get_otp
+from flowchart.common.session_manager import SessionManager, OverloadDetector
+from flowchart.common.human_behavior import HumanBehavior
 
 class DreaminaGenerator:
     DREAMINA_URL = "https://auth.business.gemini.google/login?continueUrl=https://business.gemini.google/"
     
-    def __init__(self, headless=False, profile_path=None):
-        self.driver = start_browser(profile_path, headless)
+    def __init__(self, headless=False, profile_path=None, proxy_manager=None, proxy=None):
+        self.driver = start_browser(profile_path, headless, proxy=proxy)
         self.wait = WebDriverWait(self.driver, 30)
+        
+        # Advanced anti-bot detection
+        self.session_manager = SessionManager(
+            max_requests=15, 
+            min_interval=15,
+            proxy_manager=proxy_manager  # NEW: Proxy rotation support
+        )
+        self.overload_detector = OverloadDetector()
+        self.human = HumanBehavior()
+        self.profile_path = profile_path
+        self.headless = headless
+        self.proxy_manager = proxy_manager  # Store for session restart
+        
+        print("[ANTI-BOT] Session manager initialized (max 15 requests per session)")
+        print("[ANTI-BOT] Overload detector activated")
+        print("[ANTI-BOT] Human behavior simulator ready")
 
     def login(self, max_login_attempts=3):
         """Login with automatic retry on any error."""
@@ -301,6 +319,34 @@ class DreaminaGenerator:
             reference_image: Optional path to reference image for consistency
             max_retries: Maximum number of retry attempts (default: 2)
         """
+        # === ANTI-BOT: Session Management ===
+        # Check if session should be restarted
+        should_restart, reason = self.session_manager.should_restart_session()
+        if should_restart:
+            print(f"[SESSION] Restarting session: {reason}")
+            self.close()
+            time.sleep(random.uniform(5, 10))  # Cooling period
+            self.driver = start_browser(self.profile_path, self.headless)
+            self.wait = WebDriverWait(self.driver, 30)
+            self.session_manager.reset_session()
+            self.login()  # Re-login with new session
+        
+        # Track this request
+        self.session_manager.track_request()
+        
+        # === ANTI-BOT: Pre-generation checks ===
+        # Check for overload message before starting
+        if self.overload_detector.check_for_overload(self.driver):
+            print("[OVERLOAD] Detected before generation, attempting recovery...")
+            if self.overload_detector.handle_overload(self.driver, max_attempts=3):
+                print("[OVERLOAD] Successfully recovered")
+            else:
+                print("[OVERLOAD] Could not recover, aborting generation")
+                return False
+        
+        # Human-like thinking pause before starting
+        self.human.smart_delay('thinking')
+        
         for attempt in range(max_retries + 1):
             try:
                 print(f"[INFO] Generating Image (Attempt {attempt + 1}/{max_retries + 1}): {prompt[:50]}...")
@@ -339,8 +385,21 @@ class DreaminaGenerator:
                 # 6. Wait & Save
                 result = self.save_result(output_path)
                 
+                # === ANTI-BOT: Post-generation checks ===
+                if not result:
+                    # Check if failure was due to overload
+                    if self.overload_detector.check_for_overload(self.driver):
+                        print("[OVERLOAD] Detected after generation attempt")
+                        if self.overload_detector.handle_overload(self.driver, attempt=attempt, max_attempts=max_retries):
+                            print("[OVERLOAD] Recovered, retrying generation...")
+                            continue
+                        else:
+                            print("[OVERLOAD] Could not recover")
+                            return False
+                
                 if result:
                     print(f"[SUCCESS] Image generated successfully on attempt {attempt + 1}")
+                    self.session_manager.print_status()  # Show session stats
                     
                     # Reset interface for next generation
                     self.go_to_new_chat()

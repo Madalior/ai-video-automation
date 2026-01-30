@@ -23,18 +23,21 @@ class ParallelInfoDirector:
     Processes multiple scenes simultaneously for 4-8x speedup.
     """
     
-    def __init__(self, num_workers=4, output_dir="output_info"):
+    def __init__(self, num_workers=4, output_dir="output_info", proxy_manager=None):
         """
         Initialize parallel info director
         
         Args:
             num_workers: Number of parallel Chrome workers (default: 4)
             output_dir: Output directory for videos
+            proxy_manager: Optional proxy manager for IP rotation
         """
         self.num_workers = num_workers
         self.output_dir = output_dir
+        self.proxy_manager = proxy_manager
         
         print(f"[ParallelInfoDirector] Initialized with {num_workers} workers")
+        print(f"[ParallelInfoDirector] Proxy enabled: {'YES' if proxy_manager else 'NO'}")
     
     def generate_ai_videos_parallel(self, scenes: List[Dict], use_veo3=True) -> List[str]:
         """
@@ -116,7 +119,7 @@ class ParallelInfoDirector:
         try:
             from modules.generators.veo3_generator import Veo3Generator
             
-            gen = Veo3Generator(headless=False, profile_path=profile_path)
+            gen = Veo3Generator(headless=False, profile_path=profile_path, proxy_manager=self.proxy_manager)
             try:
                 if gen.login():
                     success = gen.generate_video(prompt, None, output_path)
@@ -142,7 +145,7 @@ class ParallelInfoDirector:
         try:
             from flowchart.character.video_generator import DreaminaVideoGenerator
             
-            gen = DreaminaVideoGenerator(headless=False, profile_path=profile_path)
+            gen = DreaminaVideoGenerator(headless=False, profile_path=profile_path, proxy_manager=self.proxy_manager)
             try:
                 if gen.login():
                     success = gen.generate_video(prompt, None, output_path)

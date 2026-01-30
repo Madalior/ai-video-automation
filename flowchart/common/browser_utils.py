@@ -11,41 +11,80 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # ================= BROWSER SETUP =================
-def start_browser(profile_path=None, headless=False):
+def start_browser(profile_path=None, headless=False, proxy=None):
     """
-    Starts a Chrome browser instance with anti-detection flags.
-    If profile_path is provided, it uses that user data directory.
-    """
-    options = Options()
+    Starts a Chrome browser instance with ADVANCED anti-detection.
     
-    if profile_path:
-        options.add_argument(f"user-data-dir={profile_path}")
+    This now uses the comprehensive stealth browser with:
+    - WebDriver masking
+    - Plugin mocking
+    - WebGL spoofing
+    - Canvas randomization
+    - Chrome runtime injection
+    - And 10+ other anti-detection measures
+    
+    Args:
+        profile_path: Chrome profile directory
+        headless: Run in headless mode
+        proxy: Proxy URL (optional)
         
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--start-maximized")
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option("useAutomationExtension", False)
+    Returns:
+        Stealth-configured WebDriver
+    """
+    try:
+        from .stealth_browser import start_stealth_browser
+        print("[BROWSER] Using advanced stealth mode")
+        if proxy:
+            print(f"[BROWSER] Starting with proxy: {proxy.split('@')[1] if '@' in proxy else proxy}")
+        return start_stealth_browser(profile_path, headless, proxy=proxy)
+    except ImportError:
+        print("[BROWSER] Warning: stealth_browser not found, using basic mode")
+        # Fallback to basic setup
+        options = Options()
+        
+        if profile_path:
+            options.add_argument(f"user-data-dir={profile_path}")
+            
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--start-maximized")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
 
-    if headless:
-        options.add_argument("--headless=new")
+        if headless:
+            options.add_argument("--headless=new")
 
-    # Assuming chromedriver is in PATH or handled by Selenium Manager (Selenium 4+)
-    driver = webdriver.Chrome(options=options)
-    
-    # Stealth adjustments
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-        "source": """
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-        """
-    })
-    
-    return driver
+        driver = webdriver.Chrome(options=options)
+        
+        # Basic stealth
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """
+        })
+        
+        return driver
 
 # ================= SHADOW DOM HELPERS =================
-def universal_shadow_click(driver, selector):
-    """Clicks any element, safely handling quotes and nested Shadow DOMs."""
+def universal_shadow_click(driver, selector, delay_before=True, delay_after=True):
+    """
+    Clicks any element, safely handling quotes and nested Shadow DOMs.
+    
+    Args:
+        driver: Selenium WebDriver
+        selector: CSS selector for the element
+        delay_before: Add random delay before click (default: True)
+        delay_after: Add random delay after click (default: True)
+    """
+    import random
+    
+    # Delay BEFORE click - mimics human hesitation
+    if delay_before:
+        pre_delay = random.uniform(1.0, 4.0)
+        print(f"[CLICK] Waiting {pre_delay:.1f}s before clicking...")
+        time.sleep(pre_delay)
+    
     safe_selector = json.dumps(selector)
     script = f"""
     function findInShadow(root, selector) {{
@@ -69,7 +108,14 @@ def universal_shadow_click(driver, selector):
     }}
     return false;
     """
-    return driver.execute_script(script)
+    result = driver.execute_script(script)
+    
+    # Delay AFTER click - waits for page response
+    if result and delay_after:
+        post_delay = random.uniform(1.0, 2.0)
+        time.sleep(post_delay)
+    
+    return result
 
 def find_shadow_element(driver, selector):
     """Returns the element if found in Shadow DOM, else None."""

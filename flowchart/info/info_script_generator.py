@@ -18,8 +18,13 @@ load_dotenv()
 # Import LLM Manager
 try:
     from .llm_manager import LLMManager
+    from .emotional_script_generator import EmotionalScriptGenerator
 except ImportError:
     from modules.llm_manager import LLMManager
+    try:
+        from flowchart.common.emotional_script_generator import EmotionalScriptGenerator
+    except ImportError:
+        EmotionalScriptGenerator = None
 
 
 class InfoScriptGenerator:
@@ -40,8 +45,9 @@ class InfoScriptGenerator:
         "Health", "Psychology", "Space", "AI News"
     ]
     
-    def __init__(self, llm_provider: str = None):
+    def __init__(self, llm_provider: str = None, use_emotional_ai: bool = True):
         self.llm = LLMManager(provider=llm_provider) if llm_provider else LLMManager()
+        self.emotional_gen = EmotionalScriptGenerator(use_genkit=use_emotional_ai) if (use_emotional_ai and EmotionalScriptGenerator) else None
     
     def generate_overview(self, topic: str) -> Dict:
         """
@@ -163,8 +169,50 @@ class InfoScriptGenerator:
             'transition': 'fade_out'
         })
         
+        # Enhance narration with emotional AI
+        if self.emotional_gen:
+            scenes = self._enhance_narration_with_emotion(scenes)
+        
         print(f"   [OK] Generated {len(scenes)} scenes")
         return scenes
+    
+    def _enhance_narration_with_emotion(self, scenes: List[Dict]) -> List[Dict]:
+        """
+        Enhance scene narrations with emotional storytelling.
+        """
+        try:
+            # Combine all narration for emotional enhancement
+            full_narration = "\n".join([scene.get('narration', '') for scene in scenes])
+            
+            if not full_narration.strip():
+                return scenes
+            
+            # Enhance with emotional AI
+            enhanced = self.emotional_gen.enhance_script(
+                script=full_narration,
+                video_type="info",
+                emotion_style="educational",  # Good default for info content
+                num_scenes=len(scenes)
+            )
+            
+            # Apply emotional enhancements to scenes
+            if enhanced and 'enhanced_script' in enhanced:
+                enhanced_scenes = enhanced['enhanced_script'].get('scenes', [])
+                for i, scene in enumerate(scenes):
+                    if i < len(enhanced_scenes):
+                        emotional_scene = enhanced_scenes[i]
+                        # Update narration with emotionally enhanced version
+                        if emotional_scene.get('narration'):
+                            scene['narration'] = emotional_scene['narration']
+                        # Add emotional metadata
+                        scene['emotion'] = emotional_scene.get('emotion', 'curiosity')
+                        scene['pacing'] = emotional_scene.get('pacing', 'moderate')
+                        scene['delivery_hint'] = emotional_scene.get('delivery_hint', '')
+            
+            return scenes
+        except Exception as e:
+            print(f"[WARNING] Emotional enhancement failed: {str(e)[:100]}")
+            return scenes
     
     def _extract_key_stat(self, fact: str) -> Optional[str]:
         """Extract number/statistic from fact for text overlay"""

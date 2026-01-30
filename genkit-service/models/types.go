@@ -118,6 +118,49 @@ type PromptOptimizerResponse struct {
 	EstimatedComplexity string   `json:"estimated_complexity"`
 }
 
+// Emotional Script Generation Types
+type EmotionalScriptRequest struct {
+	Script       string `json:"script"`
+	VideoType    string `json:"video_type"` // "character" or "info"
+	EmotionStyle string `json:"emotion_style,omitempty"` // "auto", "joy", "dramatic", etc.
+	NumScenes    int    `json:"num_scenes,omitempty"`
+}
+
+type SceneEmotion struct {
+	SceneNumber  int    `json:"scene_number"`
+	Narration    string `json:"narration"`
+	Emotion      string `json:"emotion"`
+	Pacing       string `json:"pacing"`
+	DeliveryHint string `json:"delivery_hint"`
+}
+
+type EnhancedScript struct {
+	FullText string         `json:"full_text"`
+	Scenes   []SceneEmotion `json:"scenes"`
+}
+
+type EmotionMap struct {
+	OverallArc     string   `json:"overall_arc"`
+	SceneEmotions  []string `json:"scene_emotions"`
+	PeakMoment     string   `json:"peak_moment"`
+	ResolutionTone string   `json:"resolution_tone"`
+}
+
+type PacingHints struct {
+	Intro         string `json:"intro"`
+	Body          string `json:"body"`
+	Conclusion    string `json:"conclusion"`
+	OverallRhythm string `json:"overall_rhythm"`
+}
+
+type EmotionalScriptResponse struct {
+	EnhancedScript   EnhancedScript `json:"enhanced_script"`
+	EmotionMap       EmotionMap     `json:"emotion_map"`
+	DeliveryNotes    []string       `json:"delivery_notes"`
+	PacingHints      PacingHints    `json:"pacing_hints"`
+	StorytellingArc  string         `json:"storytelling_arc"`
+}
+
 // Generic API Response
 type APIResponse struct {
 	Success bool        `json:"success"`

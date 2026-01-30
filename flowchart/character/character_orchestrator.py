@@ -119,7 +119,8 @@ class WorkflowOrchestrator:
                  use_rag=True,
                  use_multi_models=True,
                  use_ai_editor=True,
-                 output_dir="output"):
+                 output_dir="output",
+                 proxy_manager=None):
         
         self.num_image_workers = num_image_workers
         self.num_video_workers = num_video_workers
@@ -127,6 +128,7 @@ class WorkflowOrchestrator:
         self.use_multi_models = use_multi_models
         self.use_ai_editor = use_ai_editor
         self.output_dir = output_dir
+        self.proxy_manager = proxy_manager
         
         # Create output directories
         self._setup_directories()
@@ -583,7 +585,17 @@ class WorkflowOrchestrator:
         
         profile_path = os.path.abspath(f"chrome_data_img_{worker_id}")
         
-        gen = DreaminaGenerator(headless=False, profile_path=profile_path)
+        # Get proxy from manager if available (WorkerBatchProxy)
+        proxy = None
+        if self.proxy_manager:
+            try:
+                # WorkerBatchProxy simply returns the current batch proxy
+                # It doesn't need meaningful worker_id for retrieval, just registration
+                proxy = self.proxy_manager.get_proxy()
+            except Exception as e:
+                print(f"   [Worker {worker_id}] Proxy error: {e}")
+        
+        gen = DreaminaGenerator(headless=False, profile_path=profile_path, proxy=proxy)
         try:
             if gen.login():
                 success = gen.generate_image(prompt, output_path, reference_image=reference_image)
@@ -722,7 +734,16 @@ class WorkflowOrchestrator:
         
         profile_path = os.path.abspath(f"chrome_data_vid_{worker_id}")
         
-        gen = DreaminaVideoGenerator(headless=False, profile_path=profile_path)
+        # Get proxy from manager if available (WorkerBatchProxy)
+        proxy = None
+        if self.proxy_manager:
+            try:
+                # WorkerBatchProxy simply returns the current batch proxy
+                proxy = self.proxy_manager.get_proxy()
+            except Exception as e:
+                print(f"   [Worker {worker_id}] Proxy error: {e}")
+        
+        gen = DreaminaVideoGenerator(headless=False, profile_path=profile_path, proxy=proxy)
         try:
             if gen.login():
                 # Upload all reference images for this scene

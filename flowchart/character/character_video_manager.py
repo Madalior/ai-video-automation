@@ -33,16 +33,18 @@ class CharacterVideoManager:
     4. Thumbnail Generation → Creates viral thumbnails
     """
     
-    def __init__(self, output_dir: str = "output/character_videos", headless: bool = False):
+    def __init__(self, output_dir: str = "output/character_videos", headless: bool = False, proxy_manager=None):
         """
         Initialize the Character Video Manager.
         
         Args:
             output_dir: Base directory for all outputs
             headless: Run browsers in headless mode (for automation)
+            proxy_manager: Optional proxy manager for IP rotation
         """
         self.output_dir = output_dir
         self.headless = headless
+        self.proxy_manager = proxy_manager
         
         # Create output directories
         self.dirs = {
@@ -53,7 +55,11 @@ class CharacterVideoManager:
             'thumbnails': os.path.join(output_dir, 'thumbnails'),
             'metadata': os.path.join(output_dir, 'metadata')
         }
-        
+        # JSON Example
+        curl \
+        -d '{"apiKey": "your_api_key", "country": ["US", "RU"], "https": true, "quantity": 20}' \
+        -H 'Content-Type: application/json' \
+        https://api.proxifly.dev/get-proxy
         for dir_path in self.dirs.values():
             os.makedirs(dir_path, exist_ok=True)
         
@@ -65,6 +71,7 @@ class CharacterVideoManager:
         
         print(f"[MANAGER] Character Video Manager initialized")
         print(f"[MANAGER] Output directory: {output_dir}")
+        print(f"[MANAGER] Proxy enabled: {'YES' if proxy_manager else 'NO'}")
     
     @property
     def script_generator(self) -> ScriptGenerator:
@@ -78,7 +85,7 @@ class CharacterVideoManager:
     def image_generator(self) -> DreaminaGenerator:
         """Lazy load image generator."""
         if self._image_generator is None:
-            self._image_generator = DreaminaGenerator(headless=self.headless)
+            self._image_generator = DreaminaGenerator(headless=self.headless, proxy_manager=self.proxy_manager)
             print("[MANAGER] Image Generator loaded")
         return self._image_generator
     
@@ -86,7 +93,7 @@ class CharacterVideoManager:
     def video_generator(self) -> DreaminaVideoGenerator:
         """Lazy load video generator."""
         if self._video_generator is None:
-            self._video_generator = DreaminaVideoGenerator(headless=self.headless)
+            self._video_generator = DreaminaVideoGenerator(headless=self.headless, proxy_manager=self.proxy_manager)
             print("[MANAGER] Video Generator loaded")
         return self._video_generator
     

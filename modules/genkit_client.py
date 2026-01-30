@@ -238,6 +238,41 @@ class GenkitClient:
             complexity = result.get('estimated_complexity', 'unknown')
             logger.info(f"✓ Prompt optimized (complexity: {complexity})")
         return result
+    
+    def enhance_script_emotions(
+        self,
+        script: str,
+        video_type: str = "info",
+        emotion_style: str = "auto",
+        num_scenes: int = 7
+    ) -> Optional[Dict]:
+        """
+        Enhance script with emotional depth and human-like storytelling
+        
+        Args:
+            script: Original script text
+            video_type: "character" or "info"
+            emotion_style: Target emotion - "auto", "joy", "dramatic", 
+                          "educational", "inspirational", "nostalgic", "empathetic"
+            num_scenes: Number of scenes in the video
+            
+        Returns:
+            Dict with enhanced_script, emotion_map, delivery_notes, 
+            pacing_hints, storytelling_arc
+        """
+        data = {
+            "script": script,
+            "video_type": video_type,
+            "emotion_style": emotion_style,
+            "num_scenes": num_scenes
+        }
+        
+        result = self._post("enhance-script-emotions", data)
+        if result:
+            arc = result.get('storytelling_arc', 'N/A')[:50]
+            logger.info(f"✓ Script enhanced with emotional storytelling: {arc}...")
+        return result
+
 
 
 

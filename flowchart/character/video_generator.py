@@ -8,6 +8,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from flowchart.common.browser_utils import start_browser, universal_shadow_click, get_new_email, get_otp
+from flowchart.common.session_manager import SessionManager, OverloadDetector
+from flowchart.common.human_behavior import HumanBehavior
 
 class DreaminaVideoGenerator:
     DREAMINA_URL = "https://auth.business.gemini.google/login?continueUrl=https://business.gemini.google/"
@@ -15,6 +17,15 @@ class DreaminaVideoGenerator:
     def __init__(self, headless=False, profile_path=None):
         self.driver = start_browser(profile_path, headless)
         self.wait = WebDriverWait(self.driver, 30)
+        
+        # Advanced anti-bot detection
+        self.session_manager = SessionManager(max_requests=15, min_interval=15)
+        self.overload_detector = OverloadDetector()
+        self.human = HumanBehavior()
+        self.profile_path = profile_path
+        self.headless = headless
+        
+        print("[ANTI-BOT] Video generator anti-bot protection active")
 
     def login(self, max_login_attempts=3):
         """Login with automatic retry on any error."""

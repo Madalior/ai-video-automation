@@ -9,15 +9,15 @@ load_dotenv()
 class LLMManager:
     """
     Manages multiple LLM providers with automatic failover.
-    Supported: Gemini, Groq, Cerebras, SambaNova, GitHub Models.
+    Primary: Groq (FREE & Fast), Backups: Gemini, GitHub, SambaNova, Cerebras.
     """
     def __init__(self):
         self.providers = [
-            self._call_groq,       # Fastest & Working
-            self._call_github,     # Reliable backup
-            self._call_sambanova,  # Working after fix
-            self._call_cerebras,   # Needs JSON fix
-            self._call_gemini      # Currently failing
+            self._call_groq,          # Primary: FREE & Fast (Llama 3)
+            self._call_gemini,        # Backup: Gemini 2.0
+            self._call_github,        # Backup: GPT-4o via GitHub
+            self._call_sambanova,     # Backup: Llama 3.1
+            self._call_cerebras,      # Backup: Fast inference
         ]
         
         # Initialize Gemini
@@ -55,6 +55,7 @@ class LLMManager:
         print("[ERROR] All LLM providers failed.")
         return None
 
+    
     # --- PROVIDERS ---
 
     def _call_gemini(self, prompt, json_mode):

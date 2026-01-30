@@ -37,6 +37,7 @@ func main() {
 	flows.DefineErrorRecoveryFlow()
 	flows.DefineNicheDiscoveryFlow()
 	flows.DefinePromptOptimizerFlow()
+	flows.DefineEmotionalScriptFlow()
 
 	// Setup HTTP server
 	mux := http.NewServeMux()
@@ -67,6 +68,9 @@ func main() {
 	// Prompt Optimizer endpoint
 	mux.HandleFunc("/optimize-antigravity-prompt", enableCORS(handlePromptOptimizer))
 
+	// Emotional Script endpoint
+	mux.HandleFunc("/enhance-script-emotions", enableCORS(handleEmotionalScript))
+
 	// Start server
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("🚀 Genkit AI Service starting on http://localhost%s", addr)
@@ -78,6 +82,7 @@ func main() {
 	log.Println("  POST /recover-error - Error recovery")
 	log.Println("  POST /discover-niches - Niche discovery")
 	log.Println("  POST /optimize-antigravity-prompt - Antigravity prompt optimization")
+	log.Println("  POST /enhance-script-emotions - Emotional script generation")
 	log.Println("  GET  /health - Health check")
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
@@ -217,6 +222,29 @@ func handlePromptOptimizer(w http.ResponseWriter, r *http.Request) {
 	result, err := flow.Run(r.Context(), &req)
 	if err != nil {
 		log.Printf("Prompt optimizer error: %v", err)
+		sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sendSuccess(w, result)
+}
+
+func handleEmotionalScript(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.EmotionalScriptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	flow := genkit.LookupFlow("enhance-script-emotions")
+	result, err := flow.Run(r.Context(), &req)
+	if err != nil {
+		log.Printf("Emotional script error: %v", err)
 		sendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
