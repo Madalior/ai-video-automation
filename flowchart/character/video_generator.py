@@ -365,6 +365,10 @@ class DreaminaVideoGenerator:
                 'continuity': 'prev_frame.png'
             })
         """
+        if self.shared_session:
+            print("[VIDEO GEN] Delegating generation to SharedSessionManager")
+            return self.shared_session.generate_video(prompt, output_path, reference_image_paths)
+
         # Process references with SmartReferenceManager
         processed_refs = None
         if reference_image_paths:

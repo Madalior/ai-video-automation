@@ -414,6 +414,10 @@ class DreaminaGenerator:
             reference_image: Optional path to reference image for consistency
             max_retries: Maximum number of retry attempts (default: 2)
         """
+        if self.shared_session:
+            print("[IMAGE GEN] Delegating generation to SharedSessionManager")
+            return self.shared_session.generate_image(prompt, output_path, reference_image)
+
         # === ANTI-BOT: Session Management ===
         # Check if session should be restarted
         should_restart, reason = self.session_manager.should_restart_session()
