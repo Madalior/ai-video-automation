@@ -31,7 +31,7 @@
                         <mxPoint x="-3.1149999999998954" y="255" as="sourcePoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="22" value="&lt;b&gt;a)Character based&lt;br&gt;@character folder&lt;br&gt;&lt;/b&gt;" style="whiteSpace=wrap;html=1;sketch=0;rounded=1;" parent="1" vertex="1">
+                <mxCell id="22" value="&lt;b&gt;a)Character based&lt;br&gt;@character folder&lt;br&gt;(⚡ 4-Worker Parallel)&lt;/b&gt;" style="whiteSpace=wrap;html=1;sketch=0;rounded=1;" parent="1" vertex="1">
                     <mxGeometry x="-63.11500000000001" y="325" width="120" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="23" value="choose Niche&lt;br&gt;a)URL link video based video" style="rhombus;whiteSpace=wrap;html=1;sketch=0;rounded=1;" parent="1" vertex="1">
@@ -66,7 +66,7 @@
                 <mxCell id="119" value="" style="edgeStyle=none;html=1;fontSize=10;" parent="1" source="35" target="89" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="35" value="&lt;b&gt;b)Without Character based&lt;br&gt;@info folder&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=0;" parent="1" vertex="1">
+                <mxCell id="35" value="&lt;b&gt;b)Without Character based&lt;br&gt;@info folder&lt;br&gt;(⚡ 4-Worker Parallel)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;sketch=0;" parent="1" vertex="1">
                     <mxGeometry x="794.135" y="325" width="120" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="36" value="" style="edgeStyle=none;html=1;" parent="1" target="35" edge="1">
@@ -337,8 +337,8 @@
                         <mxPoint x="440" y="2200" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="133" value="&lt;b&gt;CORE TOOLS:&lt;/b&gt;&lt;br&gt;@llm_manager.py (Gemini AI)&lt;br&gt;@stock_media.py (Pexels)&lt;br&gt;@browser_utils.py (Automation)&lt;br&gt;&lt;br&gt;&lt;b&gt;⭐ VEO 3.1 CONSISTENCY:&lt;/b&gt;&lt;br&gt;@identity_cards.py&lt;br&gt;@prompt_builder.py&lt;br&gt;@frame_controller.py&lt;br&gt;@frame_extractor.py" style="rounded=0;whiteSpace=wrap;html=1;fontSize=7;fillColor=none;strokeColor=#b85450;" parent="1" vertex="1">
-                    <mxGeometry x="313.14" y="2130" width="260" height="110" as="geometry"/>
+                <mxCell id="133" value="&lt;b&gt;CORE TOOLS:&lt;/b&gt;&lt;br&gt;@llm_manager.py (Gemini AI)&lt;br&gt;@stock_media.py (Pexels)&lt;br&gt;@browser_utils.py (Automation)&lt;br&gt;&lt;br&gt;&lt;b&gt;⭐ SESSION MANAGEMENT:&lt;/b&gt;&lt;br&gt;@shared_session.py (Single Worker)&lt;br&gt;@multi_shared_session.py (⚡4-Worker)&lt;br&gt;&lt;br&gt;&lt;b&gt;⭐ STEALTH &amp; ANTI-BOT:&lt;/b&gt;&lt;br&gt;@stealth_browser.py&lt;br&gt;@human_behavior.py&lt;br&gt;@rate_limiter.py&lt;br&gt;&lt;br&gt;&lt;b&gt;⭐ VEO 3.1 CONSISTENCY:&lt;/b&gt;&lt;br&gt;@identity_cards.py&lt;br&gt;@prompt_builder.py&lt;br&gt;@frame_controller.py&lt;br&gt;@frame_extractor.py&lt;br&gt;@smart_reference_manager.py" style="rounded=0;whiteSpace=wrap;html=1;fontSize=7;fillColor=none;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="313.14" y="2130" width="260" height="185" as="geometry"/>
                 </mxCell>
                 <mxCell id="134" value="&lt;b&gt;A&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;" parent="1" vertex="1">
                     <mxGeometry x="191.26" y="225" width="30" height="20" as="geometry"/>

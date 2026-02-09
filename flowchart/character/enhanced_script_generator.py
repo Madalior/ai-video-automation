@@ -35,12 +35,16 @@ class EnhancedScriptGenerator:
         Create a detailed video plan for: "{video_idea}".
         
         For EACH character, create an IDENTITY CARD with unchangeable attributes (anchors).
+        Also generate SEO KEYWORDS for the video.
         
         Return ONLY a JSON object:
         {{
             "title": "Catchy video title",
             "synopsis": "Brief summary",
             "Full_script": "Complete narration",
+            "keywords": ["keyword1", "keyword2", "keyword3", ...],
+            "tags": ["tag1", "tag2", "tag3", ...],
+            "categories": ["category1", "category2"],
             "characters": {{
                 "Character Name": {{
                     "anchor_attributes": {{
@@ -64,6 +68,12 @@ class EnhancedScriptGenerator:
             }}
         }}
         
+        KEYWORDS RULES:
+        - Generate 10-15 highly relevant SEO keywords
+        - Mix short-tail (1-2 words) and long-tail (3-4 words) keywords
+        - Include trending variations and synonyms
+        - Consider YouTube and TikTok search patterns
+        
         CRITICAL: Make anchor_attributes HIGHLY SPECIFIC. These define the character forever.
         """
         
@@ -86,6 +96,15 @@ class EnhancedScriptGenerator:
                 print(f"   ✓ Identity card created for: {char_name}")
             
             # Format for compatibility
+            keywords = result.get('keywords', [])
+            tags = result.get('tags', [])
+            categories = result.get('categories', [])
+            
+            if keywords:
+                print(f"   ✓ Generated {len(keywords)} SEO keywords")
+            if tags:
+                print(f"   ✓ Generated {len(tags)} tags")
+            
             overview = {
                 'title': result.get('title', video_idea),
                 'synopsis': result.get('synopsis', ''),
@@ -94,7 +113,10 @@ class EnhancedScriptGenerator:
                     name: data.get('anchor_attributes', {}) 
                     for name, data in characters_data.items()
                 },
-                'Full_script': result.get('Full_script', '')
+                'Full_script': result.get('Full_script', ''),
+                'keywords': keywords,
+                'tags': tags,
+                'categories': categories
             }
             
             return {
@@ -110,7 +132,10 @@ class EnhancedScriptGenerator:
                 'synopsis': 'Automated generation',
                 'characters': ['Narrator'],
                 'character_description': {'Narrator': 'Professional narrator'},
-                'Full_script': 'Auto-generated content'
+                'Full_script': 'Auto-generated content',
+                'keywords': [],
+                'tags': [],
+                'categories': []
             },
             'identity_cards': {}
         }
@@ -179,11 +204,11 @@ class EnhancedScriptGenerator:
                     # Build anchor+delta prompt
                     deltas = scene.get('delta_attributes', {})
                     full_prompt = card.get_scene_prompt(deltas)
-                    scene['consistency_prompt'] = full_prompt
-                    scene['anchor_prompt'] = card.get_anchor_prompt()
+                    scene['consistency_prompt'] = f"Generate {full_prompt}"
+                    scene['anchor_prompt'] = f"Generate {card.get_anchor_prompt()}"
                     scene['voice_prompt'] = card.get_voice_prompt()
                 else:
-                    scene['consistency_prompt'] = scene.get('character_description', '')
+                    scene['consistency_prompt'] = f"Generate {scene.get('character_description', '')}"
                     scene['anchor_prompt'] = ''
                     scene['voice_prompt'] = ''
                 

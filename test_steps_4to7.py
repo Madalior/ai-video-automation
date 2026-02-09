@@ -77,7 +77,7 @@ try:
         print("   ✅ Login successful!")
         
         # Generate reference image
-        prompt = f"Character portrait: {script['character_description'][script['characters'][0]]}, professional photography, 8k, highly detailed"
+        prompt = f"Generate a photorealistic character portrait of {script['character_description'][script['characters'][0]]}. Professional photography style, highly detailed, 8K resolution."
         print(f"   [GENERATE] Prompt: {prompt[:60]}...")
         
         if gen.generate_image(prompt, char_ref_path):
@@ -114,7 +114,7 @@ try:
     
     if gen.login():
         # Use reference image
-        prompt = f"{scene['character_description']}, {scene['background']}, cinematic, 8k"
+        prompt = f"Generate an image of {scene['character_description']} with {scene['background']}. Cinematic style, photorealistic, 8K resolution."
         print(f"   [GENERATE] Prompt: {prompt[:60]}...")
         
         if gen.generate_image(prompt, scene_img_path, reference_image=char_ref_path):
@@ -206,7 +206,7 @@ try:
     )
     
     if gen.login():
-        prompt = f"YouTube thumbnail: {script['title']}, woman vlogger, vibrant colors, bold text, eye-catching, 8k"
+        prompt = f"Generate a YouTube thumbnail for a video titled '{script['title']}'. Feature a woman vlogger with vibrant colors, bold text overlay, and an eye-catching composition."
         print(f"   [GENERATE] Prompt: {prompt[:60]}...")
         
         if gen.generate_image(prompt, thumbnail_path):

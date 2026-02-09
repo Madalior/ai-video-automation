@@ -461,7 +461,7 @@ class WorkflowOrchestrator:
         
         tasks = []
         for i, (char_name, description) in enumerate(character_descriptions.items()):
-            prompt = f"Character portrait: {description}, cinematic lighting, 8k, highly detailed"
+            prompt = f"Generate a photorealistic character portrait of {description}. Use cinematic lighting, highly detailed, 8K resolution."
             output_path = f"{self.output_dir}/images/{char_name.replace(' ', '_')}_reference.png"
             tasks.append({
                 'char_name': char_name,
@@ -522,7 +522,7 @@ class WorkflowOrchestrator:
                 char_desc = scene.get('character_description', '')
                 
                 if char_desc:
-                    prompt = f"{char_desc}, cinematic, 8k"
+                    prompt = f"Generate an image of {char_desc}. Cinematic style, photorealistic, 8K resolution."
                     output_path = f"{self.output_dir}/images/{char_name.replace(' ', '_')}_scene_{scene_num}.png"
                     tasks.append({
                         'type': 'character_scene',
@@ -536,7 +536,7 @@ class WorkflowOrchestrator:
             # Background
             background = scene.get('background', '')
             if background:
-                prompt = f"{background}, cinematic, 8k, detailed environment"
+                prompt = f"Generate an image of {background}. Cinematic style, detailed environment, photorealistic, 8K resolution."
                 output_path = f"{self.output_dir}/images/background_scene_{scene_num}.png"
                 tasks.append({
                     'type': 'background',
@@ -595,7 +595,7 @@ class WorkflowOrchestrator:
             except Exception as e:
                 print(f"   [Worker {worker_id}] Proxy error: {e}")
         
-        gen = DreaminaGenerator(headless=False, profile_path=profile_path, proxy=proxy)
+        gen = DreaminaGenerator(headless=False, profile_path=profile_path, proxy=proxy, fresh_profile=True)
         try:
             if gen.login():
                 success = gen.generate_image(prompt, output_path, reference_image=reference_image)
@@ -743,7 +743,7 @@ class WorkflowOrchestrator:
             except Exception as e:
                 print(f"   [Worker {worker_id}] Proxy error: {e}")
         
-        gen = DreaminaVideoGenerator(headless=False, profile_path=profile_path, proxy=proxy)
+        gen = DreaminaVideoGenerator(headless=False, profile_path=profile_path, proxy=proxy, fresh_profile=True)
         try:
             if gen.login():
                 # Upload all reference images for this scene
@@ -806,7 +806,7 @@ class WorkflowOrchestrator:
                 gen = DreaminaGenerator(headless=False, profile_path=os.path.abspath("chrome_data_img_0"))
                 try:
                     if gen.login():
-                        prompt = f"YouTube thumbnail for '{title}', {niche}, bold text, vibrant colors, eye-catching"
+                        prompt = f"Generate a YouTube thumbnail for a video titled '{title}' in the {niche} category. Make it eye-catching with bold text overlay and vibrant colors."
                         gen.generate_image(prompt, thumbnail_path)
                 finally:
                     gen.close()

@@ -233,34 +233,44 @@ class UnifiedVideoStudio:
         
         # MODE 2: ParallelDirector (fast generation)
         elif use_parallel:
-            # NOTE: ParallelDirector module not implemented yet
-            # Falling back to full workflow mode
-            print(f"[INFO] Parallel mode requested, using WorkflowOrchestrator instead")
-            print(f"       Image Workers: {self.config['num_image_workers']}")
-            print(f"       Video Workers: {self.config['num_video_workers']}")
+            print(f"[INFO] Parallel mode requested. Initializing ParallelDirector...")
+            # Local import to avoid circular dependencies
+            try:
+                from flowchart.character.parallel_director import ParallelDirector
+            except ImportError as e:
+                 print(f"[ERROR] Could not import ParallelDirector: {e}")
+                 # Fallback to standard
+                 return self._generate_sequential(niche, title, num_scenes)
+
+            total_workers = self.config.get('num_image_workers', 2) + self.config.get('num_video_workers', 4)
+            print(f"       Active Workers: {total_workers}")
             
-            orchestrator = WorkflowOrchestrator(
-                num_image_workers=self.config['num_image_workers'],
-                num_video_workers=self.config['num_video_workers'],
-                use_rag=self.config.get('use_rag', True)
+            director = ParallelDirector(
+                output_dir="output/character_videos",
+                headless=False,
+                num_workers=total_workers
             )
             
-            workflow_result = orchestrator.execute_full_workflow(
-                niche=niche,
-                idea=title,
-                reference_url=reference_url,
-                upload_platforms=None,  # Skip upload in parallel mode
-                duration=self.config.get('video_duration', 60),
+            parallel_result = director.produce_video(
+                video_idea=title or f"Viral {niche} Video",
                 num_scenes=num_scenes
             )
             
+            # Extract successful videos
+            success_videos = [v['video_path'] for v in parallel_result.get('videos', []) if v.get('status') == 'success']
+            final_video = success_videos[0] if success_videos else None
+            
+            thumbnails = parallel_result.get('thumbnails', [])
+            thumbnail_path = thumbnails[0] if thumbnails else None
+
             result = {
-                'success': workflow_result.get('success', False),
-                'video_path': workflow_result.get('final_video'),
-                'thumbnail_path': workflow_result.get('thumbnail'),
+                'success': parallel_result['status'] == 'completed',
+                'video_path': final_video,
+                'thumbnail_path': thumbnail_path,
                 'niche': niche,
-                'title': workflow_result.get('script', {}).get('title', title or "Auto-generated"),
-                'mode': 'workflow_parallel'
+                'title': parallel_result.get('video_idea'),
+                'mode': 'parallel_director',
+                'details': parallel_result
             }
         else:
             # Sequential processing (simpler, more reliable)

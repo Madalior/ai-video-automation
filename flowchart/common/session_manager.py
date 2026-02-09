@@ -21,7 +21,7 @@ class SessionManager:
     - Automatic session rotation
     """
     
-    def __init__(self, max_requests=15, session_lifetime=3600, min_interval=15, proxy_manager=None):
+    def __init__(self, max_requests=15, session_lifetime=3600, min_interval=15):
         """
         Initialize session manager.
         
@@ -29,12 +29,10 @@ class SessionManager:
             max_requests: Maximum requests before session restart (default: 15)
             session_lifetime: Session lifetime in seconds (default: 3600 = 1 hour)
             min_interval: Minimum seconds between requests (default: 15)
-            proxy_manager: Optional ProxyManager for IP rotation
         """
         self.max_requests = max_requests
         self.session_lifetime = session_lifetime
         self.min_interval = min_interval
-        self.proxy_manager = proxy_manager
         
         # Session tracking
         self.request_count = 0
@@ -49,11 +47,6 @@ class SessionManager:
         print(f"[SESSION] Max requests per session: {max_requests}")
         print(f"[SESSION] Session lifetime: {session_lifetime}s")
         print(f"[SESSION] Min interval: {min_interval}s")
-        if proxy_manager:
-            stats = proxy_manager.get_stats()
-            print(f"[SESSION] Proxy rotation: ENABLED ({stats['total_proxies']} proxies)")
-        else:
-            print(f"[SESSION] Proxy rotation: DISABLED")
     
     def track_request(self):
         """

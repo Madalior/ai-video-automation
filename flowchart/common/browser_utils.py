@@ -2,6 +2,9 @@ import time
 import json
 import requests
 import re
+import os
+import shutil
+import zipfile
 from uuid import uuid4
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -11,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # ================= BROWSER SETUP =================
-def start_browser(profile_path=None, headless=False, proxy=None):
+def start_browser(profile_path=None, headless=False, fresh_profile=False):
     """
     Starts a Chrome browser instance with ADVANCED anti-detection.
     
@@ -26,17 +29,23 @@ def start_browser(profile_path=None, headless=False, proxy=None):
     Args:
         profile_path: Chrome profile directory
         headless: Run in headless mode
-        proxy: Proxy URL (optional)
+        fresh_profile: Create unique new Chrome ID for this instance
         
     Returns:
         Stealth-configured WebDriver
     """
+    # Create fresh unique Chrome profile if requested
+    if fresh_profile:
+        unique_id = uuid4().hex[:12]
+        profile_path = os.path.abspath(f"temp_chrome_profiles/fresh_{unique_id}")
+        os.makedirs(profile_path, exist_ok=True)
+        print(f"[BROWSER] Created fresh Chrome ID: fresh_{unique_id}")
+    
     try:
         from .stealth_browser import start_stealth_browser
         print("[BROWSER] Using advanced stealth mode")
-        if proxy:
-            print(f"[BROWSER] Starting with proxy: {proxy.split('@')[1] if '@' in proxy else proxy}")
-        return start_stealth_browser(profile_path, headless, proxy=proxy)
+        
+        return start_stealth_browser(profile_path, headless)
     except ImportError:
         print("[BROWSER] Warning: stealth_browser not found, using basic mode")
         # Fallback to basic setup
@@ -65,6 +74,8 @@ def start_browser(profile_path=None, headless=False, proxy=None):
         })
         
         return driver
+
+
 
 # ================= SHADOW DOM HELPERS =================
 def universal_shadow_click(driver, selector, delay_before=True, delay_after=True):
@@ -187,7 +198,7 @@ def get_new_email():
     return None, None
 
 
-def get_otp(email, config, max_wait=120):
+def get_otp(email, config, max_wait=300):
     """
     Get OTP from Mail.tm inbox.
     

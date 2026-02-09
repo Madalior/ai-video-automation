@@ -2,6 +2,7 @@ import os
 import time
 import random
 import string
+from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -11,30 +12,75 @@ from flowchart.common.session_manager import SessionManager, OverloadDetector
 from flowchart.common.human_behavior import HumanBehavior
 
 class DreaminaGenerator:
-    DREAMINA_URL = "https://auth.business.gemini.google/login?continueUrl=https://business.gemini.google/"
+    DREAMINA_URL = "https://business.gemini.google/"
     
-    def __init__(self, headless=False, profile_path=None, proxy_manager=None, proxy=None):
-        self.driver = start_browser(profile_path, headless, proxy=proxy)
-        self.wait = WebDriverWait(self.driver, 30)
+    def __init__(self, headless=False, profile_path=None, fresh_profile=False, shared_session=None):
+        """
+        Initialize image generator.
         
-        # Advanced anti-bot detection
+        Args:
+            headless: Run browser in headless mode
+            profile_path: Chrome profile path
+            fresh_profile: Create fresh temporary profile
+            shared_session: Optional SharedSessionManager for session sharing (NEW)
+        """
+        self.is_temp_profile = False
+        self.shared_session = shared_session
+        self._owns_driver = shared_session is None  # Only own driver if not using shared session
+        
+        if shared_session:
+            # Use shared session (NEW APPROACH)
+            print("[IMAGE GEN] Using shared session (no separate login needed)")
+            self.driver = shared_session.get_driver()
+            self.wait = WebDriverWait(self.driver, 30)
+            self.profile_path = shared_session.profile_path
+            self.headless = shared_session.headless
+        else:
+            # Create own browser (BACKWARD COMPATIBLE)
+            if fresh_profile:
+                unique_id = uuid4().hex[:12]
+                profile_path = os.path.abspath(f"temp_chrome_profiles/fresh_{unique_id}")
+                os.makedirs(profile_path, exist_ok=True)
+                self.is_temp_profile = True
+                print(f"[BROWSER] Created fresh Chrome ID: fresh_{unique_id}")
+                
+            self.driver = start_browser(profile_path, headless, fresh_profile=False)
+            self.wait = WebDriverWait(self.driver, 30)
+            self.profile_path = profile_path
+            self.headless = headless
+            
+            # Clear Google cookies on startup (prevents account linking)
+            if fresh_profile:
+                try:
+                    self.driver.get("about:blank")
+                    self.driver.execute_cdp_cmd('Network.clearBrowserCookies', {})
+                    print("[ANTI-BOT] Cleared all browser cookies for fresh session")
+                except Exception as e:
+                    print(f"[ANTI-BOT] Cookie clear skipped: {e}")
+        
+        # Advanced anti-bot detection (always needed)
         self.session_manager = SessionManager(
             max_requests=15, 
-            min_interval=15,
-            proxy_manager=proxy_manager  # NEW: Proxy rotation support
+            min_interval=15
         )
         self.overload_detector = OverloadDetector()
         self.human = HumanBehavior()
-        self.profile_path = profile_path
-        self.headless = headless
-        self.proxy_manager = proxy_manager  # Store for session restart
         
         print("[ANTI-BOT] Session manager initialized (max 15 requests per session)")
         print("[ANTI-BOT] Overload detector activated")
         print("[ANTI-BOT] Human behavior simulator ready")
 
+
+
     def login(self, max_login_attempts=3):
         """Login with automatic retry on any error."""
+        
+        # If using shared session, login is already done
+        if self.shared_session:
+            print("[IMAGE GEN] Using shared session, skipping separate login")
+            return True
+        
+        # Otherwise, use original login logic
         print("[INFO] Starting Login Flow...")
         
         for login_attempt in range(max_login_attempts):
@@ -77,6 +123,10 @@ class DreaminaGenerator:
                     try:
                         email_input = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#email-input")))
                         email_input.clear()
+                        # Human-like delay before typing email
+                        delay = random.uniform(2, 4)
+                        print(f"[ANTI-BOT] Waiting {delay:.1f}s before typing email...")
+                        time.sleep(delay)
                         email_input.send_keys(email)
                         
                         continue_btn = self.wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(),'Continue with email')]")))
@@ -144,6 +194,10 @@ class DreaminaGenerator:
                     return self._wait_for_manual_login()
                 
                 # OTP Handling
+                # Human-like delay before entering OTP
+                delay = random.uniform(2, 4)
+                print(f"[ANTI-BOT] Waiting {delay:.1f}s before entering OTP...")
+                time.sleep(delay)
                 self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='pinInput']"))).send_keys(otp)
                 time.sleep(1)
                 
@@ -156,7 +210,48 @@ class DreaminaGenerator:
                     print("[WARNING] Verify button issue, trying fallback CSS...")
                 
                 # Step 4: Name & Agree
-                self.wait.until(EC.presence_of_element_located((By.XPATH, "//input[@formcontrolname='fullName']"))).send_keys("User" + "".join(random.choices(string.ascii_letters, k=5)))
+                first_names = ["James", "Sarah", "Michael", "Emily", "David", "Jessica", "Robert", "Ashley", "William", "Amanda"]
+                last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Wilson", "Anderson"]
+                human_name = f"{random.choice(first_names)} {random.choice(last_names)}"
+                # Human-like delay before typing name
+                delay = random.uniform(2, 4)
+                print(f"[ANTI-BOT] Waiting {delay:.1f}s before typing name ({human_name})...")
+                time.sleep(delay)
+                # Use JS to inject name and trigger events (more reliable)
+                name_script = """
+                function cleanType(selector, text) {
+                    const input = document.querySelector(selector);
+                    if (input) {
+                        input.value = text;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        return true;
+                    }
+                    return false;
+                }
+                return cleanType("input[formcontrolname='fullName']", arguments[0]);
+                """
+                
+                # Try to enter name with retries
+                name_entered = False
+                for i in range(5):
+                    try:
+                        name_input = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[formcontrolname='fullName']")))
+                        # Try JS injection first
+                        if self.driver.execute_script(name_script, human_name):
+                            name_entered = True
+                            break
+                        # Fallback to standard typing
+                        name_input.clear()
+                        name_input.send_keys(human_name)
+                        name_entered = True
+                        break
+                    except:
+                        time.sleep(1)
+                
+                if not name_entered:
+                    print("[WARNING] Could not enter name, trying to proceed anyway...")
+                time.sleep(random.uniform(1, 2))  # Small delay before clicking agree
                 self.wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class,'agree-button')]"))).click()
                 
                 print("[SUCCESS] Login Successful")
@@ -374,7 +469,7 @@ class DreaminaGenerator:
                     self.upload_reference(reference_image)
                 
                 # 3. Select Image Tool
-                self.click_menu_item_by_text("Create images (Pro)")
+                self.click_menu_item_by_text("Generate images (Pro)")
                 
                 # 4. Inject Prompt
                 self.inject_prompt(prompt)
@@ -481,10 +576,50 @@ class DreaminaGenerator:
 
     def click_start_button(self):
         """Click the Start button with retry logic and touch overlay handling."""
+        # Human-like delay before clicking
+        delay = random.uniform(2, 4)
+        print(f"[ANTI-BOT] Waiting {delay:.1f}s before clicking Start button...")
+        time.sleep(delay)
+        
         print("[INFO] Searching for Start button and touch overlay...")
         
-        # JavaScript logic that mirrors the working implementation from test file
+        # JavaScript logic with proper event dispatching for Lit components
         js_click_script = """
+        // Helper: Dispatch proper mouse events (mousedown → mouseup → click)
+        function realClick(element) {
+            if (!element) return false;
+            
+            // Scroll into view
+            element.scrollIntoView({block: 'center', behavior: 'instant'});
+            
+            // Get element center coordinates
+            const rect = element.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            
+            const eventOptions = {
+                bubbles: true,
+                cancelable: true,
+                composed: true, // Critical for Shadow DOM/Lit events
+                view: window,
+                detail: 1,
+                clientX: x,
+                clientY: y
+            };
+            
+            // Dispatch full mouse event sequence (what real clicks do)
+            element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+            element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+            element.dispatchEvent(new MouseEvent('click', eventOptions));
+            
+            // Also try pointerdown/up for touch-enabled components
+            element.dispatchEvent(new PointerEvent('pointerdown', eventOptions));
+            element.dispatchEvent(new PointerEvent('pointerup', eventOptions));
+            
+            return true;
+        }
+        
+        // Deep search for button in Shadow DOM
         const btn = (function findElementEverywhere(selector) {
             const findInElement = (root) => {
                 const el = root.querySelector(selector);
@@ -501,30 +636,23 @@ class DreaminaGenerator:
             return findInElement(document);
         })('#button');
 
-        // Synchronous sleep function
-        function sleep(ms) {
-            const start = Date.now();
-            while (Date.now() - start < ms) {}
+        if (btn) {
+            // Try clicking touch overlay first (Lit pattern)
+            const touchArea = btn.querySelector('.touch');
+            if (touchArea) {
+                if (realClick(touchArea)) return "touch_clicked";
+            }
+            
+            // Try the label
+            const labelArea = btn.querySelector('.label');
+            if (labelArea) {
+                if (realClick(labelArea)) return "label_clicked";
+            }
+            
+            // Fall back to button itself
+            if (realClick(btn)) return "button_clicked";
         }
         
-        if (btn) {
-            const touchArea = btn.querySelector('.touch');
-            const labelArea = btn.querySelector('.label');
-            
-            if (touchArea) {
-                sleep(500);
-                touchArea.click();
-                return "touch_clicked";
-            } else if (labelArea) {
-                sleep(500);
-                labelArea.click();
-                return "label_clicked";
-            } else {
-                sleep(500);
-                btn.click();
-                return "button_clicked";
-            }
-        }
         return null;
         """
         
@@ -545,8 +673,13 @@ class DreaminaGenerator:
         print("[ERROR] Could not click the button after 10 retries.")
         return False
 
-    def click_menu_item_by_text(self, text="Create images (Pro)"):
+    def click_menu_item_by_text(self, text="Image (Pro)"):
         """Click menu item by text with retry logic and Shadow DOM traversal."""
+        # Human-like delay before clicking menu
+        delay = random.uniform(2, 4)
+        print(f"[ANTI-BOT] Waiting {delay:.1f}s before clicking menu item...")
+        time.sleep(delay)
+        
         print(f"[INFO] Searching for menu item: '{text}'...")
 
         # This JS script handles Shadow DOM, Slots, and Composed Events
@@ -606,7 +739,7 @@ class DreaminaGenerator:
                 print(f"[WARNING] Error during attempt {i+1}: {e}")
             
             print(f"[INFO] Retry {i+1}/5: Element not found or not interactable...")
-            time.sleep(2)
+            time.sleep(4)
 
         print(f"[ERROR] Failed to find and click '{text}' after retries.")
         return False
@@ -666,6 +799,11 @@ class DreaminaGenerator:
 
     def submit_generation(self):
         """Trigger submission with force-click sequence and retry logic."""
+        # Human-like delay before submitting
+        delay = random.uniform(2, 4)
+        print(f"[ANTI-BOT] Waiting {delay:.1f}s before clicking Submit button...")
+        time.sleep(delay)
+        
         print("[INFO] Triggering Force-Click sequence on Submit button...")
         
         # This script bypasses standard listeners by simulating a physical hardware click
@@ -685,34 +823,34 @@ class DreaminaGenerator:
 
         const btn = findInShadow(document, 'button[aria-label="Submit"]');
         
-        if (btn && !btn.disabled) {
-            try {
-                // 1. Force the browser to treat this as the active element
-                btn.focus();
+        if (!btn) return "missing";
+        if (btn.disabled) return "disabled";
 
-                // 2. Dispatch sequence to trigger internal framework listeners (React/Angular)
-                const events = ['mousedown', 'mouseup', 'click'];
-                events.forEach(type => {
-                    btn.dispatchEvent(new MouseEvent(type, {
-                        view: window,
-                        bubbles: true,
-                        cancelable: true,
-                        buttons: 1, // Left click
-                        which: 1
-                    }));
-                });
-                
-                // 3. Synchronous sleep before final fallback click
-                const start = Date.now();
-                while (Date.now() - start < 500) {}
-                
-                btn.click();
-                return "clicked";
-            } catch (e) {
-                return "error: " + e.message;
-            }
+        try {
+            // 1. Force the browser to treat this as the active element
+            btn.focus();
+
+            // 2. Dispatch sequence to trigger internal framework listeners (React/Angular)
+            const events = ['mousedown', 'mouseup', 'click'];
+            events.forEach(type => {
+                btn.dispatchEvent(new MouseEvent(type, {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true,
+                    buttons: 1, // Left click
+                    which: 1
+                }));
+            });
+            
+            // 3. Synchronous sleep before final fallback click
+            const start = Date.now();
+            while (Date.now() - start < 500) {}
+            
+            btn.click();
+            return "clicked";
+        } catch (e) {
+            return "error: " + e.message;
         }
-        return "not_ready_or_missing";
         """
         
         for attempt in range(1, 11):
@@ -724,7 +862,7 @@ class DreaminaGenerator:
                 time.sleep(5)
                 return True
             else:
-                print(f"[INFO] Attempt {attempt}/10: Button not ready for click ({result}). Retrying...")
+                print(f"[INFO] Attempt {attempt}/10: Button status: {result}. Retrying...")
                 
             time.sleep(2)
 
@@ -786,11 +924,21 @@ class DreaminaGenerator:
         return False
 
     def close(self):
-        """Closes the browser instance."""
+        """Closes the browser instance and cleans up temporary profiles."""
         try:
             if self.driver:
                 self.driver.quit()
                 print("[INFO] Browser closed.")
+            
+            # Cleanup temp profile if it was a fresh one
+            if hasattr(self, 'is_temp_profile') and self.is_temp_profile and self.profile_path and os.path.exists(self.profile_path):
+                import shutil
+                try:
+                    shutil.rmtree(self.profile_path, ignore_errors=True)
+                    print(f"[INFO] Cleaned up temp profile: {os.path.basename(self.profile_path)}")
+                except Exception as e:
+                    print(f"[WARN] Failed to delete temp profile: {e}")
+                    
         except Exception as e:
             print(f"[WARNING] Error closing browser: {e}")
 
@@ -798,44 +946,56 @@ class DreaminaGenerator:
 class MultiDreaminaGenerator:
     """
     Parallel Image Generator - Manages multiple DreaminaGenerator workers.
-    
-    Features:
-    - Multiple workers with unique Chrome profiles
-    - Staggered start (10-second delay between workers)
-    - Batch processing with progress tracking
-    - Automatic result aggregation
     """
     
     def __init__(self, num_workers=2, headless=False):
-        """
-        Initialize parallel image generator.
-        
-        Args:
-            num_workers: Number of parallel workers (default: 2)
-            headless: Run browsers in headless mode (default: False)
-        """
         self.num_workers = num_workers
         self.headless = headless
-        print(f"[INFO] MultiDreaminaGenerator initialized with {num_workers} workers")
-    
+        self.workers = []
+        
+        print(f"[MULTI-GEN] Initializing {num_workers} image workers...")
+        print(f"[ANTI-BOT] Using 10-second delays between worker launches to avoid detection")
+        
+        # Initialize workers SEQUENTIALLY with 10-second delays to avoid bot detection
+        for i in range(num_workers):
+            if i > 0:
+                print(f"\n[ANTI-BOT] Waiting 10 seconds before launching Worker {i}...")
+                time.sleep(10)
+            
+            profile_path = os.path.abspath(f"chrome_data_parallel_img_{i}")
+            worker = self._init_worker(i, profile_path)
+            if worker:
+                self.workers.append(worker)
+        
+        print(f"[MULTI-GEN] {len(self.workers)}/{num_workers} workers initialized and ready.")
+
+    def _init_worker(self, i, profile_path):
+        """Initialize and login a single worker."""
+        print(f"[WORKER {i}] Launching Chrome...")
+        try:
+            gen = DreaminaGenerator(
+                headless=self.headless, 
+                profile_path=profile_path, 
+                fresh_profile=True  # Use fresh Chrome ID for each worker
+            )
+            
+            # Login immediately
+            if gen.login():
+                print(f"[WORKER {i}] Login successful")
+                return gen
+            else:
+                print(f"[WORKER {i}] Login failed")
+                gen.close()
+                return None
+        except Exception as e:
+            print(f"[WORKER {i}] Initialization failed: {e}")
+            return None
+
     def generate_batch(self, tasks):
         """
-        Generate multiple images in parallel.
-        
-        Args:
-            tasks: List of dicts with 'prompt' and 'output_path'
-                   Example: [
-                       {'prompt': 'A cat', 'output_path': 'output/cat.png'},
-                       {'prompt': 'A dog', 'output_path': 'output/dog.png'}
-                   ]
-        
-        Returns:
-            List of successful output paths
+        Generate multiple images in parallel using persistent workers.
+        tasks: List of dicts with 'prompt', 'output_path', 'reference_image'
         """
-        print(f"\n{'='*70}")
-        print(f"  STARTING PARALLEL GENERATION - {len(tasks)} TASKS")
-        print(f"{'='*70}\n")
-        
         results = []
         start_time = time.time()
         
@@ -849,91 +1009,46 @@ class MultiDreaminaGenerator:
                     print(f"\n   Waiting 10 seconds before starting Worker {i}...")
                     time.sleep(10)
                 
+                # Assign task to worker based on index
+                if not self.workers:
+                    raise RuntimeError("No workers available")
+                    
+                worker_idx = i % len(self.workers)
+                worker = self.workers[worker_idx]
+
                 future = executor.submit(
-                    self._generate_single_task,
-                    i,  # worker_id
-                    task['prompt'],
-                    task['output_path']
+                    worker.generate_image,
+                    prompt=task['prompt'],
+                    output_path=task['output_path'],
+                    reference_image=task.get('reference_image')
                 )
                 futures[future] = task
-                print(f"   [STARTED] Worker {i} started")
             
-            # Wait for completion
             for future in as_completed(futures):
                 task = futures[future]
                 try:
-                    result = future.result()
-                    if result:
-                        results.append(result)
+                    success = future.result()
+                    results.append({
+                        'task': task,
+                        'status': 'success' if success else 'failed',
+                        'path': task['output_path'] if success else None
+                    })
+                    status = 'OK' if success else 'FAIL'
+                    print(f"   [BATCH] Task finished: {os.path.basename(task['output_path'])} ({status})")
                 except Exception as e:
-                    print(f"\n[FAIL] Task failed: {e}")
-        
-        # Calculate duration
-        duration = time.time() - start_time
-        
-        # Show results
-        print(f"\n{'='*70}")
-        print(f"  BATCH GENERATION COMPLETE")
-        print(f"{'='*70}\n")
-        print(f"[RESULTS]:")
-        print(f"   Total Tasks: {len(tasks)}")
-        print(f"   Successful: {len(results)}")
-        print(f"   Failed: {len(tasks) - len(results)}")
-        print(f"   Duration: {int(duration)} seconds ({int(duration/60)} minutes)")
-        
-        if results:
-            print(f"\n[SUCCESS] Generated Images:")
-            for path in results:
-                if os.path.exists(path):
-                    size_kb = os.path.getsize(path) / 1024
-                    print(f"   [OK] {path} ({size_kb:.1f} KB)")
+                    print(f"   [BATCH] Task error: {e}")
+                    results.append({'task': task, 'status': 'failed', 'error': str(e)})
         
         return results
-    
-    def _generate_single_task(self, worker_id, prompt, output_path):
-        """
-        Worker function for parallel execution.
-        
-        Args:
-            worker_id: Unique worker identifier
-            prompt: Image generation prompt
-            output_path: Where to save the image
-            
-        Returns:
-            output_path if successful, None otherwise
-        """
-        print(f"\n[Worker {worker_id}] Starting...")
-        print(f"[Worker {worker_id}] Prompt: {prompt[:80]}...")
-        
-        # Create generator with unique Chrome profile
-        profile_path = os.path.abspath(f"chrome_data_img_{worker_id}")
-        gen = DreaminaGenerator(headless=self.headless, profile_path=profile_path)
-        
-        try:
-            # Login
-            print(f"[Worker {worker_id}] Logging in...")
-            if not gen.login():
-                print(f"[Worker {worker_id}] [FAIL] Login failed!")
-                return None
-            
-            print(f"[Worker {worker_id}] [SUCCESS] Logged in")
-            
-            # Generate image
-            print(f"[Worker {worker_id}] Generating image...")
-            success = gen.generate_image(prompt, output_path)
-            
-            if success:
-                print(f"[Worker {worker_id}] [SUCCESS] Image saved: {os.path.basename(output_path)}")
-                return output_path
-            else:
-                print(f"[Worker {worker_id}] [FAIL] Generation failed!")
-                return None
-                
-        except Exception as e:
-            print(f"[Worker {worker_id}] [ERROR] Error: {e}")
-            return None
-        finally:
-            gen.close()
+
+    def close(self):
+        """Close all workers."""
+        print("[MULTI-GEN] Closing workers...")
+        for w in self.workers:
+            try:
+                w.close()
+            except:
+                pass
 
 
 if __name__ == "__main__":
@@ -946,22 +1061,11 @@ if __name__ == "__main__":
     # Define 2 tasks with DETAILED prompts
     tasks = [
         {
-            'prompt': """ASMR artist workspace scene, cozy minimalist studio with warm ambient lighting,
-            young female artist with peaceful expression wearing comfortable white sweater,
-            sitting at wooden desk with microphone and soft props, large window with natural daylight,
-            plants in background, bokeh effect, professional photography, cinematic composition,
-            warm color palette with cream and beige tones, shallow depth of field,
-            8k ultra high resolution, photorealistic quality, magazine editorial style""",
+            'prompt': "A cute futuristic robot cat sitting on a neon rooftop, cyberpunk city background, 8k resolution",
             'output_path': 'output/tests/test_image_worker_0.png'
         },
         {
-            'prompt': """Extreme close-up macro shot of ASMR paint mixing on pristine white ceramic palette,
-            vibrant royal blue and sunshine yellow acrylic paint being poured and swirling together,
-            creating beautiful emerald green patterns and gradients, smooth glossy liquid texture,
-            paint brush gently stirring creating mesmerizing swirl patterns, soft natural lighting
-            from above creating subtle highlights and reflections on wet paint surface,
-            shallow depth of field with soft bokeh background, professional product photography,
-            8k macro detail showing paint texture, satisfying ASMR visual aesthetic""",
+            'prompt': "A majestic dragon flying over a medieval castle at sunset, epic fantasy art, 8k resolution",
             'output_path': 'output/tests/test_image_worker_1.png'
         }
     ]
@@ -977,4 +1081,6 @@ if __name__ == "__main__":
         print(f"\n[PARTIAL] Generated {len(results)}/{len(tasks)} images")
     else:
         print("\n[FAILED] No images generated")
+    
+    generator.close()
 

@@ -65,19 +65,65 @@ class ScriptGenerator:
             CRITICAL: Make anchor_attributes HIGHLY SPECIFIC. These define the character forever.
             """
         else:
+            # Traditional mode with ENHANCED storytelling
             prompt = f"""
-            You are a professional video producer. Create a detailed video plan for the idea: "{video_idea}".
+            You are an Emmy Award-winning screenwriter and video producer creating a compelling story.
+            
+            TASK: Create a professional video story for: "{video_idea}"
+            
+            STORYTELLING REQUIREMENTS:
+            1. **Character-Driven Narrative**:
+               - Protagonist with clear motivation and internal conflict
+               - Character arc (transformation through story)
+               - Unique voice and perspective
+            
+            2. **Emotional Journey**:
+               - Define emotional progression (opening → tension → peak → resolution)
+               - Each beat serves the emotional arc
+            
+            3. **Visual Storytelling**:
+               - Show, don't tell
+               - Cinematic quality descriptions
+               - Consistent visual style
+            
             Return ONLY a JSON object with this structure:
             {{
-                "title": "Catchy Title",
-                "synopsis": "Short summary",
-                "characters": ["Character1 Name", "Character2 Name"],
-                "character_description": {{
-                    "Character1 Name": "Detailed visual description for AI image generation - appearance, clothing, features",
-                    "Character2 Name": "Detailed visual description for AI image generation - appearance, clothing, features"
+                "title": "Compelling, clickable title (evokes emotion/curiosity)",
+                "logline": "One-sentence high-concept pitch",
+                "theme": "Central message or meaning",
+                "emotional_arc": ["starting_emotion", "peak_emotion", "ending_emotion"],
+                "protagonist": {{
+                    "name": "Character name",
+                    "core_trait": "Defining characteristic that drives their choices",
+                    "motivation": "What they desperately want",
+                    "internal_conflict": "Inner struggle or fear they must overcome",
+                    "external_goal": "Concrete objective they're pursuing",
+                    "flaw": "What holds them back or makes them relatable",
+                    "transformation": "How they change by the end"
                 }},
-                "Full_script": "Complete narration/voiceover text for the entire video"
+                "supporting_characters": [
+                    {{
+                        "name": "Name",
+                        "role": "Relationship to protagonist",
+                        "purpose": "How they affect the protagonist's journey"
+                    }}
+                ],
+                "character_description": {{
+                    "Protagonist Name": "Detailed visual: age, appearance, clothing style, distinctive features, body language that reveals character",
+                    "Supporting Name": "Visual description including how they contrast/complement protagonist"
+                }},
+                "act_structure": {{
+                    "act1_setup": "Establish protagonist, their world, and the inciting incident that disrupts it",
+                    "act2_confrontation": "Obstacles escalate, protagonist struggles, internal conflict intensifies",
+                    "act3_resolution": "Climax where protagonist overcomes flaw, achieves transformation"
+                }},
+                "visual_style": "Visual tone (e.g., cinematic noir, vibrant documentary, intimate character study, epic adventure)",
+                "tone": "Emotional tone (e.g., suspenseful thriller, heartwarming drama, dark comedy, inspirational journey)",
+                "Full_script": "Complete narration/voiceover that reveals the theme and emotional journey"
             }}
+            
+            CRITICAL: Focus on EMOTIONAL TRUTH and CHARACTER DEPTH. Make viewers FEEL something.
+            Every element must serve the protagonist's transformation journey.
             """
         
         result = self.llm.generate(prompt, json_mode=True)
@@ -88,13 +134,48 @@ class ScriptGenerator:
             if self.use_identity_cards and 'characters' in result and isinstance(result['characters'], dict):
                 return self._create_overview_with_identity_cards(result)
             
-            # Traditional mode - ensure all required fields exist
+            # Enhanced mode - ensure all fields exist with fallbacks
+            if 'protagonist' not in result and 'characters' in result:
+                # Extract protagonist from legacy format
+                chars = result.get('characters', [])
+                protagonist_name = chars[0] if isinstance(chars, list) and len(chars) > 0 else "Protagonist"
+                result['protagonist'] = {
+                    'name': protagonist_name,
+                    'core_trait': 'Determined',
+                    'motivation': 'To achieve their goal',
+                    'internal_conflict': 'Self-doubt',
+                    'external_goal': 'Complete the journey',
+                    'flaw': 'Hesitation',
+                    'transformation': 'Gains confidence'
+                }
+            
+            # Build character list from protagonist + supporting
             if 'characters' not in result:
-                result['characters'] = []
+                prot_name = result.get('protagonist', {}).get('name', 'Protagonist')
+                supporting = result.get('supporting_characters', [])
+                result['characters'] = [prot_name] + [s.get('name') for s in supporting if 'name' in s]
+            
+            # Ensure character descriptions exist
             if 'character_description' not in result:
                 result['character_description'] = {}
+                if 'protagonist' in result:
+                    prot_name = result['protagonist'].get('name', 'Protagonist')
+                    result['character_description'][prot_name] = f"{prot_name}, the protagonist"
+            
+            # Fallback fields
             if 'Full_script' not in result:
-                result['Full_script'] = result.get('synopsis', '')
+                result['Full_script'] = result.get('synopsis', result.get('logline', ''))
+            if 'synopsis' not in result:
+                result['synopsis'] = result.get('logline', 'A compelling story')
+            if 'emotional_arc' not in result:
+                result['emotional_arc'] = ['curious', 'challenged', 'triumphant']
+            if 'act_structure' not in result:
+                result['act_structure'] = {
+                    'act1_setup': 'Introduction',
+                    'act2_confrontation': 'Challenges',
+                    'act3_resolution': 'Resolution'
+                }
+            
             return result
         
         print("[WARNING] LLM returned invalid overview, using fallback.")
@@ -105,7 +186,22 @@ class ScriptGenerator:
             "character_description": {
                 "Narrator": "Professional narrator, neutral appearance"
             },
-            "Full_script": "Automated video content"
+            "Full_script": "Automated video content",
+            "protagonist": {
+                "name": "Narrator",
+                "core_trait": "Professional",
+                "motivation": "Tell the story",
+                "internal_conflict": "None",
+                "external_goal": "Deliver message",
+                "flaw": "None",
+                "transformation": "None"
+            },
+            "emotional_arc": ["neutral", "engaging", "conclusive"],
+            "act_structure": {
+                "act1_setup": "Begin",
+                "act2_confrontation": "Develop",
+                "act3_resolution": "Conclude"
+            }
         }
 
     def generate_scenes(self, overview, num_scenes=6):
@@ -154,35 +250,102 @@ class ScriptGenerator:
             ]
             """
         else:
-            # Traditional mode
+            # Enhanced cinematic mode
+            protagonist = overview.get('protagonist', {})
+            prot_name = protagonist.get('name', overview.get('characters', ['Protagonist'])[0] if overview.get('characters') else 'Protagonist')
+            prot_trait = protagonist.get('core_trait', 'determined')
+            prot_goal = protagonist.get('external_goal', 'achieve their goal')
+            prot_conflict = protagonist.get('internal_conflict', 'overcome doubts')
+            prot_transformation = protagonist.get('transformation', 'grows stronger')
+            
+            emotional_arc = overview.get('emotional_arc', ['curious', 'challenged', 'triumphant'])
+            visual_style = overview.get('visual_style', 'cinematic')
+            tone = overview.get('tone', 'engaging')
+            act_structure = overview.get('act_structure', {})
+            
             prompt = f"""
-            Create a {num_scenes}-scene script for a video titled "{overview['title']}".
-            Characters: {overview.get('characters', [])}
-            Character Descriptions: {overview.get('character_description', {})}
-            Synopsis: {overview['synopsis']}
+            You are a master cinematographer and director creating a {num_scenes}-scene video.
             
-            Rules:
-            1. Each scene must be EXACTLY 8 seconds (optimized for Veo 3.1 video generation).
-            2. Provide detailed, specific visual descriptions for AI video generation.
-            3. Include character name, character description, background, dialogue, and video script.
-            4. Keep actions simple and focused - 8 seconds is short!
-            5. Dialogue can be detailed - max 100 words for rich character speech.
-            6. Return ONLY a JSON list of objects.
+            STORY OVERVIEW:
+            - Title: {overview['title']}
+            - Theme: {overview.get('theme', overview.get('synopsis', ''))}
+            - Protagonist: {prot_name} ({prot_trait})
+            - Goal: {prot_goal}
+            - Internal Conflict: {prot_conflict}
+            - Transformation: {prot_transformation}
+            - Emotional Journey: {' → '.join(emotional_arc)}
+            - Visual Style: {visual_style}
+            - Tone: {tone}
             
-            Format:
+            ACT STRUCTURE:
+            - Act 1 (Scenes 1-2): {act_structure.get('act1_setup', 'Setup and inciting incident')}
+            - Act 2 (Scenes 3-4): {act_structure.get('act2_confrontation', 'Confrontation and obstacles')}
+            - Act 3 (Scenes 5-6): {act_structure.get('act3_resolution', 'Climax and resolution')}
+            
+            CINEMATIC REQUIREMENTS:
+            
+            **Scene Structure** (Each scene = 8 seconds):
+            - ONE focused visual moment
+            - Clear emotional beat
+            - Advances both plot AND character
+            - Reveals internal state through external action
+            
+            **Visual Language**:
+            - Camera: Specific angle (wide/medium/close-up), movement (static/dolly/pan)
+            - Composition: Rule of thirds, depth layers, focal point
+            - Lighting: Motivated source, mood, contrast (soft/hard)
+            - Color: Palette that supports emotion
+            - Show character's INTERNAL state through EXTERNAL visuals
+            
+            **Character Progression**:
+            - Scenes 1-2: Protagonist BEFORE transformation (struggling with flaw)
+            - Scenes 3-4: Protagonist GROWING (facing challenges, changing)
+            - Scenes 5-6: Protagonist AFTER transformation (overcoming flaw, achieving goal)
+            
+            **Emotional Beats**:
+            - Map to emotional arc: {emotional_arc}
+             - Physical manifestation (body language, micro-expressions)
+            - Build tension, release, build again
+            
+            Return ONLY a JSON list:
             [
                 {{
                     "scene_number": 1,
-                    "character_name": "Name of character in this scene (or 'None')",
-                    "character_description": "How the character appears/acts in THIS specific scene (detailed for consistency)",
-                    "background": "Detailed visual description of background/setting for video generation",
-                    "dialogue": "Character's spoken words (max 100 words for detailed speech)",
-                    "video_script": "Visual: [specific action/shot]. Tone: [mood]. Music: [style]. Duration: 8 seconds"
+                    "act": "Act 1",
+                    "purpose": "Story purpose of this scene (setup/conflict/revelation/climax/resolution)",
+                    "emotion": "Primary emotion (contemplative/tense/joyful/melancholic/triumphant)",
+                    "character_state": {{
+                        "internal": "What {prot_name} feels internally (fear/hope/doubt/determination)",
+                        "external": "What {prot_name} does physically (detailed action)",
+                        "transformation_stage": "Before/During/After transformation"
+                    }},
+                    "visual": {{
+                        "shot_type": "Specific camera setup (wide establishing/medium two-shot/close-up/over-shoulder/POV)",
+                        "camera_movement": "Static/slow dolly in/pan left/tracking shot/handheld",
+                        "composition": "Visual arrangement (character centered/rule of thirds/foreground-background layers)",
+                        "lighting": "Light quality and source (golden hour natural/harsh overhead/soft window light/dramatic side light)",
+                        "color_palette": "Dominant colors and mood (warm amber/cool blue/desaturated/vibrant)",
+                        "focal_point": "Where eye is drawn (character's eyes/hands/environmental detail)"
+                    }},
+                    "character_name": "{prot_name}",
+                    "character_description": "How {prot_name} appears in THIS scene (posture, expression, clothing details that reveal state)",
+                    "background": "Detailed environment that reflects/contrasts character's internal state",
+                    "action": "Specific physical action in 8 seconds (one clear beat)",
+                    "dialogue": "Natural, character-revealing speech (max 100 words, reveals subtext)",
+                    "subtext": "What the character DOESN'T say but audience understands",
+                    "video_script": "Complete cinematic description: [{visual['shot_type']}] {prot_name} [action]. [Lighting]. [Emotion]. Duration: 8 seconds"
                 }}
             ]
             
-            IMPORTANT: 8 seconds = 1 simple action or moment. Focus on ONE clear visual per scene.
-            Make dialogue emotionally rich and human-like with natural conversational patterns.
+            CRITICAL RULES:
+            1. Each scene = EXACTLY 8 seconds = ONE focused moment
+            2. Show internal state through external visuals (body language, environment, lighting)
+            3. Dialogue reveals character, not plot
+            4. Every visual choice has emotional purpose
+            5. Progression: Establish → Complicate → Resolve
+            6. Make viewers FEEL the character's journey
+            
+            STORYTELLING: Use cinematic language. Show don't tell. Emotional truth over generic action.
             """
         
         result = self.llm.generate(prompt, json_mode=True)
@@ -223,9 +386,33 @@ class ScriptGenerator:
                 if 'dialogue' not in scene:
                     scene['dialogue'] = ''
                 if 'video_script' not in scene:
-                    visual = scene.get('visual_prompt', '')
-                    dialogue = scene.get('dialogue', '')
-                    scene['video_script'] = f"Visual: {visual}. Dialogue: {dialogue}. Tone: Engaging. Music: Ambient. Duration: 8 seconds"
+                    # Build from available fields
+                    if 'visual' in scene and 'action' in scene:
+                        shot = scene['visual'].get('shot_type', 'Medium shot')
+                        action = scene.get('action', '')
+                        emotion = scene.get('emotion', 'engaging')
+                        scene['video_script'] = f"[{shot}] {action}. Emotion: {emotion}. Duration: 8 seconds"
+                    else:
+                        visual = scene.get('visual_prompt', '')
+                        dialogue = scene.get('dialogue', '')
+                        scene['video_script'] = f"Visual: {visual}. Dialogue: {dialogue}. Tone: Engaging. Music: Ambient. Duration: 8 seconds"
+                
+                # Add enhanced storytelling metadata if available
+                if 'act' not in scene:
+                    # Infer act from scene number
+                    scene_num = scene.get('scene_number', 1)
+                    if scene_num <= 2:
+                        scene['act'] = 'Act 1'
+                    elif scene_num <= 4:
+                        scene['act'] = 'Act 2'
+                    else:
+                        scene['act'] = 'Act 3'
+                
+                if 'emotion' not in scene:
+                    scene['emotion'] = 'neutral'
+                
+                if 'purpose' not in scene:
+                    scene['purpose'] = 'Advance the story'
                 
                 enhanced_scenes.append(scene)
             

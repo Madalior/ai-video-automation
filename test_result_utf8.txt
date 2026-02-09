@@ -1,0 +1,8 @@
+﻿--- TESTING HASHED SESSION ID ---
+Session ID: worker_alpha_1
+Proxy URL: http://scraperapi.session_number=4272284:1b60ef7bf31cd2410a773798a15891dd@proxy-server.scraperapi.com:8001
+Request 1...
+IP 1: unknown, 193.46.0.57
+Request 2...
+IP 2: unknown, 193.46.0.57
+[PASS] IP Preserved

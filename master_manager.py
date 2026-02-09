@@ -11,7 +11,7 @@ Complete video automation workflow orchestrator (Based on FLOWCHART.drawio):
 - Retention optimization
 - AI metadata generation
 - Multi-platform uploading
-- Full pipeline: Gmail → Niche → Script → Media → Edit → Optimize → Upload
+- Full pipeline: Gmail -> Niche -> Script -> Media -> Edit -> Optimize -> Upload
 
 Usage:
     python master_manager.py --type character --idea "Detective mystery" --scenes 5
@@ -95,7 +95,7 @@ class MasterVideoAutomation:
     - Progress tracking and logging
     """
     
-    def __init__(self, output_dir: str = "output", headless: bool = False, use_emotional_ai: bool = True, use_proxy: bool = False, proxy_file: str = "fast_proxies.txt", proxifly_api_key: str = None):
+    def __init__(self, output_dir: str = "output", headless: bool = False, use_emotional_ai: bool = True):
         """
         Initialize master automation manager.
         
@@ -103,14 +103,10 @@ class MasterVideoAutomation:
             output_dir: Base output directory
             headless: Run browsers in headless mode
             use_emotional_ai: Enable emotional script generation (default: True)
-            use_proxy: Enable IP rotation with proxies (default: False)
-            proxy_file: Path to proxy file (fallback if no API key)
-            proxifly_api_key: Proxifly API key for reliable HTTPS proxies
         """
         self.output_dir = output_dir
         self.headless = headless
         self.use_emotional_ai = use_emotional_ai
-        self.use_proxy = use_proxy
         
         # Create output structure
         self.dirs = {
@@ -128,69 +124,6 @@ class MasterVideoAutomation:
         self.character_manager = None
         self.info_manager = None
         self.frame_controller = FrameController()
-        
-        # Initialize proxy manager with validation
-        # Priority: 1) Proxifly API (best), 2) File-based proxies (fallback)
-        if use_proxy:
-            self.proxifly_manager = None
-            self.proxy_manager = None
-            
-            # Try Proxifly first (reliable HTTPS proxies)
-            if proxifly_api_key:
-                try:
-                    from flowchart.common.proxifly_manager import ProxiflyManager
-                    self.proxifly_manager = ProxiflyManager(api_key=proxifly_api_key)
-                    print("[PROXIFLY] Using Proxifly API for proxy rotation")
-                    
-                    # Get and validate a working proxy
-                    print("[PROXIFLY] Validating proxy connectivity...")
-                    working_proxy = self.proxifly_manager.get_working_proxy(max_attempts=5)
-                    if working_proxy:
-                        print(f"[PROXIFLY] Validated working proxy: {working_proxy}")
-                        self.validated_proxy = working_proxy
-                    else:
-                        raise RuntimeError(
-                            "[PROXIFLY ERROR] No working proxies from API! "
-                            "Check your API key or try --no-proxy flag."
-                        )
-                except ImportError:
-                    print("[WARNING] Proxifly manager not available, using file-based proxies")
-                    proxifly_api_key = None  # Fall through to file-based
-            
-            # Fallback to file-based proxies
-            if not proxifly_api_key:
-                from flowchart.common.proxy_manager import WorkerBatchProxy
-                self.proxy_manager = WorkerBatchProxy(
-                    proxy_file=proxy_file,
-                    image_workers=2,
-                    video_workers=4
-                )
-                total_proxies = self.proxy_manager.get_stats()['total_proxies']
-                print(f"[PROXY] Loaded {total_proxies} file-based proxies")
-                
-                # Validate at least one proxy works before proceeding - STOP if none work
-                if total_proxies > 0:
-                    print("[PROXY] Validating proxy connectivity...")
-                    working_proxy = self._find_working_proxy()
-                    if working_proxy:
-                        print(f"[PROXY] Validated working proxy: {working_proxy}")
-                        self.validated_proxy = working_proxy
-                    else:
-                        raise RuntimeError(
-                            "[PROXY ERROR] No working proxies found! "
-                            "Cannot proceed without a working proxy. "
-                            "Please use Proxifly API key or --no-proxy flag."
-                        )
-                else:
-                    raise RuntimeError(
-                        "[PROXY ERROR] No proxies in file! "
-                        "Cannot proceed without proxies. "
-                        "Please use Proxifly API key or --no-proxy flag."
-                    )
-        else:
-            self.proxifly_manager = None
-            self.proxy_manager = None
-            self.validated_proxy = None
         
         # Initialize flowchart tools
         if GMAIL_AVAILABLE:
@@ -223,101 +156,24 @@ class MasterVideoAutomation:
         
         print(f"[MASTER] Video Automation Manager initialized")
         print(f"[MASTER] Output: {output_dir}")
-        print(f"[MASTER] Emotional AI: {'YES' if use_emotional_ai else 'NO'}") 
-        print(f"[MASTER] IP Rotation: {'YES' if use_proxy else 'NO'}")
+        print(f"[MASTER] Emotional AI: {'YES' if use_emotional_ai else 'NO'}")
         print(f"[MASTER] Gmail: {'YES' if GMAIL_AVAILABLE else 'NO'}")
         print(f"[MASTER] Niche Tools: {'YES' if NICHE_TOOLS_AVAILABLE else 'NO'}")
         print(f"[MASTER] Optimization: {'YES' if OPTIMIZATION_AVAILABLE else 'NO'}")
         print(f"[MASTER] Uploader: {'YES' if UPLOADER_AVAILABLE else 'NO'}")
     
-    def _find_working_proxy(self, max_attempts: int = 10) -> Optional[str]:
-        """
-        Find a working proxy from the proxy list.
-        
-        Tests proxies against HTTPS sites (Google) since video generation
-        requires HTTPS tunnel support.
-        
-        Args:
-            max_attempts: Maximum number of proxies to test
-            
-        Returns:
-            Working proxy URL or None if all failed
-        """
-        import requests
-        
-        if not self.proxy_manager:
-            return None
-        
-        # Test against HTTPS site to ensure tunnel works for Google services
-        test_urls = [
-            'https://www.google.com',  # Primary - must work for Gemini
-            'https://httpbin.org/ip',  # Fallback HTTPS test
-        ]
-        
-        for i in range(max_attempts):
-            proxy = self.proxy_manager.proxy_manager.get_next_proxy()
-            if not proxy:
-                break
-                
-            print(f"  [{i+1}/{max_attempts}] Testing: {proxy}...", end=" ")
-            
-            # Test against HTTPS endpoints
-            works = False
-            for test_url in test_urls:
-                try:
-                    response = requests.get(
-                        test_url,
-                        proxies={'http': proxy, 'https': proxy},
-                        timeout=15,
-                        allow_redirects=True
-                    )
-                    if response.status_code == 200:
-                        print(f"OK (HTTPS verified)")
-                        return proxy
-                except requests.exceptions.Timeout:
-                    continue  # Try next URL
-                except requests.exceptions.ProxyError:
-                    break  # Proxy error, try next proxy
-                except requests.exceptions.SSLError:
-                    break  # SSL/HTTPS tunnel failed
-                except Exception:
-                    continue  # Try next URL
-            
-            # If we get here, proxy failed
-            print("FAILED (HTTPS tunnel not supported)")
-        
-        return None
-    
-    def validate_proxy(self) -> bool:
-        """
-        Validate that proxy is working before starting production.
-        
-        Call this before starting video production to ensure proxy works.
-        
-        Returns:
-            True if proxy works (or proxy disabled), False otherwise
-        """
-        if not self.use_proxy or not self.proxy_manager:
-            print("[PROXY] Proxy rotation disabled, proceeding without proxy")
-            return True
-        
-        print("[PROXY] Validating proxy before production...")
-        working = self._find_working_proxy(max_attempts=5)
-        
-        if working:
-            print(f"[PROXY] Proxy validated: {working}")
-            self.validated_proxy = working
-            return True
-        else:
-            print("[PROXY ERROR] No working proxy found!")
-            return False
     
     def produce_character_video(
         self,
         video_idea: str,
         num_scenes: int = 5,
         use_consistency: bool = True,
-        parallel: bool = False
+        parallel: bool = False,
+        pipeline_mode: bool = True,
+        chained_consistency: bool = True,
+        shared_session: bool = True,  # Forced to True in logic below
+        character_ref: str = None,
+        background_ref: str = None
     ) -> Dict:
         """
         Produce character-based video with full automation.
@@ -327,6 +183,11 @@ class MasterVideoAutomation:
             num_scenes: Number of scenes
             use_consistency: Enable Veo 3.1 consistency
             parallel: Use parallel processing
+            pipeline_mode: Use pipeline mode (workers start immediately after login) (default: True)
+            chained_consistency: Use chained consistency (Scene N -> Scene N+1) (default: True)
+            shared_session: Use shared session for image+video generators (default: True)
+            character_ref: Optional character reference image path for consistent appearance
+            background_ref: Optional background/style reference image for environmental consistency
         
         Returns:
             Production result dictionary
@@ -337,47 +198,466 @@ class MasterVideoAutomation:
         print(f"Idea: {video_idea}")
         print(f"Scenes: {num_scenes}")
         print(f"Consistency: {'Enabled (Veo 3.1)' if use_consistency else 'Disabled'}")
+        print(f"Chained Consistency: {'ENABLED' if chained_consistency else 'DISABLED'}")
         print(f"Processing: {'Parallel' if parallel else 'Sequential'}")
         print("="*80 + "\n")
         
         project_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        if parallel:
-            # Use WorkflowOrchestrator for parallel processing
-            print("[MODE] Using Parallel Workflow Orchestrator")
+        
+        if True: # Always use pipeline mode for character videos
+            parallel = True # Enforce parallel for character videos
+            pipeline_mode = True 
+            shared_session = True # Enforce shared session
+
+            # HYBRID PIPELINE MODE: Persistent Workers
+            print("[MODE] Using Hybrid Pipeline Mode - Persistent Workers")
+            print("[INFO] Workers login once and stay alive for both phases")
+            print("[PHASE 1] Parallel image generation (independent)")
+            print("[PHASE 2] Sequential video generation (chained consistency)")
             
-            if not self.character_manager:
-                self.character_manager = WorkflowOrchestrator(
-                    num_image_workers=2,
-                    num_video_workers=4,
-                    output_dir=self.dirs['character'],
-                    proxy_manager=self.proxy_manager
+            from flowchart.character.enhanced_script_generator import EnhancedScriptGenerator
+            from moviepy.editor import VideoFileClip, concatenate_videoclips
+            import threading
+            import os
+            
+            # Step 1: Generate script
+            print("\n[STEP 1/3] Generating script...")
+            script_gen = EnhancedScriptGenerator()
+            overview_data = script_gen.generate_overview_with_identity_cards(video_idea)
+            scenes = script_gen.generate_scenes_with_deltas(overview_data, num_scenes)
+            print(f"[SCRIPT] [OK] Generated {len(scenes)} scenes")
+            
+            # Step 2: Generate character reference
+            print("\n[STEP 2/3] Generating character reference...")
+            character_ref = self._generate_character_reference(overview_data)
+            
+            # Step 3: Launch persistent workers (login once, handle both phases)
+            print(f"\n[STEP 3/3] Launching {num_scenes} persistent workers...")
+            
+            results_dict = {}
+            lock = threading.Lock()
+            
+            # Create video completion events for chained consistency
+            video_ready_events = {i: threading.Event() for i in range(num_scenes)}
+            
+            # Launch workers (one per scene)
+            workers = []
+            for i in range(num_scenes):
+                thread = threading.Thread(
+                    target=self._hybrid_persistent_worker,
+                    args=(i, scenes[i], character_ref, results_dict, video_ready_events, lock),
+                    daemon=False
                 )
+                thread.start()
+                workers.append(thread)
+                
+                # Stagger worker launches to prevent mail.tm 429 rate limiting
+                if i < num_scenes - 1:
+                    import time
+                    print(f"[INFO] Waiting 25s before launching next worker to avoid rate limits...")
+                    time.sleep(25)
             
-            result = self.character_manager.execute_full_workflow(
-                niche=video_idea,
-                num_scenes=num_scenes
-            )
+            # Wait for all workers to complete both phases
+            print("\n[PIPELINE] Waiting for all workers to complete...")
+            for i, worker in enumerate(workers):
+                worker.join()
+                print(f"[PIPELINE] Worker {i} completed both phases")
             
-        else:
-            # Use CharacterVideoManager for sequential
-            print("[MODE] Using Sequential Character Manager")
+            print("\n[PIPELINE] [DONE] All scenes processed!")
             
-            manager = CharacterVideoManager(
-                output_dir=self.dirs['character'],
-                headless=self.headless,
-                proxy_manager=self.proxy_manager
-            )
+            # Sort results by scene ID
+            sorted_scenes = [results_dict[i] for i in sorted(results_dict.keys())]
             
-            result = manager.produce_video(
-                video_idea=video_idea,
-                num_scenes=num_scenes
-            )
+            # Combine videos
+            print("\n[EDITING] Combining scene videos...")
+            video_paths = [scene['video'] for scene in sorted_scenes if scene.get('video')]
+            
+            # Simple video combining using moviepy
+            output_path = os.path.join(self.dirs['character'], f"{project_id}_final.mp4")
+            clips = [VideoFileClip(path) for path in video_paths]
+            final_clip = concatenate_videoclips(clips, method="compose")
+            final_clip.write_videofile(output_path, codec="libx264", audio_codec="aac")
+            
+            # Clean up
+            for clip in clips:
+                clip.close()
+            final_clip.close()
+            
+            final_video = output_path
+            
+            result = {
+                'status': 'completed',
+                'video_path': final_video,
+                'scenes': sorted_scenes,
+                'script': {'overview': overview_data, 'scenes': scenes},
+                'project_id': project_id,
+                'num_scenes': num_scenes,
+                'mode': 'hybrid_persistent_workers',
+                'character_ref': character_ref,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Save metadata
+            self._save_production_metadata(result, 'character', project_id)
+            
+            return result
+        
+        # Sequential mode (default or fallback)
+        print("[MODE] Using Sequential Character Manager")
+        
+        from flowchart.character.character_video_manager import CharacterVideoManager
+        manager = CharacterVideoManager(
+            output_dir=self.dirs['character'],
+            headless=self.headless,
+            use_chained_consistency=chained_consistency,
+            use_shared_session=shared_session
+        )
+        
+        result = manager.produce_video(
+            video_idea=video_idea,
+            num_scenes=num_scenes,
+            use_chained_consistency=chained_consistency
+        )
         
         # Save metadata
         self._save_production_metadata(result, 'character', project_id)
         
         return result
+    
+    
+    def _hybrid_persistent_worker(self, scene_id, scene, character_ref, results_dict, video_ready_events, lock):
+        """
+        Persistent worker that handles BOTH image and video generation.
+        
+        Worker lifecycle:
+        1. Login once
+        2. PHASE 1: Generate image (parallel, independent)
+        3. PHASE 2: Wait for turn, generate video (sequential, chained)
+        4. Close browser
+        
+        Args:
+            scene_id: Scene number (0, 1, 2, ...)
+            scene: Scene dictionary with prompts
+            character_ref: Path to character reference image
+            results_dict: Shared results dictionary
+            video_ready_events: Dict of threading events for video coordination
+            lock: Threading lock for results_dict access
+        """
+        from flowchart.common.shared_session import SharedSessionManager
+        from flowchart.character.image_generator import DreaminaGenerator
+        from flowchart.character.video_generator import DreaminaVideoGenerator
+        import time
+        
+        try:
+            # Step 1: Login
+            print(f"\n[WORKER {scene_id}] Initializing browser...")
+            session = SharedSessionManager(headless=self.headless, fresh_profile=True)
+            
+            print(f"[WORKER {scene_id}] Logging in...")
+            if not session.login():
+                print(f"[WORKER {scene_id}] [FAIL] Login failed")
+                return
+            
+            img_gen = DreaminaGenerator(shared_session=session)
+            video_gen = DreaminaVideoGenerator(shared_session=session)
+            print(f"[WORKER {scene_id}] [OK] Login successful")
+            
+            # PHASE 1: Generate image (parallel, all workers work simultaneously)
+            print(f"\n[WORKER {scene_id}] [PHASE 1] Generating image...")
+            
+            img_filename = f"scene_{scene_id}_image.png"
+            img_output_path = os.path.join(self.dirs['character'], img_filename)
+            
+            success = img_gen.generate_image(
+                prompt=scene.get('image_prompt', scene.get('description', '')),
+                output_path=img_output_path,
+                reference_image=character_ref  # Same reference for all scenes!
+            )
+            
+            if success:
+                img_path = img_output_path
+                print(f"[WORKER {scene_id}] [PHASE 1] [OK] Image saved: {img_path}")
+            else:
+                img_path = None
+                print(f"[WORKER {scene_id}] [PHASE 1] [FAIL] Image generation failed")
+            
+            # Store image result
+            with lock:
+                if scene_id not in results_dict:
+                    results_dict[scene_id] = {}
+                results_dict[scene_id]['image'] = img_path
+                results_dict[scene_id]['scene'] = scene
+            
+            if not img_path:
+                print(f"[WORKER {scene_id}] Aborting due to image generation failure")
+                video_ready_events[scene_id].set() # Unblock others
+                return
+
+            # PHASE 2: Generate video (sequential with chained consistency)
+            print(f"[WORKER {scene_id}] [PHASE 2] Waiting for turn to generate video...")
+            
+            # Wait for previous scene's video to complete (if not first scene)
+            if scene_id > 0:
+                print(f"[WORKER {scene_id}] [PHASE 2] Waiting for Scene {scene_id - 1} video...")
+                video_ready_events[scene_id - 1].wait()
+                print(f"[WORKER {scene_id}] [PHASE 2] Scene {scene_id - 1} ready!")
+            
+            # Get reference video from previous scene
+            reference_video = None
+            if scene_id > 0:
+                reference_video_path = None
+                with lock:
+                    reference_video_path = results_dict[scene_id - 1].get('video')
+                
+                if reference_video_path and os.path.exists(reference_video_path):
+                    reference_video = reference_video_path
+                    print(f"[WORKER {scene_id}] [PHASE 2] Using Scene {scene_id - 1} video as reference")
+                else:
+                    print(f"[WORKER {scene_id}] [PHASE 2] [WARNING] Previous video missing, skipping chained consistency")
+            
+            # Generate video
+            print(f"[WORKER {scene_id}] [PHASE 2] Generating video...")
+            video_path = video_gen.generate_video(
+                prompt=scene.get('video_prompt', scene.get('description', '')),
+                first_frame=img_path,
+                reference_video=reference_video  # Chained consistency!
+            )
+            print(f"[WORKER {scene_id}] [PHASE 2] [OK] Video saved: {video_path}")
+            
+            # Store video result and signal completion
+            with lock:
+                results_dict[scene_id]['video'] = video_path
+            
+            # Signal that this scene's video is ready for next scene
+            video_ready_events[scene_id].set()
+            
+            print(f"[WORKER {scene_id}] [DONE] Both phases complete!")
+            
+        except Exception as e:
+            print(f"[WORKER {scene_id}] [ERROR] Error: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Set event even on failure so other workers don't hang
+            video_ready_events[scene_id].set()
+        
+        finally:
+            try:
+                if 'session' in locals():
+                    session.close()
+            except:
+                pass
+            print(f"[WORKER {scene_id}] Browser closed")
+    
+    
+    def _generate_character_reference(self, overview_data):
+        """
+        Generate single character reference image from script's identity cards.
+        
+        This reference will be used by all scenes for consistent character appearance.
+        
+        Args:
+            overview_data: Script overview containing identity cards
+            
+        Returns:
+            str: Path to character reference image, or None if generation fails
+        """
+        identity_cards = overview_data.get('identity_cards', [])
+        if not identity_cards:
+            print("[WARNING] No identity cards found, skipping character reference")
+            return None
+        
+        # Handle both list and dict formats
+        if isinstance(identity_cards, dict):
+            # Get first character from dict
+            main_char = list(identity_cards.values())[0] if identity_cards else None
+        else:
+            # Get first item from list
+            main_char = identity_cards[0] if len(identity_cards) > 0 else None
+        
+        if not main_char:
+            print("[WARNING] No main character found")
+            return None
+            
+        char_description = main_char.get('anchor_attributes', '')
+        
+        if not char_description:
+            print("[WARNING] No character description found")
+            return None
+        
+        print(f"\n[CHARACTER REF] Generating reference for: {main_char.get('character_name', 'Unknown')}")
+        print(f"[CHARACTER REF] Description: {char_description}")
+        
+        try:
+            from flowchart.common.shared_session import SharedSessionManager
+            from flowchart.character.image_generator import DreaminaGenerator
+            import os
+            
+            # Create temporary session for reference generation
+            session = SharedSessionManager(headless=self.headless, fresh_profile=True)
+            
+            if not session.login():
+                print("[ERROR] Failed to login for character reference generation")
+                return None
+            
+            ref_gen = DreaminaGenerator(shared_session=session)
+            
+            # Generate character reference portrait
+            ref_filename = f"character_ref_{overview_data.get('project_id', 'temp')}.png"
+            ref_output_path = os.path.join(self.dirs['character'], ref_filename)
+            
+            success = ref_gen.generate_image(
+                prompt=f"Character reference portrait: {char_description}, professional headshot, clear details",
+                output_path=ref_output_path,
+                reference_image=None
+            )
+            
+            session.close()
+            
+            if success:
+                print(f"[CHARACTER REF] [OK] Generated: {ref_output_path}")
+                return ref_output_path
+            else:
+                print("[CHARACTER REF] [FAIL] Generation failed")
+                return None
+            
+        except Exception as e:
+            print(f"[CHARACTER REF] [ERROR] Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    
+                if 'session' in locals():
+                    session.close()
+            except:
+                pass
+            print(f"[IMAGE WORKER {worker_id}] Worker terminated")
+    
+    
+    def _sequential_video_phase(self, scenes, image_results):
+        """
+        Phase 2: Generate videos sequentially with chained consistency.
+        
+        Each video uses the previous video as reference for smooth transitions.
+        Videos are generated in order: 0 -> 1 -> 2 -> 3 -> 4
+        
+        Args:
+            scenes: List of scene dictionaries
+            image_results: Results from Phase 1 containing images
+            
+        Returns:
+            dict: {scene_id: {'image': path, 'video': path}}
+        """
+        from flowchart.common.shared_session import SharedSessionManager
+        from flowchart.character.video_generator import DreaminaVideoGenerator
+        
+        print(f"\n[PHASE 2/2] Sequential Video Generation ({len(scenes)} scenes)")
+        print(f"[INFO] Using chained consistency for smooth transitions")
+        
+        # Login single session for all videos
+        session = SharedSessionManager(headless=self.headless, fresh_profile=True)
+        if not session.login():
+            print("[ERROR] Video phase login failed")
+            return image_results
+        
+        video_gen = DreaminaVideoGenerator(shared_session=session)
+        
+        video_results = {}
+        reference_video = None
+        
+        # Generate videos in sequential order
+        for i in range(len(scenes)):
+            scene = image_results[i]['scene']
+            img_path = image_results[i]['image']
+            
+            print(f"\n[VIDEO {i+1}/{len(scenes)}] Generating Scene {i} video...")
+            if reference_video:
+                print(f"[VIDEO {i+1}/{len(scenes)}] Using Scene {i-1} video as reference")
+            
+            try:
+                video_path = video_gen.generate_video(
+                    prompt=scene.get('video_prompt', scene.get('description', '')),
+                    first_frame=img_path,
+                    reference_video=reference_video  # Uses previous video!
+                )
+                
+                print(f"[VIDEO {i+1}/{len(scenes)}] [OK] Scene {i} video saved: {video_path}")
+                
+                video_results[i] = {
+                    'image': img_path,
+                    'video': video_path,
+                    'scene': scene
+                }
+                
+                # Next video uses this one as reference
+                reference_video = video_path
+                
+            except Exception as e:
+                print(f"[VIDEO {i+1}/{len(scenes)}] [ERROR] Error: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue with next video even if one fails
+                video_results[i] = {
+                    'image': img_path,
+                    'video': None,
+                    'scene': scene
+                }
+        
+        session.close()
+        print(f"\n[PHASE 2] [DONE] All {len(video_results)} videos completed!")
+        
+        return video_results
+    
+    
+    def _init_workers_pipeline(self, scene_queue, results_dict, num_workers: int = 4, stagger_delay: int = 10):
+        """
+        Initialize workers in pipeline mode - each worker processes scenes from queue immediately after login.
+        
+        Pipeline behavior:
+        - Worker logs in
+        - Immediately pulls next scene from queue
+        - Generates image
+        - Generates video
+        - Repeats until queue empty
+        
+        Args:
+            scene_queue: Queue of scenes to process
+            results_dict: Shared dictionary to store results
+            num_workers: Number of workers (default: 4)
+            stagger_delay: Delay between worker launches (default: 10s)
+            
+        Returns:
+            List of worker threads
+        """
+        import threading
+        import time
+        
+        workers = []
+        lock = threading.Lock()
+        
+        for i in range(num_workers):
+            print(f"\n[WORKER {i}] Launching pipeline worker...")
+            
+            # Create worker thread
+            thread = threading.Thread(
+                target=self._worker_pipeline,
+                args=(i, scene_queue, results_dict, lock),
+                daemon=False
+            )
+            thread.start()
+            workers.append(thread)
+            
+            # Stagger next worker launch
+            if i < num_workers - 1:
+                print(f"[STAGGER] Waiting {stagger_delay}s before launching Worker {i+1}...")
+                time.sleep(stagger_delay)
+        
+        print(f"\n[WORKERS] Launched {len(workers)} pipeline workers")
+        return workers
+    
+    
     
     def discover_niche_from_url(self, video_url: str) -> str:
         """
@@ -503,8 +783,7 @@ class MasterVideoAutomation:
             
             director = ParallelInfoDirector(
                 output_dir=self.dirs['info'],
-                num_workers=4,
-                proxy_manager=self.proxy_manager
+                num_workers=4
             )
             
             result = director.produce_video(niche=niche)
@@ -517,13 +796,12 @@ class MasterVideoAutomation:
                 self.info_manager = InfoContentOrchestrator(
                     output_dir=self.dirs['info'],
                     video_mode=video_mode,
-                    headless=self.headless,
-                    proxy_manager=self.proxy_manager
+                    headless=self.headless
                 )
             
             result = self.info_manager.produce_content(niche=niche)
         
-        # Post-production steps (Flowchart: Retention → Thumbnail → Metadata → Upload)
+        # Post-production steps (Flowchart: Retention -> Thumbnail -> Metadata -> Upload)
         if result.get('status') == 'completed':
             result = self._apply_post_production(result, project_id)
         
@@ -627,9 +905,9 @@ class MasterVideoAutomation:
                     optimized_path = self.retention_optimizer.optimize(video_path)
                     result['video_path'] = optimized_path
                     result['retention_optimized'] = True
-                    print(f"  ✓ Optimized video saved")
+                    print(f"  [OK] Optimized video saved")
                 else:
-                    print("  ✓ Retention already good, no optimization needed")
+                    print("  [OK] Retention already good, no optimization needed")
                     result['retention_optimized'] = False
                     
                 result['retention_score'] = retention_score
@@ -647,9 +925,9 @@ class MasterVideoAutomation:
                     niche=result.get('niche', result.get('video_idea', ''))
                 )
                 result['ai_metadata'] = metadata
-                print(f"  ✓ Title: {metadata.get('title', 'N/A')}")
-                print(f"  ✓ Tags: {len(metadata.get('tags', []))} generated")
-                print(f"  ✓ Description generated")
+                print(f"  [OK] Title: {metadata.get('title', 'N/A')}")
+                print(f"  [OK] Tags: {len(metadata.get('tags', []))} generated")
+                print(f"  [OK] Description generated")
             except Exception as e:
                 print(f"  [WARNING] Metadata generation failed: {e}")
         else:
@@ -666,7 +944,7 @@ class MasterVideoAutomation:
                     platforms=['youtube']  # Can be extended to TikTok, etc.
                 )
                 result['upload_result'] = upload_result
-                print(f"  ✓ Uploaded to: {', '.join(upload_result.get('platforms', []))}")
+                print(f"  [OK] Uploaded to: {', '.join(upload_result.get('platforms', []))}")
             except Exception as e:
                 print(f"  [WARNING] Upload failed: {e}")
         else:
@@ -861,10 +1139,61 @@ Examples:
     )
     
     parser.add_argument(
+        '--pipeline',
+        action='store_true',
+        default=True,
+        dest='pipeline_mode',
+        help='Use pipeline mode - workers start immediately after login (default: True)'
+    )
+    
+    parser.add_argument(
         '--consistency',
         action='store_true',
         default=True,
         help='Enable Veo 3.1 consistency (character)'
+    )
+    
+    parser.add_argument(
+        '--chained-consistency',
+        action='store_true',
+        default=True,
+        dest='chained_consistency',
+        help='Enable chained consistency (Scene N -> Scene N+1) (default: True)'
+    )
+    
+    parser.add_argument(
+        '--no-chained-consistency',
+        action='store_false',
+        dest='chained_consistency',
+        help='Disable chained consistency, use pre-generated character images instead'
+    )
+    
+    parser.add_argument(
+        '--shared-session',
+        action='store_true',
+        default=True,
+        dest='shared_session',
+        help='Enable shared session (1 account for images+videos) (default: True)'
+    )
+    
+    parser.add_argument(
+        '--no-shared-session',
+        action='store_false',
+        dest='shared_session',
+        help='Disable shared session, use separate accounts for image and video generators'
+    )
+    
+    # Smart Reference System (NEW)
+    parser.add_argument(
+        '--character-ref',
+        type=str,
+        help='Character reference image for consistent appearance across scenes'
+    )
+    
+    parser.add_argument(
+        '--background-ref',
+        type=str,
+        help='Background/style reference image for environmental consistency'
     )
     
     parser.add_argument(
@@ -893,33 +1222,6 @@ Examples:
     )
     
     parser.add_argument(
-        '--proxy',
-        action='store_true',
-        default=True,
-        help='Enable IP rotation with proxies (default: True)'
-    )
-    
-    parser.add_argument(
-        '--no-proxy',
-        action='store_false',
-        dest='proxy',
-        help='Disable IP rotation'
-    )
-    
-    parser.add_argument(
-        '--proxy-file',
-        type=str,
-        default='fast_proxies.txt',
-        help='Path to proxy file (fallback if no API key)'
-    )
-    
-    parser.add_argument(
-        '--proxifly-key',
-        type=str,
-        help='Proxifly API key for reliable HTTPS proxies (recommended)'
-    )
-    
-    parser.add_argument(
         '--summary',
         action='store_true',
         help='Show system capabilities'
@@ -931,10 +1233,7 @@ Examples:
     manager = MasterVideoAutomation(
         output_dir=args.output,
         headless=args.headless,
-        use_emotional_ai=not args.no_emotion,
-        use_proxy=args.proxy,
-        proxy_file=args.proxy_file,
-        proxifly_api_key=getattr(args, 'proxifly_key', None)
+        use_emotional_ai=not args.no_emotion
     )
     
     # Show summary
@@ -965,7 +1264,12 @@ Examples:
             video_idea=args.idea,
             num_scenes=args.scenes,
             use_consistency=args.consistency,
-            parallel=args.parallel and not args.sequential
+            parallel=args.parallel and not args.sequential,
+            pipeline_mode=args.pipeline_mode,
+            chained_consistency=args.chained_consistency,
+            shared_session=args.shared_session,
+            character_ref=args.character_ref,  # NEW: Smart reference
+            background_ref=args.background_ref  # NEW: Smart reference
         )
         
     elif args.type == 'info':
@@ -992,10 +1296,10 @@ Examples:
     
     # Check result
     if result.get('status') == 'completed':
-        print("\n✅ VIDEO PRODUCTION COMPLETE!")
+        print("\n[DONE] VIDEO PRODUCTION COMPLETE!")
         return 0
     else:
-        print("\n❌ VIDEO PRODUCTION FAILED")
+        print("\n[FAIL] VIDEO PRODUCTION FAILED")
         return 1
 
 

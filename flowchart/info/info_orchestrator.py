@@ -149,8 +149,7 @@ class InfoContentOrchestrator:
                  ai_ratio=0.4,         # NEW: 40% AI, 60% Stock when hybrid
                  use_parallel=False,   # NEW: Parallel AI generation
                  num_ai_workers=4,     # NEW: Number of AI workers
-                 headless=False,       # NEW: Headless browser mode
-                 proxy_manager=None):  # NEW: Proxy manager for IP rotation
+                 headless=False):      # NEW: Headless browser mode
         
         self.output_dir = output_dir
         self.use_ai_graphics = use_ai_graphics and INFO_IMAGE_AVAILABLE
@@ -160,7 +159,6 @@ class InfoContentOrchestrator:
         self.use_parallel = use_parallel
         self.num_ai_workers = num_ai_workers
         self.headless = headless
-        self.proxy_manager = proxy_manager
         
         # Create output directories
         self._setup_directories()
@@ -183,8 +181,7 @@ class InfoContentOrchestrator:
                 ai_ratio=ai_ratio,
                 use_parallel=use_parallel,
                 num_workers=num_ai_workers,
-                headless=headless,
-                proxy_manager=proxy_manager
+                headless=headless
             )
             print(f"[INFO] Video Mode: HYBRID (AI {ai_ratio*100:.0f}% + Stock {(1-ai_ratio)*100:.0f}%)")
         elif video_mode == 'stock' and INFO_VIDEO_AVAILABLE:
@@ -415,7 +412,7 @@ class InfoContentOrchestrator:
             
             # Use image generator
             profile_path = os.path.abspath("chrome_data_info_0")
-            gen = DreaminaGenerator(headless=self.headless, profile_path=profile_path, proxy_manager=self.proxy_manager)
+            gen = DreaminaGenerator(headless=self.headless, profile_path=profile_path)
             
             try:
                 if gen.login():
@@ -502,8 +499,7 @@ class InfoContentOrchestrator:
                 try:
                     director = ParallelInfoDirector(
                         num_workers=self.num_ai_workers,
-                        output_dir=self.output_dir,
-                        proxy_manager=self.proxy_manager
+                        output_dir=self.output_dir
                     )
                     
                     video_paths = director.generate_ai_videos_parallel(
@@ -527,7 +523,7 @@ class InfoContentOrchestrator:
                 from modules.generators.video_generator import DreaminaVideoGenerator
                 
                 profile_path = os.path.abspath("chrome_data_info_video_0")
-                gen = DreaminaVideoGenerator(headless=self.headless, profile_path=profile_path, proxy_manager=self.proxy_manager)
+                gen = DreaminaVideoGenerator(headless=self.headless, profile_path=profile_path)
                 
                 video_paths = []
                 

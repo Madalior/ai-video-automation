@@ -18,9 +18,18 @@ import random
 import string
 import time
 from flowchart.common.proxy_manager import ProxyManager
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+
+# Try to use undetected-chromedriver for best stealth
+try:
+    import undetected_chromedriver as uc
+    UC_AVAILABLE = True
+    print("[DISPOSABLE] Using undetected-chromedriver for maximum stealth")
+except ImportError:
+    UC_AVAILABLE = False
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.chrome.options import Options
+    print("[DISPOSABLE] undetected-chromedriver not found, using standard selenium")
 
 
 class DisposableAccountGenerator:
@@ -54,7 +63,7 @@ class DisposableAccountGenerator:
     
     def create_browser_with_proxy(self, proxy_url):
         """
-        Launch Chrome browser with proxy configuration.
+        Launch Chrome browser with proxy configuration using undetected-chromedriver.
         
         Args:
             proxy_url: Proxy URL (e.g., http://1.2.3.4:8080)
@@ -62,36 +71,48 @@ class DisposableAccountGenerator:
         Returns:
             WebDriver instance
         """
-        chrome_options = Options()
-        
-        # Proxy configuration
-        chrome_options.add_argument(f'--proxy-server={proxy_url}')
-        
-        # Anti-detection measures
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-        
-        # Random user agent
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        ]
-        chrome_options.add_argument(f'user-agent={random.choice(user_agents)}')
-        
-        # Create temp profile for this session
         import tempfile
         temp_dir = tempfile.mkdtemp()
-        chrome_options.add_argument(f'--user-data-dir={temp_dir}')
         
-        try:
-            driver = webdriver.Chrome(options=chrome_options)
-            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            return driver, temp_dir
-        except Exception as e:
-            print(f"[ERROR] Failed to launch browser: {e}")
-            return None, None
+        if UC_AVAILABLE:
+            # Use undetected-chromedriver (better stealth)
+            chrome_options = uc.ChromeOptions()
+            chrome_options.add_argument(f'--proxy-server={proxy_url}')
+            chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument(f'--user-data-dir={temp_dir}')
+            
+            try:
+                driver = uc.Chrome(options=chrome_options, use_subprocess=True)
+                print(f"[BROWSER] Launched with UC stealth + proxy: {proxy_url}")
+                return driver, temp_dir
+            except Exception as e:
+                print(f"[ERROR] UC browser launch failed: {e}")
+                return None, None
+        else:
+            # Fallback to standard selenium
+            chrome_options = Options()
+            chrome_options.add_argument(f'--proxy-server={proxy_url}')
+            chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            
+            user_agents = [
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            ]
+            chrome_options.add_argument(f'user-agent={random.choice(user_agents)}')
+            chrome_options.add_argument(f'--user-data-dir={temp_dir}')
+            
+            try:
+                driver = webdriver.Chrome(options=chrome_options)
+                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                print(f"[BROWSER] Launched with standard selenium + proxy: {proxy_url}")
+                return driver, temp_dir
+            except Exception as e:
+                print(f"[ERROR] Failed to launch browser: {e}")
+                return None, None
     
     def create_disposable_account(self):
         """

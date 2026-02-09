@@ -56,7 +56,7 @@ try:
     if img_gen.login():
         print("   ✅ Login successful")
         
-        prompt = f"Character portrait: {script['character_description']['Sarah']}, cinematic lighting, 8k, highly detailed"
+        prompt = f"Generate a photorealistic character portrait of {script['character_description']['Sarah']}. Use cinematic lighting, highly detailed, 8K resolution."
         print(f"\n   [1/1] Generating: Sarah_reference.png")
         print(f"   Prompt: {prompt[:60]}...")
         
@@ -85,7 +85,7 @@ for scene in script['scenes']:
     if char_desc:
         # Character scene image
         char_scene_path = f"output/images/Sarah_scene_{scene_num}.png"
-        prompt = f"{char_desc}, cinematic, 8k"
+        prompt = f"Generate an image of {char_desc}. Cinematic style, photorealistic, 8K resolution."
         
         print(f"\n   [{scene_num}/3] Generating: Sarah_scene_{scene_num}.png")
         print(f"   Prompt: {prompt[:60]}...")
@@ -108,7 +108,7 @@ for scene in script['scenes']:
     if background:
         # Background image
         bg_path = f"output/images/background_scene_{scene_num}.png"
-        prompt = f"{background}, cinematic, 8k, detailed environment"
+        prompt = f"Generate an image of {background}. Cinematic style, detailed environment, photorealistic, 8K resolution."
         
         print(f"\n   [{scene_num}/3] Generating: background_scene_{scene_num}.png")
         print(f"   Prompt: {prompt[:60]}...")
@@ -194,7 +194,7 @@ print(f"   Using first video frame and character reference")
 img_gen = DreaminaGenerator(headless=False, profile_path=os.path.abspath("chrome_data_img_0"))
 try:
     if img_gen.login():
-        prompt = f"YouTube thumbnail for '{script['title']}', Vlog, bold text, vibrant colors, eye-catching, woman with camera"
+        prompt = f"Generate a YouTube thumbnail for a video titled '{script['title']}' in the Vlog category. Feature a woman with camera, bold text, vibrant colors, eye-catching composition."
         if img_gen.generate_image(prompt, thumbnail_path):
             print(f"✅ Thumbnail generated: {thumbnail_path}")
         else:
