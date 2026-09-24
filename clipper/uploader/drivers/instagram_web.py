@@ -67,12 +67,27 @@ class InstagramWebUploader:
                 "message": "Session expired or not logged in. Please run the 1-time login command."
             }
 
+        # Dismiss common popups (Save Info / Notifications)
+        for popup_text in ["Not Now", "Not now", "Cancel"]:
+            try:
+                btn = self.page.locator(f"button:has-text('{popup_text}')").first
+                if btn.is_visible():
+                    btn.click(timeout=2000)
+                    self.page.wait_for_timeout(1000)
+            except Exception:
+                pass
+
         # 2. Click 'Create' (+) button
         print("[INSTAGRAM_BOT] Opening Create Dialog...")
-        create_btn = self.page.locator("svg[aria-label='New post'], span:has-text('Create'), a[href='#']:has-text('Create')").first
+        create_btn = self.page.locator("svg[aria-label='New post'], span:has-text('Create'), div[role='button']:has-text('Create'), a:has-text('Create')").first
         try:
             create_btn.wait_for(state="visible", timeout=15000)
             create_btn.click()
+            self.page.wait_for_timeout(1500)
+            # If sub-menu appears (Post / Live video), click Post
+            post_sub = self.page.locator("span:has-text('Post'), div:has-text('Post')").first
+            if post_sub.is_visible():
+                post_sub.click(timeout=3000)
         except PlaywrightTimeoutError:
             return {"status": "error", "message": "Could not find 'Create' button on Instagram."}
 
@@ -94,23 +109,33 @@ class InstagramWebUploader:
 
         # 4. Click 'Next' (Crop screen)
         print("[INSTAGRAM_BOT] Navigating crop screen...")
-        next_btn = self.page.locator("div[role='button']:has-text('Next'), button:has-text('Next')").first
-        if next_btn.is_visible():
-            next_btn.click()
-            self.page.wait_for_timeout(2000)
+        try:
+            next_btn1 = self.page.locator("div[role='button']:has-text('Next'), button:has-text('Next')").first
+            next_btn1.wait_for(state="visible", timeout=15000)
+            next_btn1.click()
+            self.page.wait_for_timeout(2500)
+        except Exception as e:
+            print(f"[INSTAGRAM_BOT] Next 1 notice: {e}")
 
         # 5. Click 'Next' (Filter/Cover screen)
-        if next_btn.is_visible():
-            next_btn.click()
-            self.page.wait_for_timeout(2000)
+        try:
+            next_btn2 = self.page.locator("div[role='button']:has-text('Next'), button:has-text('Next')").first
+            next_btn2.wait_for(state="visible", timeout=10000)
+            next_btn2.click()
+            self.page.wait_for_timeout(2500)
+        except Exception as e:
+            print(f"[INSTAGRAM_BOT] Next 2 notice: {e}")
 
         # 6. Add Caption
         print("[INSTAGRAM_BOT] Setting Caption...")
-        caption_area = self.page.locator("div[aria-label*='caption'], div[contenteditable='true']").first
-        if caption_area.is_visible():
+        try:
+            caption_area = self.page.locator("div[aria-label*='caption'], div[contenteditable='true']").first
+            caption_area.wait_for(state="visible", timeout=10000)
             caption_area.click()
             caption_area.fill(full_caption)
             self.page.wait_for_timeout(1000)
+        except Exception as cap_err:
+            print(f"[INSTAGRAM_BOT] Caption set notice: {cap_err}")
 
         # 7. Click 'Share'
         print("[INSTAGRAM_BOT] Clicking Share...")

@@ -94,13 +94,19 @@ class BulkDispatcher:
         caption: str = "",
         hashtags: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """Uploads a Reel to Instagram via instagrapi."""
-        if not INSTAGRAPI_AVAILABLE:
-            return {"status": "error", "message": "instagrapi is not installed."}
+        """Uploads a Reel to Instagram via authenticated browser session or instagrapi."""
+        session_file = self.accounts_dir / f"{account_id}_ig_session.json"
+
+        # Primary: If no direct mobile API session file, upload via browser engine with saved cookies
+        if not INSTAGRAPI_AVAILABLE or not session_file.exists():
+            print(f"[INSTAGRAM] Uploading Reel via authenticated Playwright browser session for [{account_id}]...")
+            with self.browser_engine.open_session(account_id=account_id, headless=True) as (context, page):
+                from clipper.uploader.drivers.instagram_web import InstagramWebUploader
+                ig_driver = InstagramWebUploader(page)
+                return ig_driver.upload_reel(video_path=video_path, caption=caption, hashtags=hashtags)
 
         cfg = self.get_account_config(account_id)
         ig_cfg = cfg.get("instagram", {})
-        session_file = self.accounts_dir / f"{account_id}_ig_session.json"
 
         hashtags = hashtags or []
         tag_str = " ".join(h if h.startswith("#") else f"#{h}" for h in hashtags)
@@ -121,19 +127,7 @@ class BulkDispatcher:
                 print(f"[INSTAGRAM] Loading saved session: {session_file.name}")
                 cl.load_settings(session_file)
             except Exception as e:
-                print(f"[INSTAGRAM] Session load failed ({e}), re-logging in...")
-                username = ig_cfg.get("username")
-                password = ig_cfg.get("password")
-                if username and password:
-                    cl.login(username, password)
-                    cl.dump_settings(session_file)
-                else:
-                    return {"status": "error", "message": f"Saved session invalid and no username/password in {account_id}.json"}
-        else:
-            username = ig_cfg.get("username")
-            password = ig_cfg.get("password")
-            if not username or not password:
-                print(f"[INSTAGRAM] No direct API session file -> Falling back to persistent Chrome browser session...")
+                print(f"[INSTAGRAM] Session load failed ({e}), falling back to browser session...")
                 with self.browser_engine.open_session(account_id=account_id, headless=True) as (context, page):
                     from clipper.uploader.drivers.instagram_web import InstagramWebUploader
                     ig_driver = InstagramWebUploader(page)
