@@ -1,178 +1,64 @@
-# AI Video Automation Tool
+# Going Merry & Clipper 🚀
+### 100% Cloud-Native Multi-Account Video Automation & Clipping Factory
 
-Complete video automation system with AI-powered content generation, supporting both character-based storytelling and informational content.
-
-## 🎯 Features
-
-### Character Pipeline
-- ✅ AI-generated scripts with character consistency
-- ✅ Veo 3.1 consistency techniques (95%+ character recognition)
-- ✅ Parallel processing (2-8x speedup)
-- ✅ Identity cards with anchor/delta separation
-- ✅ Multi-reference images (up to 3)
-- ✅ Automated thumbnail generation
-
-### Info Pipeline
-- ✅ Educational/informational video creation
-- ✅ Hybrid AI + stock footage
-- ✅ Parallel generation (4x speedup)
-- ✅ Automated research and scripting
-
-### Core Features
-- 🤖 LLM-powered script generation
-- 🎨 AI image generation (Dreamina)
-- 🎬 AI video generation (Veo 3.1)
-- 🚀 Parallel processing for speed
-- 📊 Complete workflow automation
-- 🎯 Batch production support
-
-## 📁 Project Structure
-
-```
-automation-tool/
-├── flowchart/
-│   ├── character/          # Character video pipeline
-│   │   ├── script_generator.py
-│   │   ├── enhanced_script_generator.py
-│   │   ├── image_generator.py
-│   │   ├── video_generator.py
-│   │   ├── character_orchestrator.py
-│   │   └── character_video_manager.py
-│   ├── info/               # Info video pipeline
-│   │   ├── info_orchestrator.py
-│   │   ├── parallel_info_director.py
-│   │   └── hybrid_info_video_generator.py
-│   └── common/             # Shared utilities
-│       ├── llm_manager.py
-│       ├── browser_utils.py
-│       ├── identity_cards.py
-│       ├── prompt_builder.py
-│       ├── frame_extractor.py
-│       └── frame_controller.py
-├── master_manager.py       # Main orchestrator
-├── batch_config.json       # Batch production config
-└── requirements.txt
-```
-
-## 🚀 Quick Start
-
-### Installation
-
-```bash
-git clone https://github.com/yourusername/ai-video-automation.git
-cd ai-video-automation
-pip install -r requirements.txt
-```
-
-### Usage
-
-**Character Video (Single):**
-```bash
-python master_manager.py --type character --idea "Detective mystery" --scenes 5 --parallel
-```
-
-**Info Video (Single):**
-```bash
-python master_manager.py --type info --niche "Space discoveries" --mode ai --parallel
-```
-
-**Batch Production:**
-```bash
-python master_manager.py --batch batch_config.json
-```
-
-**Show Capabilities:**
-```bash
-python master_manager.py --summary
-```
-
-## 📖 Documentation
-
-- `MASTER_MANAGER_GUIDE.md` - Complete CLI reference
-- `docs/PARALLEL_WORKERS_GUIDE.md` - Parallel processing guide
-- `TEMPMAIL_STATUS.md` - Email service status
-- `veo3_consistency_plan.md` - Veo 3.1 implementation details
-
-## 🎨 Veo 3.1 Consistency Techniques
-
-This tool implements all 5 official Veo 3.1 consistency techniques:
-
-1. **Detailed Prompts** - Granular character descriptions
-2. **Reference Images** - Up to 3 references per scene
-3. **Identity Cards** - Persistent character attributes
-4. **Anchor/Delta Separation** - Fixed vs changeable traits
-5. **First/Last Frame Control** - Smooth scene transitions
-
-**Result**: 95%+ character consistency vs 30% baseline!
-
-## ⚡ Performance
-
-| Mode | Workers | Speedup |
-|------|---------|---------|
-| Character Sequential | 1 | Baseline |
-| Character Parallel | 2-8 | **4-8x faster** |
-| Info Sequential | 1 | Baseline |
-| Info Parallel | 4 | **4x faster** |
-
-## 🛠️ Requirements
-
-- Python 3.8+
-- Chrome browser
-- Selenium WebDriver
-- OpenCV (for frame extraction)
-- LLM API access (Groq/OpenAI)
-
-## 📝 Configuration
-
-### Environment Variables
-
-Create `.env` file:
-```env
-GROQ_API_KEY=your_groq_api_key
-OPENAI_API_KEY=your_openai_key  # Optional
-```
-
-### Batch Configuration
-
-Edit `batch_config.json`:
-```json
-{
-  "videos": [
-    {
-      "type": "character",
-      "idea": "Your story idea",
-      "scenes": 5,
-      "parallel": true
-    }
-  ]
-}
-```
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create feature branch
-3. Commit changes
-4. Push to branch
-5. Open pull request
-
-## 📄 License
-
-MIT License - see LICENSE file
-
-## 🙏 Acknowledgments
-
-- Veo 3.1 by Google DeepMind
-- Dreamina AI by ByteDance
-- Groq for fast LLM inference
-
-## 📧 Contact
-
-For issues and questions, please open a GitHub issue.
+An autonomous, 24/7 cloud content factory that monitors livestreams, extracts viral moments with Whisper and LLMs, generates 9:16 vertical shorts with Remotion & FFmpeg, and distributes them across social platforms with multi-account session isolation.
 
 ---
 
-**Status**: Production Ready ✅  
-**Version**: 1.0.0  
-**Last Updated**: January 2026
+## ⚡ Architecture & Features
+
+### 🎬 Autonomous AI Clipping Engine (`clipper/`)
+- **Stream Auto-Monitoring:** Automatically monitors streamers and creators via `yt-dlp`.
+- **Speech-to-Text:** Local Whisper AI transcription with word-level precision timestamps.
+- **Viral Hook Detection:** LLM-based hook scoring (Gemini Flash / NVIDIA NIM / Groq).
+- **Face Tracking & Smart Crop:** YOLOv8 face detection (`yolov8n-face.pt`) for dynamic 9:16 vertical framing.
+- **Split-Screen Composition:** Dual-box layout for gameplay, reactions, and podcast interviews.
+- **High-Production Subtitles:** Animated captions rendered with Remotion and FFmpeg.
+- **Audio Ducking:** Automatic background music mixing and trending audio matching.
+
+### 📱 Mobile Web Control Dashboard (`web_app/`)
+- **Remote Mobile Touch Authentication:** Touchscreen browser login streamed to your mobile phone via `noVNC` on virtual display (`Xvfb`). Connect 30 accounts with Google 2FA approval directly from your phone.
+- **Persistent Profiles:** Browser state, cookies, and tokens stored per account in `/uploader_profiles/`.
+- **Anti-Flag Sequential Scheduler:** Posts are queued with randomized 20–30 minute human jitter to prevent datacenter IP bans.
+- **YouTube API & Social Publishing:** Official YouTube Data API v3 OAuth + Playwright stealth automation for Instagram and TikTok.
+
+---
+
+## 📁 Repository Structure
+
+```
+.
+├── web_app/               # Flask Web Dashboard & Mobile noVNC UI
+│   ├── app.py             # Application factory & setup
+│   ├── models.py          # Database models (User, Clip, SocialAccount, etc.)
+│   ├── routes/            # Dashboard, Clips, Platform Auth, and Pipeline API
+│   ├── static/            # CSS styles and frontend assets
+│   └── templates/         # Mobile touch-enabled templates
+│
+├── clipper/               # AI Video Processing & Clipping Pipeline
+│   ├── core/              # 22 modular processors (transcriber, face tracker, etc.)
+│   ├── remotion/          # React/Remotion dynamic caption composition
+│   ├── uploader/          # Multi-account dispatcher & sequential scheduler
+│   └── utils/             # Downloader and LLM routing utilities
+│
+├── going_merry.py         # Unified end-to-end CLI video pipeline
+├── yolov8n-face.pt        # YOLOv8 neural network weights for face tracking
+├── Dockerfile             # Production Ubuntu Jammy + Playwright + Xvfb + noVNC
+├── docker-compose.yml     # Cloud deployment specification (Ports 80 & 8080)
+├── start_cloud.sh         # Cloud virtual display & service bootstrapper
+└── requirements.txt       # Python production dependencies
+```
+
+---
+
+## 🚀 Cloud Deployment
+
+```bash
+# 1. Clone repository
+git clone https://github.com/Madalior/ai-video-automation.git
+cd ai-video-automation
+
+# 2. Launch production stack in background
+docker compose up -d --build
+```
+Access dashboard at `http://<your-server-ip>` or via your custom Cloudflare domain!
