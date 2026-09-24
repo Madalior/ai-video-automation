@@ -26,6 +26,9 @@ services:
       - "8080:6080"   # Cloudflare-proxied noVNC stream
       - "6080:6080"   # noVNC Mobile Streaming direct port
     volumes:
+      - ./web_app:/app/web_app
+      - ./clipper:/app/clipper
+      - ./start_cloud.sh:/app/start_cloud.sh
       - ./output:/app/output
       - ./uploader_profiles:/app/uploader_profiles
       - ./instance:/app/instance
