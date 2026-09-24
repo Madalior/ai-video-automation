@@ -34,21 +34,7 @@ services:
     networks:
       - going_merry_net
 
-  # Optional Cloudflare Tunnel:
-  # Gives you instant, free HTTPS (https://app.yourdomain.tech) without opening any ports!
-  # Just paste your token into .env: CLOUDFLARE_TUNNEL_TOKEN=...
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: going_merry_tunnel
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
-    networks:
-      - going_merry_net
-    depends_on:
-      - app
-
 networks:
   going_merry_net:
     driver: bridge
+
