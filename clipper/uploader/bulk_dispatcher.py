@@ -100,7 +100,8 @@ class BulkDispatcher:
         # Primary: If no direct mobile API session file, upload via browser engine with saved cookies
         if not INSTAGRAPI_AVAILABLE or not session_file.exists():
             print(f"[INSTAGRAM] Uploading Reel via authenticated Playwright browser session for [{account_id}]...")
-            with self.browser_engine.open_session(account_id=account_id, headless=True) as (context, page):
+            use_headless = not bool(os.getenv("DISPLAY"))
+            with self.browser_engine.open_session(account_id=account_id, headless=use_headless) as (context, page):
                 from clipper.uploader.drivers.instagram_web import InstagramWebUploader
                 ig_driver = InstagramWebUploader(page)
                 return ig_driver.upload_reel(video_path=video_path, caption=caption, hashtags=hashtags)
