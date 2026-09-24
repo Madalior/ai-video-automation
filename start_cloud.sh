@@ -39,7 +39,7 @@ sleep 1
 
 # 4. Start x11vnc (Captures the Xvfb display to VNC on port 5900)
 echo "📡 Starting x11vnc server on port 5900..."
-x11vnc -display :${DISPLAY_NUM} -nopw -listen 127.0.0.1 -xkb -ncache 10 -forever -shared &
+x11vnc -display :${DISPLAY_NUM} -nopw -listen 127.0.0.1 -xkb -forever -shared &
 sleep 1
 
 # 5. Start websockify / noVNC (Streams VNC to HTML5 on port 6080 for Mobile Phone access)
