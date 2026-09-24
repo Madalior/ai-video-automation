@@ -108,13 +108,7 @@ try:
 except ImportError:
     UPLOAD_AVAILABLE = False
 
-# PARALLEL DIRECTOR (NEW)
-try:
-    from flowchart.info.parallel_info_director import ParallelInfoDirector
-    PARALLEL_DIRECTOR_AVAILABLE = True
-except ImportError:
-    PARALLEL_DIRECTOR_AVAILABLE = False
-    print("[WARNING] Parallel info director not available")
+
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -491,30 +485,6 @@ class InfoContentOrchestrator:
             # ═══════════════════════════════════════════════════════════
             # AI-ONLY MODE: Veo3/Dreamina (with optional parallel processing)
             # ═══════════════════════════════════════════════════════════
-            
-            # Use parallel director if enabled and available
-            if self.use_parallel and PARALLEL_DIRECTOR_AVAILABLE:
-                print(f"   [AI + PARALLEL] Generating videos with {self.num_ai_workers} parallel workers...")
-                
-                try:
-                    director = ParallelInfoDirector(
-                        num_workers=self.num_ai_workers,
-                        output_dir=self.output_dir
-                    )
-                    
-                    video_paths = director.generate_ai_videos_parallel(
-                        scenes=scenes,
-                        use_veo3=True
-                    )
-                    
-                    print(f"   [OK] Generated {len(video_paths)} AI videos (parallel)")
-                    self._log_step(5, mode_label, "completed")
-                    return video_paths
-                    
-                except Exception as e:
-                    print(f"   [X] Parallel AI generation failed: {e}")
-                    print("   [FALLBACK] Trying sequential AI generation...")
-                    # Fall through to sequential mode below
             
             # Sequential AI generation (fallback or default)
             print("   [AI] Generating all videos with AI (sequential)...")

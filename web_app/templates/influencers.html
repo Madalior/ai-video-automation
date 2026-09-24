@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Followed Creators — Going Merry{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 4px;">Followed Influencers</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">
+      Going Merry scans these creators daily and automatically produces viral shorts from ended livestreams.
+    </p>
+  </div>
+  <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Follow New Creator</a>
+</div>
+
+<!-- Influencers Grid -->
+{% if influencers %}
+  <div class="influencer-grid">
+    {% for inf in influencers %}
+      <div class="influencer-card">
+        <div>
+          <div class="influencer-header">
+            <div>
+              <div class="influencer-name">{{ inf.channel_name }}</div>
+              <div class="influencer-handle">{{ inf.channel_handle or inf.channel_url }}</div>
+            </div>
+            <span class="badge {{ 'badge-active' if inf.is_active else 'badge-paused' }}">
+              {{ 'Monitoring' if inf.is_active else 'Paused' }}
+            </span>
+          </div>
+
+          <div style="margin-top: 16px; font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px;">
+            <div><strong>Platform:</strong> {{ inf.platform | capitalize }}</div>
+            <div><strong>Clips per stream:</strong> {{ inf.num_clips }}</div>
+            <div><strong>Auto-upload:</strong> {{ 'Enabled (Postiz)' if inf.auto_upload else 'Disabled' }}</div>
+            <div><strong>Last check:</strong> {{ inf.last_checked_at.strftime('%b %d, %H:%M') if inf.last_checked_at else 'Never' }}</div>
+          </div>
+        </div>
+
+        <div class="influencer-actions">
+          <!-- Manual Scan Button -->
+          <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
+            <button type="submit" class="btn-secondary" title="Scan for newly ended streams right now">
+              🔍 Scan Now
+            </button>
+          </form>
+
+          <!-- Toggle Active / Pause -->
+          <form method="POST" action="{{ url_for('influencers.toggle_influencer', influencer_id=inf.id) }}" style="display:inline;">
+            <button type="submit" class="btn-secondary">
+              {{ '⏸️ Pause' if inf.is_active else '▶️ Resume' }}
+            </button>
+          </form>
+
+          <!-- Delete -->
+          <form method="POST" action="{{ url_for('influencers.delete_influencer', influencer_id=inf.id) }}" style="display:inline;" onsubmit="return confirm('Stop monitoring {{ inf.channel_name }}?');">
+            <button type="submit" class="btn-danger" title="Unfollow">
+              🗑️
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="glass-card" style="text-align: center; padding: 48px 20px;">
+    <div style="font-size: 3rem; margin-bottom: 12px;">📡</div>
+    <h3 style="font-size: 1.3rem; margin-bottom: 8px;">No Influencers Followed Yet</h3>
+    <p style="color: var(--text-muted); max-width: 460px; margin: 0 auto 24px;">
+      Add creators like IShowSpeed, Kai Cenat, or your favorite streamers to automatically slice their streams every time they go offline.
+    </p>
+    <a href="{{ url_for('clips.new_clip') }}" class="btn-primary" style="display: inline-flex; width: auto;">
+      Follow Your First Influencer
+    </a>
+  </div>
+{% endif %}
+
+<!-- Recent Detected Streams Table -->
+<div class="glass-card" style="margin-top: 40px;">
+  <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 16px;">Detected Livestreams History</h2>
+  
+  {% if recent_streams %}
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Creator</th>
+            <th>Stream Title</th>
+            <th>Duration</th>
+            <th>Status</th>
+            <th>Detected At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stream in recent_streams %}
+            <tr>
+              <td><strong>{{ stream.influencer.channel_name }}</strong></td>
+              <td>
+                <a href="{{ stream.stream_url }}" target="_blank" style="color: var(--primary); text-decoration: none;">
+                  {{ stream.stream_title[:55] }}{% if stream.stream_title | length > 55 %}...{% endif %}
+                </a>
+              </td>
+              <td>{{ (stream.duration / 60) | round(0) }} min</td>
+              <td>
+                <span class="badge {{ 'badge-active' if stream.status == 'completed' else 'badge-processing' }}">
+                  {{ stream.status }}
+                </span>
+              </td>
+              <td style="color: var(--text-dim);">{{ stream.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p style="color: var(--text-dim); font-size: 0.9rem;">No completed streams detected yet. They will appear here automatically when your creators finish streaming.</p>
+  {% endif %}
+</div>
+{% endblock %}

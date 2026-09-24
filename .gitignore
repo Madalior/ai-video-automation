@@ -1,3 +1,8 @@
+# ==============================================================================
+# Going Merry & Clipper — Production .gitignore
+# Ensures only clean production code is tracked; excludes debug dumps & tests.
+# ==============================================================================
+
 # Python
 __pycache__/
 *.py[cod]
@@ -5,87 +10,114 @@ __pycache__/
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-
-# Virtual Environment
+.venv/
 venv/
 env/
 ENV/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
+# IDE & OS
 .DS_Store
 Thumbs.db
 desktop.ini
+*.swp
+*.swo
 
 # Logs
 *.log
 logs/
+antigravity.log
 
-# Output directories
+# Databases & Runtime Instances
+*.db
+*.sqlite3
+instance/*.db
+instance/*.sqlite
+database.db
+
+# Output & Cache Directories
 output/
 output_*/
-test_frames_cache/
+cache/
+footage_cache/
 frames_cache/
+test_frames_cache/
+music_library/trends_cache/
 
-# Chrome profiles
+# Chrome & Browser Profiles / Sessions
 chrome_data*/
 chrome_data_*/
+chrome_profiles/
+temp_chrome_profiles/
+pool_profiles/
+test_pool_profiles/
+temp_proxy_ext/
+sessions/
+gmail_tokens/
+youtube_tokens/
 
-# Temporary files
-*.tmp
-*.temp
-temp/
-
-# Test files
-test_output/
-
-# Sensitive data
-*.env
-.env.local
-secrets.json
-credentials.json
-
-# Videos and media (large files)
+# Media & Heavy Dumps
 *.mp4
 *.avi
 *.mov
 *.mkv
 *.webm
+*.tmp
+*.temp
+temp/
+clipper/remotion/detail_*.png
+clipper/remotion/ref_frame_*.png
+clipper/frame_*.png
+Text Animation Pack By Bh4vyafx/
+vaseline_extra/
 
-# Images (optional - uncomment to exclude)
-# *.png
-# *.jpg
-# *.jpeg
-# *.gif
-
-# Node modules (if any)
+# Node & Remotion Build
 node_modules/
+clipper/remotion/node_modules/
+genkit-service/
+media-inference-worker/
 
-# Genkit service
-genkit-service/node_modules/
-genkit-service/.genkit/
+# Dead Proxies & One-Off Scraper Dumps
+*proxies*.txt
+campaign_links_raw.json
+whop_scout_results.json
+channel_niche.json
+video_idea_history.json
+batch_config.json
+studio_config.json
 
-# Specific output folders
-character_videos/
-info_videos/
-automation_tool.zip
+# Scratch Tests & Deprecated Scripts
+scratch/
+flowchart/
+01_user_data/
+02_niche_discovery/
+03_ideation_scripting/
+04_generation/
+05_platform_auth/
+06_uploading/
+batch_templates/
+character_cards/
+submissions/
+test_*.py
+test_*.bat
+test_*.txt
+patch_*.py
+whop_*.py
+antigravity_optimizer*.py
+*.bat
+
+# Sensitive Configuration
+.env
+.env.local
+secrets.json
+credentials.json
+client_secrets.json
+
+# Exception: keep important production configs
+!.env.example
+!package.json
+!package-lock.json
+!requirements.txt
+!yolov8n-face.pt

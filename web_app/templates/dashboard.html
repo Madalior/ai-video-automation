@@ -1,0 +1,1882 @@
+{% extends "base.html" %}
+
+{% block title %}TECHTRONICS™ — THE NEW TECH VIBES | 30+ Fleet Command{% endblock %}
+
+{% block content %}
+<!-- Top Header & Global Actions -->
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; border-bottom: 2px solid var(--color-brand-black); padding-bottom: 20px;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+      <span class="led-pulse"></span>
+      <span style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.2em; color: var(--color-muted); text-transform: uppercase;">
+        // ARCHETYPE: NEO-BRUTALIST INDUSTRIAL TELEMETRY
+      </span>
+      <span style="font-family: var(--font-mono); font-size: 0.7rem; background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 7px; border-radius: var(--radius-xs); font-weight: 700;">
+        EST. 2024 | INDIA
+      </span>
+    </div>
+    <h1 style="font-family: var(--font-wordmark); font-size: 1.85rem; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-brand-black); line-height: 1.1;">
+      30+ FLEET COMMAND CENTER
+    </h1>
+    <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.8rem; margin-top: 6px; letter-spacing: 0.04em;">
+      TECHNOLOGY MEETS EVERYDAY LIFE • MANAGING <strong>{{ stats.total_accounts }} NODES</strong> • PHYSICAL DISK ISOLATION (YT, IG, FB, TT)
+    </p>
+  </div>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <button class="nav-btn-primary" onclick="toggleConnectGmailWizard()" style="padding: 10px 18px; cursor: pointer;">
+      ⚡ + CONNECT GMAIL & CHANNELS
+    </button>
+    <button id="btnScanViews" class="btn-secondary" onclick="scanAllViewsNow()" style="padding: 10px 16px;">
+      <span id="scanIcon">🔄</span> <strong>SCAN VIEWS NOW</strong>
+    </button>
+    <a href="{{ url_for('clips.new_clip') }}" class="btn-secondary" style="padding: 10px 16px;">
+      🎬 + NEW DISPATCH
+    </a>
+  </div>
+</div>
+
+<!-- Industrial Telemetry Stats Grid -->
+<div class="stats-grid">
+  <div class="stat-box">
+    <div class="stat-meta-header">
+      <span class="stat-index-code">[NODE.01]</span>
+      <span class="led-pulse"></span>
+    </div>
+    <span class="stat-label">30+ Fleet Nodes</span>
+    <span class="stat-value">{{ stats.total_accounts }}</span>
+    <div class="stat-footer-text">
+      <span>🏆 {{ stats.whop_accounts }} WHOP</span>
+      <span>•</span>
+      <span>🎬 {{ stats.upload_accounts }} UPLOAD</span>
+    </div>
+  </div>
+
+  <div class="stat-box" style="border-top-color: var(--color-brand-accent);">
+    <div class="stat-meta-header">
+      <span class="stat-index-code">[VIRAL.02]</span>
+      <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #111111; font-weight: 700;">≥{{ criteria_views | default(1000) }} V</span>
+    </div>
+    <span class="stat-label">🔥 Viral Hits Detected</span>
+    <span class="stat-value" style="color: #111111;">{{ stats.viral_count }}</span>
+    <div class="stat-footer-text" style="color: var(--color-brand-black); font-weight: 600;">
+      CRITERIA: ≥{{ criteria_views | default(1000) }} VIEWS
+    </div>
+  </div>
+
+  <div class="stat-box">
+    <div class="stat-meta-header">
+      <span class="stat-index-code">[METRIC.03]</span>
+      <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">YT-DLP</span>
+    </div>
+    <span class="stat-label">Total Views Tracked</span>
+    <span class="stat-value">{{ "{:,}".format(stats.total_views) }}</span>
+    <div class="stat-footer-text">
+      PHYSICAL YT-DLP EXTRACTION
+    </div>
+  </div>
+
+  <div class="stat-box" style="border-top-color: var(--color-brand-black);">
+    <div class="stat-meta-header">
+      <span class="stat-index-code">[YIELD.04]</span>
+      <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-brand-black); font-weight: 700;">$5.00 CPM</span>
+    </div>
+    <span class="stat-label">Est. Whop Yield</span>
+    <span class="stat-value" style="color: var(--color-brand-black);">
+      ${{ "%.2f"|format(stats.est_viral_bounty) }}
+    </span>
+    <div class="stat-footer-text">
+      AUTOMATED BOUNTY POOL
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     VIRAL HITS ALERT BANNER (Zero Blind Whop Submissions)
+     ═══════════════════════════════════════════════════════════════ -->
+{% if viral_clips %}
+<div class="viral-alert-banner">
+  <div class="viral-banner-header">
+    <div>
+      <div class="viral-heading">
+        <span class="led-pulse"></span> // TELEMETRY ALERT: {{ viral_clips|length }} VIDEO{{ 's' if viral_clips|length > 1 else '' }} EXCEEDED CRITERIA THRESHOLD
+      </div>
+      <div class="viral-subheading">
+        QUALITY THRESHOLD MET (≥{{ criteria_views }} VIEWS) • PROTECTED AGAINST FLOPPED SUBMISSIONS • BOUNTY YIELD UNLOCKED
+      </div>
+    </div>
+    <div>
+      <span class="badge-viral-active">[BOUNTY CLAIM READY]</span>
+    </div>
+  </div>
+
+  <div class="viral-items-grid">
+    {% for vclip in viral_clips %}
+    <div class="viral-item-card" id="viral-card-{{ vclip.id }}">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="viral-item-title">{{ vclip.title or "Viral Short" }}</div>
+        {% if vclip.post_url %}
+        <a href="{{ vclip.post_url }}" target="_blank" style="color: var(--color-brand-accent); font-family: var(--font-mono); font-size: 0.78rem; text-decoration: none;" title="Open Live Video">
+          🔗 [LIVE POST]
+        </a>
+        {% endif %}
+      </div>
+
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span class="metric-pill metric-views">
+          👁️ {{ "{:,}".format(vclip.views or 0) }} VIEWS
+        </span>
+        <span class="metric-pill metric-bounty">
+          💰 EST. ${{ "%.2f"|format(((vclip.views or 0) / 1000.0) * 5.0) }} YIELD
+        </span>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <span style="font-family: var(--font-mono); font-size: 0.75rem; color: #A0A0A0;">
+          STATUS: <strong style="color: var(--color-brand-accent);">{{ vclip.status|upper }}</strong>
+        </span>
+        {% if vclip.status == 'submitted_whop' %}
+          <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-brand-accent); font-weight: 700;">✅ SUBMITTED TO WHOP</span>
+        {% else %}
+          <button class="btn-whop-submit" id="btn-submit-{{ vclip.id }}" onclick="submitViralToWhop({{ vclip.id }})">
+            ⚡ 1-CLICK SUBMIT TO WHOP
+          </button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="tech-card" style="margin-bottom: 28px; border-left: 4px solid var(--color-brand-black); padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+  <div style="display: flex; align-items: center; gap: 14px;">
+    <div style="width: 32px; height: 32px; background: var(--color-brand-black); color: var(--color-brand-accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--font-mono); border-radius: var(--radius-xs);">
+      01
+    </div>
+    <div>
+      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.92rem; color: var(--color-brand-black); text-transform: uppercase;">
+        // VIRAL QUALITY TELEMETRY ACTIVE: ZERO BLIND WHOP SUBMISSIONS
+      </div>
+      <div style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin-top: 2px;">
+        Clips are monitored in background. As soon as views hit <strong>≥{{ criteria_views }} views</strong>, Going Merry alerts you and Telegram for 1-click Whop payout.
+      </div>
+    </div>
+  </div>
+  <button class="btn-secondary" onclick="scanAllViewsNow()" style="padding: 8px 16px;">
+    🔄 SCAN VIEWS NOW
+  </button>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════
+     WIZARD: CONNECT GMAIL & CHANNELS (User Requirement)
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="connectGmailWizard" class="tech-card" style="display: none; border-top: 4px solid var(--color-brand-black); background: #FFFFFF; margin-bottom: 28px;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; border-bottom: 1px solid var(--color-border); padding-bottom: 14px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="led-pulse"></span>
+        <h2 style="font-family: var(--font-wordmark); font-size: 1.15rem; font-weight: 400; color: var(--color-brand-black); letter-spacing: 0.05em; text-transform: uppercase;">
+          // ONBOARD CREATOR NODE & GMAIL IDENTITY
+        </h2>
+      </div>
+      <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.78rem; margin-top: 4px;">
+        INITIALIZES AN ISOLATED CHROMIUM DIRECTORY IN uploader_profiles/sessions/ FOR AUTOMATED UPLOADING.
+      </p>
+    </div>
+    <button type="button" class="btn-secondary" onclick="toggleConnectGmailWizard()" style="padding: 6px 14px; font-size: 0.75rem;">
+      ✕ CLOSE
+    </button>
+  </div>
+
+  <form id="formConnectGmail" onsubmit="handleConnectGmailSubmit(event)">
+    <!-- STEP 1: GMAIL & GENERAL USERNAME -->
+    <div style="margin-bottom: 24px;">
+      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--color-brand-black); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <span style="background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 6px; border-radius: var(--radius-xs);">[STEP 01]</span>
+        <span>// GMAIL IDENTITY & USERNAME</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Gmail Address</label>
+          <input type="email" id="wizGmail" class="form-input" placeholder="creator30@gmail.com" required>
+          <div class="form-hint">OPERATOR GOOGLE ACCOUNT USED FOR PROFILES & OAUTH.</div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">General Username for this Gmail</label>
+          <input type="text" id="wizUsername" class="form-input" placeholder="@SpeedViralClips" required>
+          <div class="form-hint">PRIMARY CREATOR HANDLE ACROSS CHANNELS.</div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Display / Brand Name</label>
+          <input type="text" id="wizName" class="form-input" placeholder="Speed Viral Network">
+          <div class="form-hint">INTERNAL LABEL FOR FLEET TELEMETRY.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: CHANNEL CONTENT TYPE -->
+    <div style="margin-bottom: 24px;">
+      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--color-brand-black); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <span style="background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 6px; border-radius: var(--radius-xs);">[STEP 02]</span>
+        <span>// CHANNEL CONTENT MODEL ALLOCATION</span>
+      </div>
+      <div class="radio-choice-grid">
+        <label class="radio-choice-card selected" id="cardWhop" onclick="selectContentType('whop_content')">
+          <input type="radio" name="contentTypeChoice" value="whop_content" checked>
+          <div>
+            <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-black); font-size: 0.85rem;">🏆 WHOP CONTENT REWARDS</div>
+            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); margin-top: 4px; line-height: 1.35;">
+              AUTOMATED BOUNTY CAMPAIGNS ($5.00 CPM). ENROLLED IN VIRAL TRACKER BEFORE SUBMISSION.
+            </div>
+          </div>
+        </label>
+        <label class="radio-choice-card" id="cardUpload" onclick="selectContentType('upload_based')">
+          <input type="radio" name="contentTypeChoice" value="upload_based">
+          <div>
+            <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-black); font-size: 0.85rem;">🎬 URL / UPLOAD-BASED CONTENT</div>
+            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); margin-top: 4px; line-height: 1.35;">
+              DIRECT VIDEO CLIPPING, LIVESTREAM CROPPING, AND MANUAL SOCIAL DISPATCHES.
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- STEP 3: PLATFORM CHANNELS REGISTRATION -->
+    <div style="margin-bottom: 24px;">
+      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--color-brand-black); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <span style="background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 6px; border-radius: var(--radius-xs);">[STEP 03]</span>
+        <span>// TARGET CHANNEL HANDLES (AUTO-DETECTED UPON BROWSER LOGIN)</span>
+      </div>
+      <p style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); margin-bottom: 14px; line-height: 1.4;">
+        CHANNELS ARE AUTHENTICATED VIA <strong>GOOGLE OAUTH (YOUTUBE)</strong> AND <strong>ISOLATED CHROME SESSIONS (IG, TT, FB)</strong>. YOU CAN ENTER TARGET HANDLES BELOW OR LEAVE BLANK TO DETECT FROM LOGIN.
+      </p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
+            <span class="channel-badge badge-yt">▶ YouTube</span> Shorts Handle
+          </label>
+          <input type="text" id="wizYt" class="form-input" placeholder="e.g. @MyShortsChannel">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
+            <span class="channel-badge badge-ig">📸 Instagram</span> Reels Handle
+          </label>
+          <input type="text" id="wizIg" class="form-input" placeholder="e.g. @MyInstagramReels">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
+            <span class="channel-badge badge-fb">🌐 Facebook</span> Page Handle
+          </label>
+          <input type="text" id="wizFb" class="form-input" placeholder="e.g. @MyFacebookPage">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
+            <span class="channel-badge badge-tt">🎵 TikTok</span> Profile Handle
+          </label>
+          <input type="text" id="wizTt" class="form-input" placeholder="e.g. @MyTikTokProfile">
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBMIT -->
+    <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--color-border); padding-top: 18px;">
+      <button type="button" class="btn-secondary" onclick="toggleConnectGmailWizard()">CANCEL</button>
+      <button type="submit" class="btn-primary" style="width: auto; padding: 12px 28px;">
+        ⚡ REGISTER NODE TO 30+ FLEET
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     UNIFIED 30+ FLEET EXPLORER (Single Dashboard View)
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="tech-card" id="fleet-section" style="margin-bottom: 32px; border-top: 4px solid var(--color-brand-black);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="led-pulse"></span>
+        <h2 style="font-family: var(--font-wordmark); font-size: 1.25rem; font-weight: 400; color: var(--color-brand-black); letter-spacing: 0.05em; text-transform: uppercase;">
+          // 30+ CREATOR FLEET TELEMETRY ({{ personas|length }}/30 NODES)
+        </h2>
+      </div>
+      <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.78rem; margin-top: 4px;">
+        ISOLATED CHROME DIRECTORIES • ZERO COOKIE OVERWRITE • ONE-CLICK REAL PLATFORM AUTHENTICATION
+      </p>
+    </div>
+    <button class="btn-primary" onclick="toggleConnectGmailWizard()" style="font-size: 0.78rem; padding: 8px 16px;">
+      ⚡ + ONBOARD ANOTHER NODE
+    </button>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="fleet-filter-bar">
+    <button class="fleet-tab active" id="filterTabAll" onclick="filterFleet('all')">
+      // ALL NODES ({{ personas|length }})
+    </button>
+    <button class="fleet-tab" id="filterTabWhop" onclick="filterFleet('whop_content')">
+      🏆 WHOP REWARDS ({{ stats.whop_accounts }})
+    </button>
+    <button class="fleet-tab" id="filterTabUpload" onclick="filterFleet('upload_based')">
+      🎬 UPLOAD-BASED ({{ stats.upload_accounts }})
+    </button>
+  </div>
+
+  {% if personas %}
+    <div class="persona-grid">
+      {% for persona in personas %}
+      {% set p_status = fleet_platform_status.get(persona.id, {}) %}
+      <div class="persona-card fleet-card" data-content-type="{{ persona.content_type or 'whop_content' }}" id="persona-card-{{ persona.id }}">
+        <div class="persona-header">
+          <div class="persona-title-group">
+            <div class="persona-avatar">🚀</div>
+            <div>
+              <div class="persona-username">{{ persona.username }}</div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
+                {% if persona.gmail %}
+                  <span class="badge-gmail" title="Linked Gmail Address">📧 {{ persona.gmail }}</span>
+                {% endif %}
+                {% if persona.content_type == 'whop_content' %}
+                  <span class="badge-whop-type">🏆 Whop Content</span>
+                {% else %}
+                  <span class="badge-upload-type">🎬 Upload-Based</span>
+                {% endif %}
+              </div>
+            </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button onclick="syncExistingSessions('{{ persona.id }}')" style="background: rgba(17,17,17,0.06); border: 1px solid var(--color-border-strong); color: var(--color-brand-black); cursor: pointer; font-size: 0.68rem; font-family: var(--font-mono); padding: 3px 8px; border-radius: var(--radius-xs); font-weight: 700;" title="Auto-detect and sync saved sessions from disk">
+              🔄 SYNC SESSIONS
+            </button>
+            <button onclick="deleteAccountPersona('{{ persona.id }}')" style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.9rem;" title="Remove account from fleet">
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        <!-- Channel List (YT, IG, FB, TikTok) with Real Actions -->
+        <div class="channel-list">
+          <!-- YouTube -->
+          <div class="channel-row" id="row-{{ persona.id }}-youtube">
+            <div class="channel-info">
+              <span class="channel-badge badge-yt">▶ YouTube</span>
+              <span class="channel-handle" id="handle-{{ persona.id }}-youtube">
+                {% if p_status.get('youtube', {}).get('connected') %}
+                  {{ p_status.get('youtube', {}).get('channel_title') or persona.youtube_handle or "Connected Channel" }}
+                {% else %}
+                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="channel-actions" id="actions-{{ persona.id }}-youtube" style="display: flex; align-items: center; gap: 6px;">
+              {% if p_status.get('youtube', {}).get('connected') %}
+                <span class="badge-connected" title="OAuth Verified on Disk">✅ Connected</span>
+                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'youtube')" title="Verify live API">⚡ Test</button>
+                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'youtube')" title="Disconnect token">✕</button>
+              {% else %}
+                <span class="badge-disconnected">⚠️ Not Connected</span>
+                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'youtube', '{{ persona.username }}')" title="Sign in with Google OAuth">🔗 Connect</button>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Instagram -->
+          <div class="channel-row" id="row-{{ persona.id }}-instagram">
+            <div class="channel-info">
+              <span class="channel-badge badge-ig">📸 Instagram</span>
+              <span class="channel-handle" id="handle-{{ persona.id }}-instagram">
+                {% if p_status.get('instagram', {}).get('connected') %}
+                  {{ p_status.get('instagram', {}).get('handle') or persona.instagram_handle or "Connected Profile" }}
+                {% else %}
+                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="channel-actions" id="actions-{{ persona.id }}-instagram" style="display: flex; align-items: center; gap: 6px;">
+              {% if p_status.get('instagram', {}).get('connected') %}
+                <span class="badge-connected" title="Cookies Saved in Profile">✅ Connected</span>
+                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'instagram')" title="Verify session">⚡ Test</button>
+                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'instagram')" title="Disconnect session">✕</button>
+              {% else %}
+                <span class="badge-disconnected">⚠️ Not Connected</span>
+                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'instagram', '{{ persona.username }}')" title="Launch Chrome to login">🔗 Connect</button>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Facebook -->
+          <div class="channel-row" id="row-{{ persona.id }}-facebook">
+            <div class="channel-info">
+              <span class="channel-badge badge-fb">🌐 Facebook</span>
+              <span class="channel-handle" id="handle-{{ persona.id }}-facebook">
+                {% if p_status.get('facebook', {}).get('connected') %}
+                  {{ p_status.get('facebook', {}).get('handle') or persona.facebook_handle or "Connected Profile" }}
+                {% else %}
+                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="channel-actions" id="actions-{{ persona.id }}-facebook" style="display: flex; align-items: center; gap: 6px;">
+              {% if p_status.get('facebook', {}).get('connected') %}
+                <span class="badge-connected" title="Cookies Saved in Profile">✅ Connected</span>
+                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'facebook')" title="Verify session">⚡ Test</button>
+                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'facebook')" title="Disconnect session">✕</button>
+              {% else %}
+                <span class="badge-disconnected">⚠️ Not Connected</span>
+                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'facebook', '{{ persona.username }}')" title="Launch Chrome to login">🔗 Connect</button>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- TikTok -->
+          <div class="channel-row" id="row-{{ persona.id }}-tiktok">
+            <div class="channel-info">
+              <span class="channel-badge badge-tt">🎵 TikTok</span>
+              <span class="channel-handle" id="handle-{{ persona.id }}-tiktok">
+                {% if p_status.get('tiktok', {}).get('connected') %}
+                  {{ p_status.get('tiktok', {}).get('handle') or persona.tiktok_handle or "Connected Profile" }}
+                {% else %}
+                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="channel-actions" id="actions-{{ persona.id }}-tiktok" style="display: flex; align-items: center; gap: 6px;">
+              {% if p_status.get('tiktok', {}).get('connected') %}
+                <span class="badge-connected" title="Cookies Saved in Profile">✅ Connected</span>
+                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'tiktok')" title="Verify session">⚡ Test</button>
+                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'tiktok')" title="Disconnect session">✕</button>
+              {% else %}
+                <span class="badge-disconnected">⚠️ Not Connected</span>
+                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'tiktok', '{{ persona.username }}')" title="Launch Chrome to login">🔗 Connect</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="persona-footer">
+          <span>Brand: <strong>{{ persona.name or persona.username }}</strong></span>
+          <span>Clips: <strong>{{ persona.clips|length }}</strong></span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 48px 24px; background: #FAF9F6; border: 2px dashed var(--color-border-strong); border-radius: var(--radius-xs); margin-top: 18px;">
+      <div style="font-family: var(--font-mono); font-size: 1.8rem; margin-bottom: 8px; color: var(--color-brand-black);">[ 0 / 30 ]</div>
+      <h3 style="font-family: var(--font-wordmark); font-size: 1.1rem; font-weight: 400; color: var(--color-brand-black); margin-bottom: 6px; text-transform: uppercase;">
+        // ZERO FLEET NODES REGISTERED
+      </h3>
+      <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.8rem; max-width: 520px; margin: 0 auto 20px; line-height: 1.4;">
+        TELEMETRY READY. CLICK THE BUTTON BELOW TO INITIALIZE AN ACCOUNT NODE WITH GMAIL IDENTITY AND ISOLATED CHROME PROFILE.
+      </p>
+      <button class="nav-btn-primary" onclick="toggleConnectGmailWizard()" style="display: inline-flex; cursor: pointer; padding: 12px 24px;">
+        ⚡ + ONBOARD FIRST NODE
+      </button>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     03 GOING MERRY AUTONOMOUS SHORTS FACTORY (ONE-CLICK PIPELINE)
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="tech-card" style="margin-bottom: 28px; border-top: 5px solid var(--color-brand-accent); background: #FFFFFF; box-shadow: 0 10px 35px rgba(0,0,0,0.06); padding: 24px;">
+  <!-- Factory Card Header -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; border-bottom: 1px solid var(--color-border); padding-bottom: 16px; flex-wrap: wrap; gap: 14px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="led-pulse"></span>
+        <h2 style="font-family: var(--font-wordmark); font-size: 1.22rem; font-weight: 400; color: var(--color-brand-black); letter-spacing: 0.05em; text-transform: uppercase;">
+          // 03 GOING MERRY AUTONOMOUS SHORTS FACTORY
+        </h2>
+        <span style="background: var(--color-brand-black); color: var(--color-brand-accent); font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 2px;">
+          ENGINE ONLINE
+        </span>
+      </div>
+      <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.78rem; margin-top: 5px; line-height: 1.4;">
+        URL / LIVESTREAM → WHISPER AI TRANSCRIPTION → LLM VIRAL DISCOVERY → YOLO FACE TRACKING → 9:16 REFRAME → REMOTION GREEN GLOW CAPTIONS → MULTI-CHANNEL DISPATCH
+      </p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <span class="badge badge-active" id="pipelineLiveBadge" style="padding: 6px 14px; font-size: 0.78rem;">
+        ⚡ ZERO DOCKER // READY
+      </span>
+    </div>
+  </div>
+
+  <!-- Factory Form -->
+  <form id="formGoingMerry" onsubmit="launchGoingMerryPipeline(event)">
+    <div style="display: grid; grid-template-columns: 2fr 1.2fr; gap: 18px; margin-bottom: 20px;">
+      <!-- Video URL / Local Source -->
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label" style="display: flex; justify-content: space-between;">
+          <span>SOURCE VIDEO URL / LIVESTREAM / LOCAL FILE</span>
+          <span style="color: var(--color-brand-accent); font-weight: 700;">[ YT / TWITCH / KICK / MP4 ]</span>
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="gmSourceUrl" class="form-input" placeholder="https://www.youtube.com/watch?v=... or C:\path\to\video.mp4" required style="font-family: var(--font-mono); font-size: 0.85rem;">
+          <button type="button" class="btn-secondary" onclick="useSampleVideoClip()" style="white-space: nowrap; padding: 0 14px; font-size: 0.75rem;" title="Load local sample clip">
+            🎬 SAMPLE
+          </button>
+        </div>
+        <div class="form-hint">DIRECT DOWNLOAD VIA YT-DLP OR HIGH-PERFORMANCE LOCAL FFmpeg SLICING.</div>
+      </div>
+
+      <!-- Account Persona Target Dropdown -->
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">ASSIGN CREATOR NODE (ROUTING IDENTITY)</label>
+        <select id="gmAccountId" class="form-input" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 700; background: #FFF;">
+          {% for persona in personas %}
+            <option value="{{ persona.id }}" {% if loop.first %}selected{% endif %}>
+              {{ persona.username }} ({{ persona.name or 'Creator' }})
+            </option>
+          {% endfor %}
+          {% if not personas %}
+            <option value="acc_01">@DefaultNode (acc_01)</option>
+          {% endif %}
+        </select>
+        <div class="form-hint">DISPATCHES COMPLETED SHORTS DIRECTLY USING THIS NODE'S ACCOUNTS.</div>
+      </div>
+    </div>
+
+    <!-- Second Row: Mode, Campaign, Clip Count, Target Platform -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <!-- Mode Selection -->
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">CONTENT STRATEGY</label>
+        <select id="gmContentMode" class="form-input" onchange="toggleModeCampaign(this.value)">
+          <option value="whop">🏆 Whop Content Rewards ($5 CPM)</option>
+          <option value="url">🎬 Viral URL / Independent Clipper</option>
+        </select>
+      </div>
+
+      <!-- Whop Campaign Name (Dynamic Campaign Adapter) -->
+      <div class="form-group" id="groupCampaign" style="margin-bottom: 0;">
+        <label class="form-label">WHOP BOUNTY CAMPAIGN</label>
+        <select id="gmCampaign" class="form-input">
+          <option value="FundingPips">FundingPips (Official $5 CPM Bounty)</option>
+          <option value="WhopGeneral">Whop Trading & Forex</option>
+          <option value="EcomSaaS">E-Commerce & SaaS Network</option>
+        </select>
+      </div>
+
+      <!-- Number of Clips -->
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">CLIPS QUANTITY</label>
+        <select id="gmNumClips" class="form-input">
+          <option value="1">1 Short (Turbo Express)</option>
+          <option value="3" selected>3 Shorts (Optimal Quality)</option>
+          <option value="5">5 Shorts (Full Batch)</option>
+          <option value="8">8 Shorts (Omni-Channel Flood)</option>
+        </select>
+      </div>
+
+      <!-- Target Platforms -->
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">TARGET PLATFORMS</label>
+        <select id="gmPlatform" class="form-input">
+          <option value="all" selected>All Connected Platforms (YT + IG + TT)</option>
+          <option value="youtube">YouTube Shorts Only</option>
+          <option value="instagram">Instagram Reels Only</option>
+          <option value="tiktok">TikTok Only</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Third Row: Neo-Brutalist Production Feature Toggles -->
+    <div style="margin-bottom: 22px;">
+      <label class="form-label" style="margin-bottom: 10px;">PRODUCTION PIPELINE MODULES (HARDWARE ACCELERATED)</label>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <label class="toggle-pill selected" id="pillSplitScreen" onclick="togglePill('pillSplitScreen', 'gmSplitScreen')">
+          <input type="checkbox" id="gmSplitScreen" checked style="display: none;">
+          <span>📐 9:16 SMART REFRAME & YOLO FACE TRACKING</span>
+        </label>
+        <label class="toggle-pill selected" id="pillCaptions" onclick="togglePill('pillCaptions', 'gmCaptions')">
+          <input type="checkbox" id="gmCaptions" checked style="display: none;">
+          <span>💬 KINETIC REMOTION CAPTIONS (GREEN GLOW)</span>
+        </label>
+        <label class="toggle-pill selected" id="pillMusic" onclick="togglePill('pillMusic', 'gmMusic')">
+          <input type="checkbox" id="gmMusic" checked style="display: none;">
+          <span>🎵 TRENDING TIKTOK MUSIC (-14 LUFS DUCKED)</span>
+        </label>
+        <label class="toggle-pill selected" id="pillUpload" onclick="togglePill('pillUpload', 'gmAutoUpload')">
+          <input type="checkbox" id="gmAutoUpload" checked style="display: none;">
+          <span>🚀 AUTO-UPLOAD TO CONNECTED CHANNELS</span>
+        </label>
+        <label class="toggle-pill" id="pillPreview" onclick="togglePill('pillPreview', 'gmPreview')">
+          <input type="checkbox" id="gmPreview" style="display: none;">
+          <span>⚡ PREVIEW RENDER (5 SEC TEST)</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Launch Action Bar -->
+    <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; border-top: 1px solid var(--color-border); padding-top: 18px; flex-wrap: wrap;">
+      <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted);">
+        STATUS: <strong>STANDBY</strong> // CACHE CHECKPOINT RECOVERY: <strong>ENABLED</strong>
+      </div>
+      <button type="submit" id="btnLaunchGoingMerry" class="btn-primary" style="padding: 14px 32px; font-size: 0.95rem; font-family: var(--font-wordmark); letter-spacing: 0.08em; background: var(--color-brand-accent); color: var(--color-brand-black); border-radius: 2px; box-shadow: 0 4px 20px rgba(76,230,22,0.4); text-transform: uppercase;">
+        ⚡ LAUNCH GOING MERRY PIPELINE
+      </button>
+    </div>
+  </form>
+
+  <!-- LIVE TELEMETRY CONSOLE & 7-STAGE PROGRESS -->
+  <div id="pipelineConsoleBox" style="display: none; margin-top: 24px; border-top: 2px dashed var(--color-brand-black); padding-top: 20px;">
+    <!-- 7-Stage Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; color: var(--color-brand-black); display: flex; align-items: center; gap: 8px;">
+        <span class="led-pulse"></span>
+        <span>// LIVE PIPELINE STAGES TELEMETRY</span>
+        <span id="activeJobIdBadge" style="background: var(--color-brand-black); color: var(--color-brand-accent); font-size: 0.7rem; padding: 2px 6px;">[JOB: IDLE]</span>
+      </div>
+      <button type="button" class="btn-secondary" onclick="stopCurrentPipeline()" style="padding: 4px 12px; font-size: 0.72rem; color: #ff3366; border-color: #ff3366;">
+        🛑 ABORT PIPELINE
+      </button>
+    </div>
+
+    <!-- 7 Stage Horizontal Checklist -->
+    <div class="pipeline-stages-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 16px;">
+      <div class="stage-cell" id="stage1">
+        <div class="stage-num">01</div>
+        <div class="stage-name">TRANSCRIBE</div>
+        <div class="stage-status" id="stageStatus1">WAITING</div>
+      </div>
+      <div class="stage-cell" id="stage2">
+        <div class="stage-num">02</div>
+        <div class="stage-name">AI MOMENTS</div>
+        <div class="stage-status" id="stageStatus2">WAITING</div>
+      </div>
+      <div class="stage-cell" id="stage3">
+        <div class="stage-num">03</div>
+        <div class="stage-name">DOWNLOAD/SLICE</div>
+        <div class="stage-status" id="stageStatus3">WAITING</div>
+      </div>
+      <div class="stage-cell" id="stage4">
+        <div class="stage-num">04</div>
+        <div class="stage-name">YOLO REFRAME</div>
+        <div class="stage-status" id="stageStatus4">WAITING</div>
+      </div>
+      <div class="stage-cell" id="stage5">
+        <div class="stage-num">05</div>
+        <div class="stage-name">REMOTION CAPTIONS</div>
+        <div class="stage-status" id="stageStatus5">WAITING</div>
+      </div>
+      <div class="stage-cell" id="stage6">
+        <div class="stage-num">06</div>
+        <div class="stage-name">TIKTOK MUSIC</div>
+        <div class="stage-status" id="stageStatus6">WAITING</div>
+      </div>
+      <div class="stage-cell" id="stage7">
+        <div class="stage-num">07</div>
+        <div class="stage-name">SOCIAL DISPATCH</div>
+        <div class="stage-status" id="stageStatus7">WAITING</div>
+      </div>
+    </div>
+
+    <!-- Live Terminal Stream Box -->
+    <div class="live-terminal-box" style="background: #111111; color: #4CE616; border: 1px solid rgba(76,230,22,0.3); border-radius: 4px; padding: 14px; font-family: var(--font-mono); font-size: 0.78rem; height: 180px; overflow-y: auto; box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);">
+      <div id="pipelineTerminalLogs" style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="color: #737373;">// GOING MERRY SSE TELEMETRY STREAM READY...</div>
+      </div>
+    </div>
+
+    <!-- Generated Clips Gallery Container -->
+    <div id="pipelineOutputClipsContainer" style="display: none; margin-top: 18px;">
+      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; color: var(--color-brand-black); margin-bottom: 10px;">
+        🎬 GENERATED VIRAL CLIPS (READY FOR TELEMETRY & BOUNTY):
+      </div>
+      <div id="pipelineOutputClipsList" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DETECTION CRITERIA & TELEGRAM ALERT SETTINGS
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="settings-grid">
+  <!-- Viral Detection Criteria -->
+  <div class="settings-card">
+    <div>
+      <div class="settings-card-header">
+        <span class="led-pulse"></span>
+        <div>
+          <h3 style="font-family: var(--font-wordmark); font-size: 0.95rem; font-weight: 400; text-transform: uppercase; color: var(--color-brand-black);">
+            // 01 VIRAL THRESHOLD TELEMETRY
+          </h3>
+          <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.72rem;">VIEWS CRITERIA BEFORE DISPATCHING BOUNTY ALERT</p>
+        </div>
+      </div>
+      <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 12px 0 16px; line-height: 1.4;">
+        PREVENTS SUBMITTING FLOPPED VIDEOS. ENGINE CONTINUOUSLY MONITORS VIEWS AND TRIGGERS NOTIFICATION ONLY WHEN VIDEO HITS THIS THRESHOLD.
+      </p>
+      <div class="form-group" style="margin-bottom: 8px;">
+        <label class="form-label">TARGET VIEW COUNT CRITERIA</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="number" id="settingCriteria" class="form-input" value="{{ criteria_views }}" min="100" step="100" placeholder="1000">
+          <button type="button" class="btn-primary" onclick="saveSettings()" style="white-space: nowrap; padding: 10px 18px;">
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+    <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); border-top: 1px solid var(--color-border); padding-top: 10px;">
+      STANDARD CPM BASELINE: <strong>1,000 VIEWS</strong> ($5.00 WHOP CPM POOL).
+    </div>
+  </div>
+
+  <!-- Telegram Bot Alert Configuration -->
+  <div class="settings-card">
+    <div>
+      <div class="settings-card-header">
+        <span class="led-pulse"></span>
+        <div>
+          <h3 style="font-family: var(--font-wordmark); font-size: 0.95rem; font-weight: 400; text-transform: uppercase; color: var(--color-brand-black);">
+            // 02 TELEGRAM DISPATCH GATEWAY
+          </h3>
+          <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.72rem;">INSTANT TELEGRAM PUSH NOTIFICATION ON HIT</p>
+        </div>
+      </div>
+      <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 12px 0 16px; line-height: 1.4;">
+        TRANSMITS REAL-TIME TELEGRAM ALERT WITH VIDEO URL AND CALCULATED BOUNTY AS SOON AS CRITERIA IS EXCEEDED.
+      </p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+        <div>
+          <label class="form-label">Bot Token</label>
+          <input type="password" id="settingTgToken" class="form-input" value="{{ settings.get('telegram_bot_token', '') }}" placeholder="123456:ABC-DEF...">
+        </div>
+        <div>
+          <label class="form-label">Chat ID</label>
+          <input type="text" id="settingTgChat" class="form-input" value="{{ settings.get('telegram_chat_id', '') }}" placeholder="987654321">
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn-primary" onclick="saveSettings()" style="flex: 1; padding: 10px;">
+          💾 SAVE GATEWAY
+        </button>
+        <button type="button" class="btn-secondary" onclick="testTelegramConnection()" style="padding: 10px 16px;">
+          🔔 TEST PING
+        </button>
+      </div>
+    </div>
+    <div id="tgStatusMsg" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); border-top: 1px solid var(--color-border); padding-top: 10px;">
+      GET TOKEN VIA <code>@BotFather</code> IN TELEGRAM.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     RECENT CLIPS & VIRAL FEED
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="tech-card" style="border-top: 4px solid var(--color-brand-black);">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="led-pulse"></span>
+        <h2 style="font-family: var(--font-wordmark); font-size: 1.15rem; font-weight: 400; color: var(--color-brand-black); letter-spacing: 0.05em; text-transform: uppercase;">
+          // DISPATCH PRODUCTION FEED ({{ clips|length }} CLIPS)
+        </h2>
+      </div>
+      <p style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.78rem; margin-top: 2px;">
+        LIVE TELEMETRY EXTRACTED VIEWS & WORD-BY-WORD KARAOKE CAPTIONS
+      </p>
+    </div>
+    <span style="font-family: var(--font-mono); color: var(--color-muted); font-size: 0.75rem;">SHOWING LATEST 50 DISPATCHES</span>
+  </div>
+
+  {% if clips %}
+    <div class="clips-table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Title & Channel</th>
+            <th>Virality Score</th>
+            <th>Live Views & Status</th>
+            <th>Duration</th>
+            <th>Whop Payout Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for clip in clips %}
+            <tr>
+              <td>
+                <div style="font-weight: 600; color: var(--text-main);">{{ clip.title or "Automated Short" }}</div>
+                <div style="font-size: 0.8rem; color: var(--text-dim); display: flex; align-items: center; gap: 8px; margin-top: 3px;">
+                  {% if clip.post_url %}
+                    <a href="{{ clip.post_url }}" target="_blank" style="color: var(--primary); text-decoration: none;">
+                      🔗 {{ clip.post_url[:35] }}...
+                    </a>
+                  {% else %}
+                    <span>{{ clip.source_url[:35] }}...</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                <span style="font-weight: 800; color: var(--primary); font-size: 1.1rem;">
+                  {{ clip.score }}/100
+                </span>
+              </td>
+              <td>
+                {% if clip.is_viral or (clip.views and clip.views >= criteria_views) %}
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="badge-viral-active">🔥 {{ "{:,}".format(clip.views) }} Views</span>
+                  </div>
+                  <div style="font-size: 0.75rem; color: #00ff88; margin-top: 2px;">
+                    +${{ "%.2f"|format((clip.views / 1000.0) * 5.0) }} Bounty
+                  </div>
+                {% elif clip.views and clip.views > 0 %}
+                  <span style="font-weight: 600; color: var(--text-main);">{{ "{:,}".format(clip.views) }} views</span>
+                  <div style="font-size: 0.75rem; color: var(--text-dim);">Monitoring</div>
+                {% else %}
+                  <span class="badge badge-processing">Monitoring (0 views)</span>
+                {% endif %}
+              </td>
+              <td>{{ clip.duration | round(1) if clip.duration else 0.0 }}s</td>
+              <td>
+                {% if clip.status == 'submitted_whop' %}
+                  <span class="badge badge-active">Submitted to Whop</span>
+                {% elif clip.is_viral or (clip.views and clip.views >= criteria_views) %}
+                  <button class="btn-whop-submit" style="padding: 5px 10px; font-size: 0.75rem;" onclick="submitViralToWhop({{ clip.id }})">
+                    Submit Whop
+                  </button>
+                {% else %}
+                  <span style="font-size: 0.8rem; color: var(--text-dim);">Threshold Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('clips.clip_detail', clip_id=clip.id) }}" class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;">
+                  Details
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 40px 20px;">
+      <div style="font-size: 2.5rem; margin-bottom: 10px;">🎬</div>
+      <h3 style="font-size: 1.15rem; margin-bottom: 6px;">No Clips Produced Yet</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+        Submit a livestream URL or run the Whop pipeline to start automatically filling this dashboard.
+      </p>
+      <a href="{{ url_for('clips.new_clip') }}" class="btn-primary" style="display: inline-flex; width: auto;">
+        Create First Clip
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DYNAMIC CLIENT JAVASCRIPT
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+let selectedContentType = "whop_content";
+
+function toggleConnectGmailWizard() {
+  const el = document.getElementById("connectGmailWizard");
+  el.style.display = el.style.display === "none" ? "block" : "none";
+  if (el.style.display === "block") {
+    el.scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+function selectContentType(type) {
+  selectedContentType = type;
+  document.getElementById("cardWhop").classList.toggle("selected", type === "whop_content");
+  document.getElementById("cardUpload").classList.toggle("selected", type === "upload_based");
+}
+
+function filterFleet(filter) {
+  document.getElementById("filterTabAll").classList.toggle("active", filter === "all");
+  document.getElementById("filterTabWhop").classList.toggle("active", filter === "whop_content");
+  document.getElementById("filterTabUpload").classList.toggle("active", filter === "upload_based");
+
+  const cards = document.querySelectorAll(".fleet-card");
+  cards.forEach(card => {
+    if (filter === "all") {
+      card.style.display = "flex";
+    } else {
+      const cardType = card.getAttribute("data-content-type");
+      card.style.display = cardType === filter ? "flex" : "none";
+    }
+  });
+}
+
+async function handleConnectGmailSubmit(e) {
+  e.preventDefault();
+  const payload = {
+    gmail: document.getElementById("wizGmail").value,
+    username: document.getElementById("wizUsername").value,
+    name: document.getElementById("wizName").value,
+    content_type: selectedContentType,
+    youtube_handle: document.getElementById("wizYt").value,
+    instagram_handle: document.getElementById("wizIg").value,
+    facebook_handle: document.getElementById("wizFb").value,
+    tiktok_handle: document.getElementById("wizTt").value
+  };
+
+  try {
+    const res = await fetch("/api/accounts/new", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert("✅ " + data.message);
+      window.location.reload();
+    } else {
+      alert("❌ " + data.message);
+    }
+  } catch (err) {
+    alert("Error saving account: " + err);
+  }
+}
+
+async function deleteAccountPersona(accId) {
+  if (!confirm("Are you sure you want to remove this account from your fleet?")) return;
+  try {
+    const res = await fetch(`/api/accounts/${accId}/delete`, {
+      method: "POST"
+    });
+    const data = await res.json();
+    if (data.success) {
+      const card = document.getElementById(`persona-card-${accId}`);
+      if (card) card.remove();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    alert("Error deleting account: " + err);
+  }
+}
+
+async function saveSettings() {
+  const criteria = document.getElementById("settingCriteria").value;
+  const botToken = document.getElementById("settingTgToken").value;
+  const chatId = document.getElementById("settingTgChat").value;
+
+  try {
+    const res = await fetch("/api/viral/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        viral_views_criteria: criteria,
+        telegram_bot_token: botToken,
+        telegram_chat_id: chatId
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert("✅ Configuration Saved: " + data.message);
+      window.location.reload();
+    } else {
+      alert("❌ Failed to save: " + data.message);
+    }
+  } catch (err) {
+    alert("Error: " + err);
+  }
+}
+
+async function testTelegramConnection() {
+  const statusMsg = document.getElementById("tgStatusMsg");
+  statusMsg.innerHTML = "⏳ Sending test ping to Telegram...";
+  statusMsg.style.color = "var(--primary)";
+
+  const botToken = document.getElementById("settingTgToken").value;
+  const chatId = document.getElementById("settingTgChat").value;
+
+  try {
+    const res = await fetch("/api/telegram/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bot_token: botToken, chat_id: chatId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      statusMsg.innerHTML = "✅ " + data.message;
+      statusMsg.style.color = "var(--success)";
+    } else {
+      statusMsg.innerHTML = "❌ " + data.message;
+      statusMsg.style.color = "var(--danger)";
+    }
+  } catch (err) {
+    statusMsg.innerHTML = "❌ Network error: " + err;
+    statusMsg.style.color = "var(--danger)";
+  }
+}
+
+async function scanAllViewsNow() {
+  const btn = document.getElementById("btnScanViews");
+  const icon = document.getElementById("scanIcon");
+  if (btn) btn.disabled = true;
+  if (icon) icon.innerHTML = "⏳";
+
+  try {
+    const res = await fetch("/api/viral/check-now", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`🔍 Scan Complete: Scanned ${data.total_scanned} clips. Found ${data.viral_count} viral hits!`);
+      window.location.reload();
+    } else {
+      alert("Scan failed: " + (data.message || "Unknown error"));
+    }
+  } catch (err) {
+    alert("Error scanning views: " + err);
+  } finally {
+    if (btn) btn.disabled = false;
+    if (icon) icon.innerHTML = "🔄";
+  }
+}
+
+async function submitViralToWhop(clipId) {
+  const btn = document.getElementById(`btn-submit-${clipId}`);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "⏳ Submitting to Whop...";
+  }
+
+  try {
+    const res = await fetch(`/api/clips/${clipId}/submit-whop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert("🎉 " + data.message);
+      window.location.reload();
+    } else {
+      alert("⚠️ Submission response: " + data.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "⚡ 1-Click Submit to Whop";
+      }
+    }
+  } catch (err) {
+    alert("Error during Whop submission: " + err);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "⚡ 1-Click Submit to Whop";
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REAL MULTI-PLATFORM AUTHENTICATION CONTROLLER (Zero Fantasy)
+// ═══════════════════════════════════════════════════════════════
+let activeAccId = null;
+let activePlatform = null;
+let loginPollTimer = null;
+
+const PLATFORM_META = {
+  youtube: { 
+    name: "YouTube", 
+    icon: "▶", 
+    guide: "Official Google OAuth authorization is opening in your browser. Select your channel Google account and click 'Allow'." 
+  },
+  instagram: { 
+    name: "Instagram", 
+    icon: "📸", 
+    guide: "A dedicated Chrome browser window has opened on your screen. Enter your Instagram login credentials. Keep it open until you reach your profile/home feed." 
+  },
+  tiktok: { 
+    name: "TikTok", 
+    icon: "🎵", 
+    guide: "A dedicated Chrome browser window has opened on your screen. Log into TikTok (QR code, Google, or Username). Persistent cookies will be automatically saved." 
+  },
+  facebook: { 
+    name: "Facebook", 
+    icon: "🌐", 
+    guide: "A dedicated Chrome browser window has opened on your screen. Log into your Facebook account managing your Reels Page." 
+  }
+};
+
+async function openConnectModal(accId, platform, username) {
+  activeAccId = accId;
+  activePlatform = platform;
+  const meta = PLATFORM_META[platform] || { name: platform, icon: "🌐", guide: "Browser window opened. Log in to continue." };
+
+  document.getElementById("modalPlatformIcon").innerText = meta.icon;
+  document.getElementById("modalTitle").innerText = `Connect ${meta.name}`;
+  document.getElementById("modalSubtitle").innerText = `Account: ${username || accId} (Session folder: ${accId})`;
+  document.getElementById("modalStatusMessage").innerText = `Initializing ${meta.name} connection...`;
+  document.getElementById("modalStatusHint").innerText = meta.guide;
+  document.getElementById("modalSpinner").innerText = "⏳";
+  document.getElementById("modalAuthActionContainer").style.display = "none";
+  document.getElementById("btnConfirmLogin").disabled = false;
+  document.getElementById("btnConfirmLogin").innerText = "✅ I Have Finished Logging In";
+  document.getElementById("connectPlatformModal").style.display = "flex";
+
+  try {
+    const res = await fetch(`/api/accounts/${accId}/connect/${platform}`, {
+      method: "POST"
+    });
+    const data = await res.json();
+    if (!data.success && data.status !== "in_progress") {
+      document.getElementById("modalStatusMessage").innerText = "⚠️ " + (data.error || data.message || "Failed to launch");
+      document.getElementById("modalSpinner").innerText = "❌";
+      return;
+    }
+
+    if (data.auth_url && platform === "youtube") {
+      document.getElementById("btnOpenAuthUrl").href = data.auth_url;
+      document.getElementById("btnOpenAuthUrl").innerHTML = `<span>🚀</span> OPEN ${meta.name.toUpperCase()} SIGN-IN PAGE`;
+      document.getElementById("modalAuthActionContainer").style.display = "block";
+      document.getElementById("modalVncContainer").style.display = "none";
+      document.getElementById("modalStatusMessage").innerText = `${meta.name} Google authorization window ready! Click below if not opened:`;
+      document.getElementById("modalSpinner").innerText = "🔑";
+      try {
+        window.open(data.auth_url, '_blank');
+      } catch (popupErr) {
+        console.warn("Popup blocked, button visible:", popupErr);
+      }
+    } else if (data.vnc_url) {
+      document.getElementById("modalAuthActionContainer").style.display = "none";
+      const vncContainer = document.getElementById("modalVncContainer");
+      const vncIframe = document.getElementById("modalVncIframe");
+      if (vncContainer && vncIframe) {
+        vncIframe.src = data.vnc_url;
+        vncContainer.style.display = "block";
+      }
+      document.getElementById("modalStatusMessage").innerText = `Cloud browser live! Log into ${meta.name} inside the window below:`;
+      document.getElementById("modalStatusHint").innerText = "Touch/click the browser screen below to enter your credentials or tap 'Sign in with Google'.";
+      document.getElementById("modalSpinner").innerText = "📱";
+    } else {
+      document.getElementById("modalVncContainer").style.display = "none";
+      document.getElementById("modalAuthActionContainer").style.display = "none";
+      document.getElementById("modalStatusMessage").innerText = `Dedicated browser window opened! Please log into ${meta.name} with this persona's credentials...`;
+      document.getElementById("modalSpinner").innerText = "🌐";
+    }
+    
+    // Start polling login progress every 2.0 seconds
+    if (loginPollTimer) clearInterval(loginPollTimer);
+    loginPollTimer = setInterval(pollLoginStatus, 2000);
+
+  } catch (err) {
+    document.getElementById("modalStatusMessage").innerText = "Network error: " + err;
+    document.getElementById("modalSpinner").innerText = "❌";
+  }
+}
+
+async function pollLoginStatus() {
+  if (!activeAccId || !activePlatform) return;
+  try {
+    const res = await fetch(`/api/accounts/${activeAccId}/login-status/${activePlatform}`);
+    const data = await res.json();
+
+    if (data.auth_url && activePlatform === "youtube" && document.getElementById("modalAuthActionContainer").style.display === "none") {
+      document.getElementById("btnOpenAuthUrl").href = data.auth_url;
+      document.getElementById("btnOpenAuthUrl").innerHTML = `<span>🚀</span> OPEN ${activePlatform.toUpperCase()} SIGN-IN PAGE`;
+      document.getElementById("modalAuthActionContainer").style.display = "block";
+      document.getElementById("modalStatusMessage").innerText = `${activePlatform.toUpperCase()} Google authorization ready! Click below:`;
+      document.getElementById("modalSpinner").innerText = "🔑";
+    }
+
+    if (data.connected || data.status === "connected") {
+      clearInterval(loginPollTimer);
+      loginPollTimer = null;
+      document.getElementById("modalSpinner").innerText = "🎉";
+      document.getElementById("modalStatusMessage").innerText = `✅ Successfully Connected to ${activePlatform.toUpperCase()}!`;
+      document.getElementById("modalStatusHint").innerText = "Physical credentials & session verified and locked on disk.";
+      document.getElementById("modalAuthActionContainer").style.display = "none";
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else if (data.status === "error") {
+      clearInterval(loginPollTimer);
+      loginPollTimer = null;
+      document.getElementById("modalSpinner").innerText = "⚠️";
+      document.getElementById("modalStatusMessage").innerText = data.error || "Login process reported error.";
+    }
+  } catch (err) {
+    console.error("Auth poll error:", err);
+  }
+}
+
+async function confirmCurrentLogin() {
+  if (!activeAccId || !activePlatform) return;
+  const btn = document.getElementById("btnConfirmLogin");
+  btn.disabled = true;
+  btn.innerText = "⏳ Verifying session...";
+
+  try {
+    const res = await fetch(`/api/accounts/${activeAccId}/confirm-login/${activePlatform}`, {
+      method: "POST"
+    });
+    const data = await res.json();
+    if (data.connected || data.success) {
+      if (loginPollTimer) clearInterval(loginPollTimer);
+      loginPollTimer = null;
+      document.getElementById("modalSpinner").innerText = "🎉";
+      document.getElementById("modalStatusMessage").innerText = `✅ Verified & Connected to ${activePlatform.toUpperCase()}!`;
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else {
+      alert("⚠️ " + (data.message || "Session not detected yet."));
+      btn.disabled = false;
+      btn.innerText = "✅ I Have Finished Logging In";
+    }
+  } catch (err) {
+    alert("Verification error: " + err);
+    btn.disabled = false;
+    btn.innerText = "✅ I Have Finished Logging In";
+  }
+}
+
+async function syncExistingSessions(accId) {
+  try {
+    const res = await fetch(`/api/accounts/${accId}/sync-existing-sessions`, { method: "POST" });
+    const data = await res.json();
+    if (data.success) {
+      alert("✅ SESSIONS SYNCED:\n\n" + data.message);
+      window.location.reload();
+    } else {
+      alert("⚠️ " + data.message);
+    }
+  } catch (err) {
+    alert("Sync error: " + err);
+  }
+}
+
+function refreshVncFrame() {
+  const iframe = document.getElementById("modalVncIframe");
+  if (iframe && iframe.src) {
+    const current = iframe.src;
+    iframe.src = "";
+    setTimeout(() => { iframe.src = current; }, 200);
+  }
+}
+
+async function cancelCurrentLogin() {
+  if (loginPollTimer) clearInterval(loginPollTimer);
+  loginPollTimer = null;
+  const vncIframe = document.getElementById("modalVncIframe");
+  if (vncIframe) vncIframe.src = "";
+  const vncContainer = document.getElementById("modalVncContainer");
+  if (vncContainer) vncContainer.style.display = "none";
+
+  if (activeAccId && activePlatform) {
+    try {
+      await fetch(`/api/accounts/${activeAccId}/cancel-login/${activePlatform}`, { method: "POST" });
+    } catch(e) {}
+  }
+  document.getElementById("connectPlatformModal").style.display = "none";
+  activeAccId = null;
+  activePlatform = null;
+}
+
+async function testPlatform(accId, platform) {
+  try {
+    const res = await fetch(`/api/accounts/${accId}/test/${platform}`, { method: "POST" });
+    const data = await res.json();
+    if (data.success && data.connected) {
+      alert("✅ CONNECTION VERIFIED:\n\n" + (data.message || "Platform session is healthy and active on disk."));
+    } else {
+      alert("⚠️ CONNECTION NOTICE:\n\n" + (data.error || data.message || "Session could not be verified."));
+    }
+  } catch (err) {
+    alert("Test request error: " + err);
+  }
+}
+
+async function disconnectPlatform(accId, platform) {
+  if (!confirm(`Are you sure you want to disconnect ${platform.toUpperCase()} and delete its credentials from disk?`)) return;
+  try {
+    const res = await fetch(`/api/accounts/${accId}/disconnect/${platform}`, { method: "POST" });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ ${platform.toUpperCase()} session cleared.`);
+      window.location.reload();
+    } else {
+      alert("Error: " + (data.message || data.error));
+    }
+  } catch (err) {
+    alert("Disconnect error: " + err);
+  }
+}
+
+// ─── GOING MERRY AUTONOMOUS PIPELINE CONTROLLER ─────────────────────────────
+let activePipelineJobId = null;
+let pipelineEventSource = null;
+let pipelinePollTimer = null;
+
+function togglePill(pillId, checkboxId) {
+  const pill = document.getElementById(pillId);
+  const cb = document.getElementById(checkboxId);
+  cb.checked = !cb.checked;
+  if (cb.checked) {
+    pill.classList.add("selected");
+  } else {
+    pill.classList.remove("selected");
+  }
+}
+
+function toggleModeCampaign(mode) {
+  const grp = document.getElementById("groupCampaign");
+  if (mode === "whop") {
+    grp.style.display = "block";
+  } else {
+    grp.style.display = "none";
+  }
+}
+
+function useSampleVideoClip() {
+  document.getElementById("gmSourceUrl").value = "campaigns/raw_footage/authentic_vault_clip.mp4";
+}
+
+async function launchGoingMerryPipeline(e) {
+  e.preventDefault();
+
+  const sourceUrl = document.getElementById("gmSourceUrl").value.trim();
+  const accountId = document.getElementById("gmAccountId").value;
+  const numClips = parseInt(document.getElementById("gmNumClips").value);
+  const platform = document.getElementById("gmPlatform").value;
+  const mode = document.getElementById("gmContentMode").value;
+  const campaign = document.getElementById("gmCampaign").value;
+
+  const splitScreen = document.getElementById("gmSplitScreen").checked;
+  const captions = document.getElementById("gmCaptions").checked;
+  const music = document.getElementById("gmMusic").checked;
+  const autoUpload = document.getElementById("gmAutoUpload").checked;
+  const preview = document.getElementById("gmPreview").checked;
+
+  const btn = document.getElementById("btnLaunchGoingMerry");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="led-pulse"></span> LAUNCHING FACTORY...`;
+
+  try {
+    const res = await fetch("/api/pipeline/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_url: sourceUrl,
+        account_id: accountId,
+        num_clips: numClips,
+        platform: platform,
+        mode: mode,
+        campaign: campaign,
+        split_screen: splitScreen,
+        captions: captions,
+        music: music,
+        auto_upload: autoUpload,
+        preview: preview,
+        resume: false
+      })
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      alert("⚠️ Launch Error: " + data.message);
+      btn.disabled = false;
+      btn.innerHTML = `⚡ LAUNCH GOING MERRY PIPELINE`;
+      return;
+    }
+
+    activePipelineJobId = data.job_id;
+    document.getElementById("pipelineConsoleBox").style.display = "block";
+    document.getElementById("activeJobIdBadge").innerText = `[JOB: ${activePipelineJobId}]`;
+    document.getElementById("pipelineLiveBadge").innerText = `⚡ PRODUCTION ACTIVE`;
+    document.getElementById("pipelineLiveBadge").className = "badge badge-active";
+    
+    // Reset stages
+    for (let i = 1; i <= 7; i++) {
+      const cell = document.getElementById(`stage${i}`);
+      const st = document.getElementById(`stageStatus${i}`);
+      if (cell && st) {
+        cell.className = "stage-cell";
+        st.innerText = "QUEUED";
+      }
+    }
+    setStageStatus(1, "RUNNING");
+
+    appendTerminalLog(`[LAUNCH] 🚀 Going Merry engaged for ${data.persona}! Job ID: ${data.job_id}`);
+    appendTerminalLog(`[CONFIG] Clips: ${data.clips} | Platform: ${platform} | Mode: ${mode.toUpperCase()}`);
+
+    // Connect SSE stream
+    initPipelineSSE(activePipelineJobId);
+
+    // Fallback status polling
+    if (pipelinePollTimer) clearInterval(pipelinePollTimer);
+    pipelinePollTimer = setInterval(pollPipelineProgress, 2500);
+
+  } catch (err) {
+    alert("Network error launching pipeline: " + err);
+    btn.disabled = false;
+    btn.innerHTML = `⚡ LAUNCH GOING MERRY PIPELINE`;
+  }
+}
+
+function setStageStatus(stageNum, status) {
+  const cell = document.getElementById(`stage${stageNum}`);
+  const st = document.getElementById(`stageStatus${stageNum}`);
+  if (!cell || !st) return;
+
+  if (status === "RUNNING") {
+    cell.className = "stage-cell active";
+    st.innerText = "ACTIVE ⚡";
+  } else if (status === "COMPLETED") {
+    cell.className = "stage-cell done";
+    st.innerText = "DONE ✅";
+  } else if (status === "FAILED") {
+    cell.className = "stage-cell failed";
+    st.innerText = "FAILED ❌";
+  }
+}
+
+function appendTerminalLog(msg) {
+  const container = document.getElementById("pipelineTerminalLogs");
+  if (!container) return;
+  const row = document.createElement("div");
+  const ts = new Date().toLocaleTimeString();
+  row.style.lineHeight = "1.35";
+  row.innerHTML = `<span style="color: #737373;">[${ts}]</span> ${msg}`;
+  container.appendChild(row);
+  container.parentElement.scrollTop = container.parentElement.scrollHeight;
+}
+
+function initPipelineSSE(jobId) {
+  if (pipelineEventSource) {
+    pipelineEventSource.close();
+  }
+
+  pipelineEventSource = new EventSource("/api/pipeline/stream");
+
+  pipelineEventSource.onmessage = function(e) {
+    try {
+      const evt = JSON.parse(e.data);
+      if (!evt.type || evt.type === "connection.established") return;
+
+      const data = evt.data || {};
+      if (data.job_id && data.job_id !== jobId) return;
+
+      handlePipelineEvent(evt.type, data);
+    } catch(err) {}
+  };
+
+  pipelineEventSource.onerror = function() {
+    // Handled by background polling
+  };
+}
+
+function handlePipelineEvent(type, data) {
+  if (type === "stage.1.transcribe") {
+    if (data.status === "starting") {
+      setStageStatus(1, "RUNNING");
+      appendTerminalLog("🎙️ [STAGE 01] Audio Transcription underway with faster-whisper...");
+    } else if (data.status === "completed" || data.status === "resumed") {
+      setStageStatus(1, "COMPLETED");
+      setStageStatus(2, "RUNNING");
+      appendTerminalLog(`✅ [STAGE 01] Transcription complete (${data.words || 0} words).`);
+    }
+  } else if (type === "stage.2.llm") {
+    if (data.status === "starting") {
+      setStageStatus(2, "RUNNING");
+      appendTerminalLog("🤖 [STAGE 02] NVIDIA NIM LLM (Llama 4) scanning for highest-virality moments...");
+    } else if (data.status === "completed" || data.status === "resumed") {
+      setStageStatus(2, "COMPLETED");
+      setStageStatus(3, "RUNNING");
+      appendTerminalLog(`✅ [STAGE 02] LLM identified ${data.count || 0} viral moments.`);
+    }
+  } else if (type === "stage.3.download") {
+    if (data.status === "starting") {
+      setStageStatus(3, "RUNNING");
+      appendTerminalLog(`📥 [STAGE 03] Slicing high-definition video section for Clip #${data.clip_index}...`);
+    } else if (data.status === "completed") {
+      setStageStatus(3, "COMPLETED");
+      setStageStatus(4, "RUNNING");
+    }
+  } else if (type === "stage.4.tracking") {
+    if (data.status === "starting") {
+      setStageStatus(4, "RUNNING");
+      appendTerminalLog(`👁️ [STAGE 04] YOLO Face Tracking & Active Speaker detection...`);
+    } else if (data.status === "completed") {
+      setStageStatus(4, "COMPLETED");
+      setStageStatus(5, "RUNNING");
+    }
+  } else if (type === "stage.5.reframe") {
+    appendTerminalLog(`🎬 [STAGE 04b] Smart Reframing to 9:16 vertical completed.`);
+  } else if (type === "stage.6.captions") {
+    if (data.status === "starting") {
+      setStageStatus(5, "RUNNING");
+      appendTerminalLog(`💬 [STAGE 05] Remotion rendering kinetic captions with Green Highlights...`);
+    } else if (data.status === "completed") {
+      setStageStatus(5, "COMPLETED");
+      setStageStatus(6, "RUNNING");
+      setStageStatus(6, "COMPLETED");
+    }
+  } else if (type === "stage.7.upload") {
+    if (data.status === "starting") {
+      setStageStatus(7, "RUNNING");
+      appendTerminalLog(`🚀 [STAGE 07] Multi-Account Social Dispatch uploading to connected channels...`);
+    } else if (data.status === "completed") {
+      setStageStatus(7, "COMPLETED");
+      appendTerminalLog(`✅ [STAGE 07] Upload complete!`);
+    }
+  } else if (type === "stage.clip.completed") {
+    appendTerminalLog(`🎬 [CLIP READY] Clip #${data.clip_index} produced: ${data.video}`);
+    addCompletedClipCard(data.clip_index, data.video);
+  } else if (type === "pipeline.complete") {
+    for (let i = 1; i <= 7; i++) setStageStatus(i, "COMPLETED");
+    appendTerminalLog(`🏆 [COMPLETE] All ${data.total_clips} clips rendered in ${data.elapsed_sec}s!`);
+    const btn = document.getElementById("btnLaunchGoingMerry");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `⚡ LAUNCH GOING MERRY PIPELINE`;
+    }
+    document.getElementById("pipelineLiveBadge").innerText = `✅ PRODUCTION FINISHED`;
+  } else if (type === "pipeline.error") {
+    appendTerminalLog(`❌ [ERROR] ${data.error}`);
+    const btn = document.getElementById("btnLaunchGoingMerry");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `⚡ LAUNCH GOING MERRY PIPELINE`;
+    }
+  }
+}
+
+async function pollPipelineProgress() {
+  if (!activePipelineJobId) return;
+  try {
+    const res = await fetch(`/api/pipeline/status/${activePipelineJobId}`);
+    const data = await res.json();
+    if (data.success && data.job) {
+      if (data.job.status === "completed") {
+        clearInterval(pipelinePollTimer);
+        pipelinePollTimer = null;
+        for (let i = 1; i <= 7; i++) setStageStatus(i, "COMPLETED");
+      }
+    }
+  } catch(err) {}
+}
+
+function addCompletedClipCard(index, videoPath) {
+  const container = document.getElementById("pipelineOutputClipsContainer");
+  const list = document.getElementById("pipelineOutputClipsList");
+  if (!container || !list) return;
+  container.style.display = "block";
+
+  const card = document.createElement("div");
+  card.style.background = "#FAF9F6";
+  card.style.border = "2px solid #111111";
+  card.style.padding = "12px";
+  card.style.borderRadius = "2px";
+
+  const filename = videoPath.split(/[\\\\/]/).pop();
+  card.innerHTML = `
+    <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.8rem; color: #111111; margin-bottom: 6px;">
+      // CLIP 0${index}: ${filename}
+    </div>
+    <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #737373; margin-bottom: 10px;">
+      STATUS: READY // VIRALITY: 95/100
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <span class="badge badge-active">Ready</span>
+      <span class="badge" style="background: #111; color: #4CE616;">9:16 Vertical</span>
+    </div>
+  `;
+  list.appendChild(card);
+}
+
+async function stopCurrentPipeline() {
+  if (!activePipelineJobId) return;
+  if (!confirm("Are you sure you want to stop this Going Merry pipeline run?")) return;
+  try {
+    await fetch(`/api/pipeline/stop/${activePipelineJobId}`, { method: "POST" });
+    appendTerminalLog(`🛑 Pipeline abort signal sent.`);
+    const btn = document.getElementById("btnLaunchGoingMerry");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `⚡ LAUNCH GOING MERRY PIPELINE`;
+    }
+  } catch(e) {}
+}
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     REAL-TIME PLATFORM CONNECTION MODAL DIALOG
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="connectPlatformModal" class="modal-backdrop" style="display: none;">
+  <div class="modal-box" style="background: var(--color-brand-black); border: 2px solid var(--color-brand-accent); box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 30px rgba(76,230,22,0.2); border-radius: 4px; padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="modalPlatformIcon" style="font-size: 1.6rem;">🌐</span>
+        <div>
+          <h3 id="modalTitle" style="font-family: var(--font-wordmark); font-size: 1.05rem; font-weight: 400; color: #FFFFFF; margin: 0; letter-spacing: 0.05em; text-transform: uppercase;">Connect Platform</h3>
+          <p id="modalSubtitle" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-top: 2px;">Account: @User</p>
+        </div>
+      </div>
+      <button onclick="cancelCurrentLogin()" style="background: none; border: none; color: var(--color-muted); font-size: 1.4rem; cursor: pointer; line-height: 1;">✕</button>
+    </div>
+
+    <!-- Status Box -->
+    <div id="modalStatusBox" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 20px; text-align: center; margin-bottom: 16px;">
+      <div id="modalSpinner" style="font-size: 2.2rem; margin-bottom: 10px;">🌐</div>
+      <div id="modalStatusMessage" style="font-family: var(--font-mono); font-size: 0.88rem; font-weight: 700; color: #FFFFFF; line-height: 1.4;">
+        Initializing connection...
+      </div>
+      <div id="modalStatusHint" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-top: 8px; line-height: 1.4;">
+        Please complete sign-in in the browser opened on your screen.
+      </div>
+    </div>
+
+    <!-- Cloud noVNC In-Dashboard Live Browser Stream (For Mobile Phone Access) -->
+    <div id="modalVncContainer" style="display: none; margin-bottom: 16px; border-radius: 4px; overflow: hidden; border: 1px solid var(--color-brand-accent);">
+      <div style="background: rgba(0,0,0,0.7); padding: 8px 12px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-brand-accent); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <span>📱 CLOUD BROWSER (TOUCH INTERACTIVE)</span>
+        <button type="button" onclick="refreshVncFrame()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 2px; padding: 2px 8px; cursor: pointer; font-size: 0.68rem;">🔄 RELOAD</button>
+      </div>
+      <iframe id="modalVncIframe" src="" style="width: 100%; height: 420px; border: none; background: #000; display: block;" allow="clipboard-read; clipboard-write"></iframe>
+    </div>
+
+    <!-- Direct Action Button Container (For Google OAuth or Direct Launch) -->
+    <div id="modalAuthActionContainer" style="display: none; margin-bottom: 16px;">
+      <a id="btnOpenAuthUrl" href="#" target="_blank" class="btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; text-decoration: none; padding: 12px 18px; font-family: var(--font-wordmark); font-size: 0.85rem; letter-spacing: 0.05em; background: var(--color-brand-accent); color: var(--color-brand-black); border-radius: 2px; box-shadow: 0 4px 20px rgba(76,230,22,0.4); text-transform: uppercase;">
+        <span>🚀</span> <span id="btnOpenAuthUrlText">OPEN SIGN-IN PAGE</span>
+      </a>
+      <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted); margin-top: 6px; text-align: center;">
+        👉 Click above if platform login window did not pop up automatically.
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; gap: 12px;">
+      <button type="button" class="btn-secondary" onclick="cancelCurrentLogin()" style="flex: 1; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 2px;">CANCEL</button>
+      <button type="button" id="btnConfirmLogin" class="btn-primary" onclick="confirmCurrentLogin()" style="flex: 2; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 2px;">
+        ✅ I HAVE FINISHED LOGGING IN
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal & Real Action Styles -->
+<style>
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(17, 17, 17, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-box {
+  width: 90%;
+  max-width: 480px;
+}
+
+.badge-connected {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 255, 136, 0.12);
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.badge-disconnected {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 153, 0, 0.12);
+  color: #ffaa33;
+  border: 1px solid rgba(255, 153, 0, 0.35);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.btn-action-connect {
+  background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
+  color: #fff;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-action-connect:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.6);
+}
+
+.btn-action-test {
+  background: rgba(255, 255, 255, 0.06);
+  color: #a0aec0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-action-test:hover {
+  color: #fff;
+  border-color: rgba(0, 240, 255, 0.5);
+  background: rgba(0, 240, 255, 0.1);
+}
+
+.btn-action-disconnect {
+  background: none;
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-action-disconnect:hover {
+  color: #ff4466;
+  border-color: rgba(255, 68, 102, 0.4);
+  background: rgba(255, 68, 102, 0.1);
+}
+
+.channel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  margin-bottom: 6px;
+  transition: background 0.2s;
+}
+
+.channel-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Going Merry Factory & Neo-Brutalist Toggle Styles */
+.toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-brand-black);
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.toggle-pill:hover {
+  border-color: var(--color-brand-black);
+  transform: translateY(-1px);
+}
+
+.toggle-pill.selected {
+  background: var(--color-brand-black);
+  color: var(--color-brand-accent);
+  border-color: var(--color-brand-black);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.stage-cell {
+  background: #FAF9F6;
+  border: 1px solid var(--color-border);
+  padding: 10px 8px;
+  text-align: center;
+  border-radius: var(--radius-xs);
+  transition: all 0.2s ease;
+}
+
+.stage-cell .stage-num {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.stage-cell .stage-name {
+  font-family: var(--font-wordmark);
+  font-size: 0.68rem;
+  color: var(--color-brand-black);
+  margin: 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage-cell .stage-status {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.stage-cell.active {
+  background: #111111;
+  border-color: var(--color-brand-accent);
+  box-shadow: 0 0 15px rgba(76, 230, 22, 0.3);
+}
+
+.stage-cell.active .stage-num {
+  color: var(--color-brand-accent);
+}
+
+.stage-cell.active .stage-name {
+  color: #FFFFFF;
+}
+
+.stage-cell.active .stage-status {
+  color: var(--color-brand-accent);
+}
+
+.stage-cell.done {
+  background: rgba(76, 230, 22, 0.08);
+  border-color: rgba(76, 230, 22, 0.6);
+}
+
+.stage-cell.done .stage-num {
+  color: #2b9e07;
+}
+
+.stage-cell.done .stage-name {
+  color: var(--color-brand-black);
+}
+
+.stage-cell.done .stage-status {
+  color: #2b9e07;
+}
+
+.stage-cell.failed {
+  background: rgba(255, 51, 102, 0.08);
+  border-color: #ff3366;
+}
+
+.stage-cell.failed .stage-status {
+  color: #ff3366;
+}
+</style>
+{% endblock %}

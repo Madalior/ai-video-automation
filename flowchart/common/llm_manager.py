@@ -1,6 +1,7 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -20,12 +21,11 @@ class LLMManager:
             self._call_cerebras,      # Backup: Fast inference
         ]
         
-        # Initialize Gemini
+        # Initialize Gemini via the new SDK
         gemini_key = os.getenv("GEMINI_API_KEY")
         if gemini_key:
-            genai.configure(api_key=gemini_key)
-            # gemini-1.5-flash is deprecated, using 2.0-flash
-            self.gemini_model = genai.GenerativeModel(os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash"))
+            self.gemini_client = genai.Client(api_key=gemini_key)
+            self.gemini_model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
     # ... (other code)
 
@@ -61,8 +61,14 @@ class LLMManager:
     def _call_gemini(self, prompt, json_mode):
         if not os.getenv("GEMINI_API_KEY"): raise Exception("No API Key")
         
-        config = {"response_mime_type": "application/json"} if json_mode else {}
-        response = self.gemini_model.generate_content(prompt, generation_config=config)
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json" if json_mode else "text/plain"
+        )
+        response = self.gemini_client.models.generate_content(
+            model=self.gemini_model_name,
+            contents=prompt,
+            config=config
+        )
         content = response.text
         if json_mode:
              # Clean up markdown code blocks if present

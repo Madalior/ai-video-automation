@@ -1,0 +1,28 @@
+/* ─────────────────────────────────────────────────────────────────
+   Deep Glow + Drop Shadow Caption Style
+   Font: Komika Axis (comic-style bold condensed)
+   ───────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap');
+
+@font-face {
+  font-family: 'Komika Axis';
+  src: url('./KOMIKAX_.ttf') format('truetype');
+  font-display: block;
+}
+
+/* ── Base reset ─────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  font-family: 'Komika Axis', 'Montserrat', 'Impact', 'Arial Black', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

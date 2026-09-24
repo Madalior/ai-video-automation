@@ -7,8 +7,16 @@ for advanced emotional intelligence.
 """
 
 import json
+import re
+import random
 from typing import Dict, List, Optional
 from modules.genkit_client import genkit
+
+try:
+    from flowchart.common.llm_manager import LLMManager
+    _LLM_OK = True
+except ImportError:
+    _LLM_OK = False
 
 class EmotionalScriptGenerator:
     """
@@ -69,6 +77,7 @@ class EmotionalScriptGenerator:
         """
         self.use_genkit = use_genkit
         self.genkit_client = genkit if use_genkit else None
+        self._llm = LLMManager() if _LLM_OK else None
     
     def enhance_script(
         self,
@@ -101,6 +110,8 @@ class EmotionalScriptGenerator:
                 
                 if result:
                     print(f"[SUCCESS] ✓ Script enhanced with emotional storytelling!")
+                    # Inject hook into Genkit result
+                    result['hook'] = self.generate_hook(script, emotion_style)
                     return result
                 else:
                     print("[WARNING] Genkit enhancement failed, using fallback...")
@@ -150,6 +161,8 @@ class EmotionalScriptGenerator:
                 "delivery_hint": emotion_info["vocal_hints"]
             })
         
+        hook = self.generate_hook(script, emotion_style)
+
         return {
             "enhanced_script": {
                 "full_text": enhanced_script,
@@ -173,7 +186,8 @@ class EmotionalScriptGenerator:
                 "conclusion": "deliberate - memorable ending",
                 "overall_rhythm": f"{emotion_style.capitalize()} with clear structure"
             },
-            "storytelling_arc": f"Opens with hook, builds through {emotion_style} narrative, resolves with impact"
+            "storytelling_arc": f"Opens with hook, builds through {emotion_style} narrative, resolves with impact",
+            "hook": hook,
         }
     
     def _detect_emotion(self, script: str) -> str:
@@ -217,6 +231,143 @@ class EmotionalScriptGenerator:
         
         return enhanced
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # HOOK GENERATION
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def generate_hook(
+        self,
+        script: str,
+        emotion_style: str = "auto",
+        title: str = "",
+    ) -> Dict:
+        """
+        Generate a hook block for the script.
+
+        Returns a dict:
+        {
+            "hook_text"  : str  — Short, bold on-screen text (2-7 words)
+                                   burned as overlay on the hook video
+            "hook_visual": str  — Cinematic AI video generation prompt
+                                   for HookVideoGenerator
+            "hook_narration": str — Spoken opening line (voiceover for scene 0)
+            "hook_style" : str  — visual style hint (dramatic/curiosity/shock)
+        }
+
+        Tries LLM first; falls back to rule-based generation.
+        """
+        if emotion_style == "auto":
+            emotion_style = self._detect_emotion(script)
+
+        # ── LLM-generated hook (best quality) ─────────────────────────────────
+        if self._llm:
+            try:
+                hook = self._llm_generate_hook(script, emotion_style, title)
+                if hook:
+                    print(f"[HOOK] Generated via LLM: {hook['hook_text'][:60]}")
+                    return hook
+            except Exception as e:
+                print(f"[HOOK] LLM failed ({e}), using fallback")
+
+        # ── Rule-based fallback ────────────────────────────────────────────────
+        return self._fallback_hook(script, emotion_style)
+
+    def _llm_generate_hook(
+        self,
+        script: str,
+        emotion_style: str,
+        title: str = "",
+    ) -> Dict:
+        """Ask LLM to generate a hook block."""
+        prompt = f"""You are a viral short-form content expert.
+
+Given this video script excerpt and emotion style, generate a HOOK block.
+The hook plays in the FIRST 3-5 SECONDS of the video to stop viewers from scrolling.
+
+Script (first 400 chars):
+{script[:400]}
+
+Title: {title or 'Not specified'}
+Emotion Style: {emotion_style}
+
+Return JSON ONLY:
+{{
+    "hook_text": "2-7 words of bold on-screen text (e.g. 'Nobody knows this secret' or 'Wait — you need to see this')",
+    "hook_visual": "Cinematic AI video generation prompt for the hook clip. 15-25 words, vivid, specific visual. E.g. 'A scientist discovers glowing alien artifact, dramatic close-up, cinematic lighting'",
+    "hook_narration": "Spoken opening line for voiceover (1-2 sentences). Must hook immediately.",
+    "hook_style": "One of: dramatic / curiosity / shock / mystery / inspiration"
+}}
+Return ONLY valid JSON."""
+
+        try:
+            result = self._llm.generate(prompt, json_mode=True)
+            if isinstance(result, dict) and all(
+                k in result for k in ("hook_text", "hook_visual", "hook_narration")
+            ):
+                return result
+            if isinstance(result, str):
+                m = re.search(r'\{.*\}', result, re.DOTALL)
+                if m:
+                    return json.loads(m.group(0))
+        except Exception:
+            pass
+        return None
+
+    def _fallback_hook(
+        self,
+        script: str,
+        emotion_style: str,
+    ) -> Dict:
+        """Rule-based hook generation — no LLM required."""
+        HOOK_TEMPLATES = {
+            "excitement": [
+                ("This changes EVERYTHING!", "Crowd erupting in cheers, time-lapse explosion of light, cinematic"),
+                ("You won't believe this!", "Person with jaw-dropping expression, neon-lit room, dramatic reveal"),
+            ],
+            "curiosity": [
+                ("Nobody talks about this...", "Mysterious dark hallway with a single glowing door, cinematic"),
+                ("The secret they hid from you", "Ancient library revealing hidden compartment, moody lighting"),
+            ],
+            "inspiration": [
+                ("One decision changed everything", "Lone figure on mountaintop at sunrise, epic wide shot"),
+                ("This will change your life!", "Person opening door to bright golden light, cinematic"),
+            ],
+            "sadness": [
+                ("They never told you this...", "Rain-soaked empty street, single light flickering, moody"),
+                ("The truth is heartbreaking", "Close-up of a tear running down a face, soft lighting"),
+            ],
+            "nostalgia": [
+                ("Remember when this existed?", "Old photograph coming to life, warm vintage colors"),
+                ("What we lost and forgot", "Dusty childhood toy in attic rays of light, cinematic"),
+            ],
+            "joy": [
+                ("This will make your day!", "Puppy and child running through sunlit meadow, golden hour"),
+                ("Prepare to smile!", "Group of friends laughing, confetti exploding, vibrant colors"),
+            ],
+            "empathy": [
+                ("You are not alone in this", "Person sitting alone then light surrounds them, warm tones"),
+                ("Everyone feels this way", "Time-lapse of people all looking at same sunset, cinematic"),
+            ],
+        }
+
+        templates = HOOK_TEMPLATES.get(emotion_style, HOOK_TEMPLATES["curiosity"])
+        hook_text, hook_visual = random.choice(templates)
+
+        # Extract a punchy opening line from the script
+        first_line = ""
+        for ln in script.strip().splitlines():
+            ln = ln.strip()
+            if len(ln) > 20:
+                first_line = ln[:120]
+                break
+
+        return {
+            "hook_text":     hook_text,
+            "hook_visual":   hook_visual,
+            "hook_narration": first_line or hook_text,
+            "hook_style":    emotion_style,
+        }
+
     def get_emotion_info(self, emotion: str) -> Dict:
         """
         Get detailed information about an emotion category.

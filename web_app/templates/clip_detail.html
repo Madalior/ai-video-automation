@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}{{ clip.title or "Clip Details" }} — Going Merry{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+  <div style="margin-bottom: 20px;">
+    <a href="{{ url_for('dash.dashboard') }}" class="btn-secondary">
+      ← Back to Dashboard
+    </a>
+  </div>
+
+  <div class="glass-card">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+      <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 6px;">{{ clip.title }}</h1>
+        <p style="color: var(--text-dim); font-size: 0.85rem;">Source: <a href="{{ clip.source_url }}" target="_blank" style="color: var(--primary);">{{ clip.source_url }}</a></p>
+      </div>
+      <span class="badge {{ 'badge-active' if clip.status == 'ready' or clip.status == 'posted' else 'badge-processing' }}">
+        {{ clip.status }}
+      </span>
+    </div>
+
+    <div class="stats-grid" style="margin-bottom: 24px;">
+      <div class="stat-box">
+        <span class="stat-label">Virality Score</span>
+        <span class="stat-value glow-cyan">{{ clip.score }}/100</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">Duration</span>
+        <span class="stat-value">{{ clip.duration | round(1) if clip.duration else 0.0 }}s</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">Time Window</span>
+        <span class="stat-value" style="font-size: 1.3rem;">{{ clip.start_time | round(0) }}s - {{ clip.end_time | round(0) }}s</span>
+      </div>
+    </div>
+
+    {% if clip.hook %}
+      <div style="background: rgba(0, 240, 255, 0.05); border-left: 3px solid var(--primary); padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: 24px;">
+        <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--primary); font-weight: 700; margin-bottom: 4px;">Viral Hook</div>
+        <p style="font-size: 0.95rem; line-height: 1.4;">"{{ clip.hook }}"</p>
+      </div>
+    {% endif %}
+
+    {% if clip.clip_path %}
+      <div style="margin-top: 24px;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 12px;">Rendered Video File</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px; word-break: break-all;">
+          Path: <code>{{ clip.clip_path }}</code>
+        </p>
+      </div>
+    {% else %}
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-subtle); border-radius: var(--radius-sm); padding: 24px; text-align: center;">
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Video is currently rendering or queued in background pipeline.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

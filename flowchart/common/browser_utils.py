@@ -279,3 +279,59 @@ def get_otp(email, config, max_wait=300):
         return None
 
 
+
+# ================= POPUP HANDLING =================
+def handle_multiple_tabs_popup(driver):
+    """
+    Detects and handles the 'Let's try something else' popup.
+    Uses JavaScript to find and click the button (same approach as console testing).
+    
+    Args:
+        driver: Selenium WebDriver
+        
+    Returns:
+        bool: True if popup was handled, False otherwise
+    """
+    try:
+        # Use JavaScript to find and click the button
+        click_script = """
+        // Synchronous sleep function
+        function sleep(ms) {
+            const start = Date.now();
+            while (Date.now() - start < ms) {}
+        }
+        
+        // Find button by jsname or by searching all buttons
+        let btn = document.querySelector("button[jsname='clYohf']");
+        
+        if (!btn) {
+            const all = document.querySelectorAll("button");
+            for (let b of all) {
+                const text = b.textContent || '';
+                if (text.includes("Sign up") || text.includes("sign in")) {
+                    btn = b;
+                    break;
+                }
+            }
+        }
+        
+        if (btn) {
+            sleep(500);
+            btn.click();
+            return true;
+        }
+        return false;
+        """
+        
+        result = driver.execute_script(click_script)
+        
+        if result:
+            print("[DETECTED] Multiple tabs popup handled (via browser_utils)")
+            time.sleep(3)
+            return True
+        else:
+            return False
+            
+    except Exception as e:
+        print(f"[WARN] Error handling popup: {e}")
+        return False

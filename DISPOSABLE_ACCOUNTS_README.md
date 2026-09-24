@@ -124,23 +124,7 @@ This will:
 
 ## Integration with Existing System
 
-### With ParallelDirector
-```python
-from dreamina_disposable_accounts import DisposableAccountGenerator
-from flowchart.parallel_director import ParallelDirector
 
-# Create generator
-account_gen = DisposableAccountGenerator()
-
-# Use in parallel video pipeline
-director = ParallelDirector(num_workers=8)
-
-# Each worker gets disposable account with unique IP
-for scene in scenes:
-    account = account_gen.create_disposable_account()
-    worker.generate_video(account, scene)
-    account_gen.cleanup_account(account)
-```
 
 ### With Batch Processing
 ```python

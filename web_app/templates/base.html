@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}TECHTRONICS™ — THE NEW TECH VIBES | 30+ Fleet Command{% endblock %}</title>
+  
+  <!-- Typography Stack: Michroma, Space Grotesk, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Michroma&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- TECHTRONICS Design System -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <!-- Top Telemetry Header Strip -->
+  <div class="system-ticker-bar">
+    <div class="system-ticker-left">
+      <span>// OBJECT REF: TECHTRONICS-CORE-01</span>
+      <span>•</span>
+      <span>EST. 2024 | INDIA</span>
+      <span>•</span>
+      <span>TECHNOLOGY MEETS EVERYDAY LIFE</span>
+    </div>
+    <div class="system-ticker-right">
+      <span class="led-pulse"></span>
+      <span>[SYSTEM: NOMINAL / AIR DISPATCH ACTIVE]</span>
+    </div>
+  </div>
+
+  <!-- Industrial Tech Navigation Bar -->
+  <nav class="navbar">
+    <a href="{{ url_for('dash.dashboard') }}" class="nav-brand-lockup">
+      <!-- Slanted Dual-T Precision Monogram SVG Glyph -->
+      <svg width="40" height="32" viewBox="0 0 48 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block;">
+        <g transform="skewX(-18) translate(10, 0)">
+          <!-- Top Crossbar with acute aerodynamic wing tip -->
+          <path d="M0 6 L9 2 L32 2 L32 8 L4 8 Z" fill="#111111" />
+          <!-- Left Stem (Primary Stem, cuts off midway) -->
+          <path d="M8 8 L14 8 L14 20 L8 20 Z" fill="#111111" />
+          <!-- Signature Electric Lime Accent: Sheared parallelogram flush on baseline -->
+          <path d="M8 25 L14 25 L14 36 L8 36 Z" fill="#4CE616" />
+          <!-- Right Stem: Floating blade extending full height to baseline -->
+          <path d="M19 8 L25 8 L25 36 L19 36 Z" fill="#111111" />
+        </g>
+      </svg>
+
+      <div class="nav-brand-text">
+        <div class="brand-wordmark">
+          TECHTRONICS<span class="brand-tm">TM</span>
+        </div>
+        <div class="brand-tagline">
+          THE NEW TECH VIBES <span class="brand-tagline-dash"></span> [ 0 ]
+        </div>
+      </div>
+    </a>
+
+    {% if current_user.is_authenticated %}
+    <div class="nav-links">
+      <a href="{{ url_for('dash.dashboard') }}" class="nav-link">// 01 DASHBOARD</a>
+      <a href="{{ url_for('dash.dashboard') }}#fleet-section" class="nav-link">// 02 30+ FLEET</a>
+      <a href="{{ url_for('influencers.list_influencers') }}" class="nav-link">// 03 CREATORS</a>
+      <a href="{{ url_for('clips.new_clip') }}" class="nav-btn-primary">+ NEW DISPATCH</a>
+      <a href="{{ url_for('auth.logout') }}" class="nav-link" style="color: var(--color-muted);" title="Lock Console">LOCK [🔒]</a>
+    </div>
+    {% else %}
+    <div class="nav-links">
+      <a href="{{ url_for('auth.login') }}" class="nav-btn-primary">AUTHENTICATE [🔒]</a>
+    </div>
+    {% endif %}
+  </nav>
+
+  <!-- Main Workspace Container -->
+  <main class="container">
+    <!-- System Notifications / Alerts -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="alert-container">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category if category != 'error' else 'error' }}">
+              <span class="led-pulse {{ 'led-pulse-danger' if category == 'error' else '' }}"></span>
+              <span><strong>// SYS.LOG:</strong> {{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Industrial Metadata Footer -->
+  <footer class="brand-footer">
+    <div>
+      <strong>TECHTRONICS™</strong> • THE NEW TECH VIBES • EST. 2024 | INDIA
+      <div style="font-size: 0.68rem; margin-top: 3px; color: var(--color-muted);">
+        TECHNOLOGY MEETS EVERYDAY LIFE // HIGH-PRECISION AUTONOMOUS TELEMETRY
+      </div>
+    </div>
+    <div class="brand-footer-specs">
+      <span>[FREQ: 2.4GHz]</span>
+      <span>[BUFFER: OK]</span>
+      <span>[CHASSIS: BONE/OBSIDIAN]</span>
+      <span style="color: var(--color-brand-black); font-weight: 700;">ACCENT: #4CE616</span>
+    </div>
+  </footer>
+
+</body>
+</html>

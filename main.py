@@ -7,8 +7,8 @@
 ╚══════════════════════════════════════════════════════════════════╝
 
 Author: Vijay
-Description: Unified interface combining ParallelDirector, 
-             Autonomous Studio, and Dashboard integration
+Description: Unified interface combining Autonomous Studio
+             and Dashboard integration
 
 Usage:
     python main.py                          # Interactive mode
@@ -231,49 +231,10 @@ class UnifiedVideoStudio:
                 'mode': 'full_8step_workflow'
             }
         
-        # MODE 2: ParallelDirector (fast generation)
-        elif use_parallel:
-            print(f"[INFO] Parallel mode requested. Initializing ParallelDirector...")
-            # Local import to avoid circular dependencies
-            try:
-                from flowchart.character.parallel_director import ParallelDirector
-            except ImportError as e:
-                 print(f"[ERROR] Could not import ParallelDirector: {e}")
-                 # Fallback to standard
-                 return self._generate_sequential(niche, title, num_scenes)
-
-            total_workers = self.config.get('num_image_workers', 2) + self.config.get('num_video_workers', 4)
-            print(f"       Active Workers: {total_workers}")
-            
-            director = ParallelDirector(
-                output_dir="output/character_videos",
-                headless=False,
-                num_workers=total_workers
-            )
-            
-            parallel_result = director.produce_video(
-                video_idea=title or f"Viral {niche} Video",
-                num_scenes=num_scenes
-            )
-            
-            # Extract successful videos
-            success_videos = [v['video_path'] for v in parallel_result.get('videos', []) if v.get('status') == 'success']
-            final_video = success_videos[0] if success_videos else None
-            
-            thumbnails = parallel_result.get('thumbnails', [])
-            thumbnail_path = thumbnails[0] if thumbnails else None
-
-            result = {
-                'success': parallel_result['status'] == 'completed',
-                'video_path': final_video,
-                'thumbnail_path': thumbnail_path,
-                'niche': niche,
-                'title': parallel_result.get('video_idea'),
-                'mode': 'parallel_director',
-                'details': parallel_result
-            }
         else:
             # Sequential processing (simpler, more reliable)
+            if use_parallel:
+                print(f"[INFO] Parallel mode was removed. Falling back to sequential processing.")
             result = self._generate_sequential(niche, title, num_scenes)
         
         self.stats['total_videos'] += 1

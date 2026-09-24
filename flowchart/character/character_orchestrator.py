@@ -41,7 +41,9 @@ except ImportError:
     print("[WARNING] Gmail verification not available")
 
 # Step 1: Trend Discovery
-from flowchart.common.trend_finder import TrendFinder
+import importlib
+trend_module = importlib.import_module("02_niche_discovery.trend_finder")
+TrendFinder = trend_module.TrendFinder
 try:
     from flowchart.common.video_url_analyzer import VideoURLAnalyzer
     URL_ANALYZER_AVAILABLE = True
@@ -50,7 +52,9 @@ except ImportError:
 
 # Step 2 & 3: AI Processing
 from flowchart.common.llm_manager import LLMManager
-from flowchart.character.script_generator import ScriptGenerator
+import importlib
+script_module = importlib.import_module("03_ideation_scripting.script_generator")
+ScriptGenerator = script_module.ScriptGenerator
 try:
     from flowchart.common.video_rag import VideoKnowledgeBase
     RAG_AVAILABLE = True
@@ -66,8 +70,8 @@ except ImportError:
     RETENTION_AVAILABLE = False
 
 # Step 4 & 5: Content Generation
-from flowchart.character.image_generator import DreaminaGenerator
-from flowchart.character.video_generator import DreaminaVideoGenerator
+from flowchart.generator.character.image_generator import DreaminaGenerator
+from flowchart.generator.character.video_generator import DreaminaVideoGenerator
 
 # Step 6: Thumbnails
 try:
@@ -77,7 +81,12 @@ except ImportError:
     THUMBNAIL_AVAILABLE = False
 
 # Step 7: Video Editing
-from flowchart.common.enhanced_editor import EnhancedVideoEditor
+import importlib
+try:
+    editing_module = importlib.import_module("04_generation.enhanced_editor")
+    EnhancedVideoEditor = editing_module.EnhancedVideoEditor
+except ImportError:
+    pass
 try:
     from flowchart.common.voiceover_generator import VoiceoverGenerator
     from flowchart.common.visual_effects import VisualEffectsManager

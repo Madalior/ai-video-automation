@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Create Clip / Follow Influencer — Going Merry{% endblock %}
+
+{% block content %}
+<div style="max-width: 680px; margin: 0 auto;">
+  <div class="glass-card">
+    <div style="margin-bottom: 24px;">
+      <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 6px;">Launch Viral Automation</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem;">
+        Paste a video URL to generate viral shorts immediately, or follow the influencer to automate daily completed livestreams.
+      </p>
+    </div>
+
+    <form method="POST" action="{{ url_for('clips.new_clip') }}">
+      
+      <!-- Video / Channel URL Input -->
+      <div class="form-group">
+        <label class="form-label" for="source_url">YouTube / Twitch Stream or Channel URL</label>
+        <input 
+          type="text" 
+          id="source_url" 
+          name="source_url" 
+          class="form-input" 
+          placeholder="e.g. https://www.youtube.com/@IShowSpeed or stream watch link"
+          required
+          autofocus
+        >
+        <p class="form-hint">Paste either a live stream link, a completed VOD, or a channel handle (@creator).</p>
+      </div>
+
+      <!-- Follow Influencer Toggle Option -->
+      <label class="toggle-card" for="follow_influencer">
+        <input type="checkbox" id="follow_influencer" name="follow_influencer" checked>
+        <div class="toggle-info">
+          <h4>🌟 Follow this Influencer (Auto-Fetch Daily)</h4>
+          <p>Going Merry will automatically monitor this creator's channel daily. When they conclude any livestream, it will instantly slice viral moments, reframe the active speaker, and post on autopilot.</p>
+        </div>
+      </label>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+        <!-- Number of Clips -->
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="num_clips">Clips to Generate</label>
+          <select id="num_clips" name="num_clips" class="form-select">
+            <option value="3">3 Clips (Fastest)</option>
+            <option value="5" selected>5 Clips (Recommended)</option>
+            <option value="8">8 Clips</option>
+            <option value="10">10 Clips</option>
+          </select>
+        </div>
+
+        <!-- Target Platform -->
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="platform">Destination Platform</label>
+          <select id="platform" name="platform" class="form-select">
+            <option value="all" selected>All (TikTok + Shorts + Reels)</option>
+            <option value="tiktok">TikTok Only</option>
+            <option value="shorts">YouTube Shorts Only</option>
+            <option value="reels">Instagram Reels Only</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Auto Upload Checkbox -->
+      <div class="form-group" style="margin-bottom: 28px;">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          <input type="checkbox" name="auto_upload" id="auto_upload" checked style="accent-color: var(--primary); width: 18px; height: 18px;">
+          <span style="font-size: 0.95rem; font-weight: 500;">Auto-Upload via Postiz once clips finish rendering</span>
+        </label>
+      </div>
+
+      <!-- Submit Button -->
+      <button type="submit" class="btn-primary" id="submit_clip_btn">
+        <span>🚀</span> Start Automation Pipeline
+      </button>
+
+    </form>
+  </div>
+</div>
+{% endblock %}

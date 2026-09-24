@@ -55,7 +55,7 @@ Generate a JSON response with:
 **Bad Prompt**: "There's a bug, please fix it"
 **Good Prompt**:
 ```
-I need to fix the AttributeError in `flowchart/character/parallel_director.py`.
+I need to fix the AttributeError in `flowchart/character/video_orchestrator.py`.
 
 **Context:**
 - Lines 131, 150, 153-154 reference undefined attributes
@@ -63,13 +63,13 @@ I need to fix the AttributeError in `flowchart/character/parallel_director.py`.
 - The `setup_workers()` method creates individual workers but doesn't initialize the multi-generators
 
 **Request:**
-1. Review the `setup_workers()` method in `parallel_director.py`
+1. Review the `setup_workers()` method in `video_orchestrator.py`
 2. Initialize `MultiDreaminaGenerator` and `MultiVeo3Generator` instances
 3. Update the `close()` method to properly clean up these new attributes
 4. Verify the changes don't break existing parallel processing
 
 **Files to check:**
-- `flowchart/character/parallel_director.py`
+- `flowchart/character/video_orchestrator.py`
 - `modules/generators/image_generator.py`
 - `modules/generators/video_generator.py`
 ```
@@ -81,7 +81,7 @@ I need to fix the AttributeError in `flowchart/character/parallel_director.py`.
 I want to add batch processing capability to the info video pipeline.
 
 **Goal:**
-Currently `flowchart/info/info_orchestrator.py` processes scenes sequentially. I want to add parallel processing similar to what exists in the character pipeline's `ParallelDirector`.
+Currently `flowchart/info/info_orchestrator.py` processes scenes sequentially. I want to add parallel processing similar to what exists in the character pipeline's `VideoOrchestrator`.
 
 **Requirements:**
 1. Process up to 4 scenes simultaneously
@@ -90,7 +90,7 @@ Currently `flowchart/info/info_orchestrator.py` processes scenes sequentially. I
 4. Handle errors gracefully with fallback to sequential processing
 
 **Reference Implementation:**
-The character pipeline's `flowchart/character/parallel_director.py` already implements this pattern - we can adapt that approach.
+The character pipeline's `flowchart/character/video_orchestrator.py` already implements this pattern - we can adapt that approach.
 
 **Verification:**
 After implementation, test with a 7-scene info video to ensure:

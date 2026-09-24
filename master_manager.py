@@ -38,12 +38,13 @@ except ImportError:
 # Character pipeline imports
 from flowchart.character.character_video_manager import CharacterVideoManager
 from flowchart.character.character_orchestrator import WorkflowOrchestrator
-from flowchart.character.enhanced_script_generator import EnhancedScriptGenerator
+import importlib
+script_module = importlib.import_module("03_ideation_scripting.enhanced_script_generator")
+EnhancedScriptGenerator = script_module.EnhancedScriptGenerator
 
 # Info pipeline imports
 try:
     from flowchart.info.info_orchestrator import InfoContentOrchestrator
-    from flowchart.info.parallel_info_director import ParallelInfoDirector
     INFO_AVAILABLE = True
 except ImportError:
     INFO_AVAILABLE = False
@@ -81,6 +82,7 @@ except ImportError:
 from flowchart.common.identity_cards import IdentityCardManager
 from flowchart.common.frame_controller import FrameController
 from flowchart.common.prompt_builder import AnchorDeltaPromptBuilder
+from flowchart.common.account_pool import AccountPoolManager
 
 
 class MasterVideoAutomation:
@@ -95,7 +97,7 @@ class MasterVideoAutomation:
     - Progress tracking and logging
     """
     
-    def __init__(self, output_dir: str = "output", headless: bool = False, use_emotional_ai: bool = True):
+    def __init__(self, output_dir: str = "output", headless: bool = False, use_emotional_ai: bool = True, pool_size: int = 5):
         """
         Initialize master automation manager.
         
@@ -103,10 +105,12 @@ class MasterVideoAutomation:
             output_dir: Base output directory
             headless: Run browsers in headless mode
             use_emotional_ai: Enable emotional script generation (default: True)
+            pool_size: Number of accounts in the pool (default: 5)
         """
         self.output_dir = output_dir
         self.headless = headless
         self.use_emotional_ai = use_emotional_ai
+        self.pool_size = pool_size
         
         # Create output structure
         self.dirs = {
@@ -124,6 +128,12 @@ class MasterVideoAutomation:
         self.character_manager = None
         self.info_manager = None
         self.frame_controller = FrameController()
+        
+        # Account Pool Manager (lazy — accounts created on first use)
+        self.account_pool = AccountPoolManager(
+            batch_size=pool_size,
+            headless=headless
+        )
         
         # Initialize flowchart tools
         if GMAIL_AVAILABLE:
@@ -150,13 +160,14 @@ class MasterVideoAutomation:
             self.ai_metadata_generator = None
             
         if UPLOADER_AVAILABLE:
-            self.smart_uploader = SmartUploader()
+            self.smart_uploader = SmartUploader(account_pool=self.account_pool)
         else:
             self.smart_uploader = None
         
         print(f"[MASTER] Video Automation Manager initialized")
         print(f"[MASTER] Output: {output_dir}")
         print(f"[MASTER] Emotional AI: {'YES' if use_emotional_ai else 'NO'}")
+        print(f"[MASTER] Pool Size: {pool_size}")
         print(f"[MASTER] Gmail: {'YES' if GMAIL_AVAILABLE else 'NO'}")
         print(f"[MASTER] Niche Tools: {'YES' if NICHE_TOOLS_AVAILABLE else 'NO'}")
         print(f"[MASTER] Optimization: {'YES' if OPTIMIZATION_AVAILABLE else 'NO'}")
@@ -216,7 +227,9 @@ class MasterVideoAutomation:
             print("[PHASE 1] Parallel image generation (independent)")
             print("[PHASE 2] Sequential video generation (chained consistency)")
             
-            from flowchart.character.enhanced_script_generator import EnhancedScriptGenerator
+            import importlib
+            script_module = importlib.import_module("03_ideation_scripting.enhanced_script_generator")
+            EnhancedScriptGenerator = script_module.EnhancedScriptGenerator
             from moviepy.editor import VideoFileClip, concatenate_videoclips
             import threading
             import os
@@ -350,18 +363,29 @@ class MasterVideoAutomation:
         import time
         
         try:
-            # Step 1: Login
-            print(f"\n[WORKER {scene_id}] Initializing browser...")
-            session = SharedSessionManager(headless=self.headless, fresh_profile=True)
+            # Step 1: Get session from account pool (or fresh if pool empty)
+            print(f"\n[WORKER {scene_id}] Getting session from account pool...")
+            session = self.account_pool.get_active_session()
             
-            print(f"[WORKER {scene_id}] Logging in...")
-            if not session.login():
-                print(f"[WORKER {scene_id}] [FAIL] Login failed")
-                return
+            if not session:
+                # Fallback: create fresh session if pool fails
+                print(f"[WORKER {scene_id}] Pool unavailable, using fresh profile...")
+                session = SharedSessionManager(headless=self.headless, fresh_profile=True)
+                if not session.login():
+                    print(f"[WORKER {scene_id}] [FAIL] Login failed")
+                    return
             
             img_gen = DreaminaGenerator(shared_session=session)
             video_gen = DreaminaVideoGenerator(shared_session=session)
-            print(f"[WORKER {scene_id}] [OK] Login successful")
+            print(f"[WORKER {scene_id}] [OK] Session ready")
+            
+            # Determine reference based on smart auto-chain
+            scene_ref = character_ref
+            if scene.get('independent') and scene.get('id_card_primary'):
+                scene_ref = scene['id_card_primary']
+                print(f"[WORKER {scene_id}] [SMART] Using ID card primary (independent scene)")
+            elif character_ref:
+                print(f"[WORKER {scene_id}] [SMART] Using chained character reference")
             
             # PHASE 1: Generate image (parallel, all workers work simultaneously)
             print(f"\n[WORKER {scene_id}] [PHASE 1] Generating image...")
@@ -372,15 +396,23 @@ class MasterVideoAutomation:
             success = img_gen.generate_image(
                 prompt=scene.get('image_prompt', scene.get('description', '')),
                 output_path=img_output_path,
-                reference_image=character_ref  # Same reference for all scenes!
+                reference_image=scene_ref
             )
             
             if success:
                 img_path = img_output_path
+                self.account_pool.track_generation()
                 print(f"[WORKER {scene_id}] [PHASE 1] [OK] Image saved: {img_path}")
             else:
                 img_path = None
                 print(f"[WORKER {scene_id}] [PHASE 1] [FAIL] Image generation failed")
+                # Check if failure is due to overload/limit
+                try:
+                    if session.overload_detector.check_for_overload(session.driver):
+                        print(f"[WORKER {scene_id}] Overload detected — marking account exhausted")
+                        self.account_pool.mark_exhausted("overload_detected")
+                except:
+                    pass
             
             # Store image result
             with lock:
@@ -423,7 +455,12 @@ class MasterVideoAutomation:
                 first_frame=img_path,
                 reference_video=reference_video  # Chained consistency!
             )
-            print(f"[WORKER {scene_id}] [PHASE 2] [OK] Video saved: {video_path}")
+            
+            if video_path:
+                self.account_pool.track_generation()
+                print(f"[WORKER {scene_id}] [PHASE 2] [OK] Video saved: {video_path}")
+            else:
+                print(f"[WORKER {scene_id}] [PHASE 2] [FAIL] Video generation failed")
             
             # Store video result and signal completion
             with lock:
@@ -490,16 +527,19 @@ class MasterVideoAutomation:
         print(f"[CHARACTER REF] Description: {char_description}")
         
         try:
-            from flowchart.common.shared_session import SharedSessionManager
             from flowchart.character.image_generator import DreaminaGenerator
             import os
             
-            # Create temporary session for reference generation
-            session = SharedSessionManager(headless=self.headless, fresh_profile=True)
+            # Use account pool session for reference generation
+            session = self.account_pool.get_active_session()
             
-            if not session.login():
-                print("[ERROR] Failed to login for character reference generation")
-                return None
+            if not session:
+                # Fallback to fresh profile
+                from flowchart.common.shared_session import SharedSessionManager
+                session = SharedSessionManager(headless=self.headless, fresh_profile=True)
+                if not session.login():
+                    print("[ERROR] Failed to login for character reference generation")
+                    return None
             
             ref_gen = DreaminaGenerator(shared_session=session)
             
@@ -513,7 +553,7 @@ class MasterVideoAutomation:
                 reference_image=None
             )
             
-            session.close()
+            self.account_pool.track_generation()
             
             if success:
                 print(f"[CHARACTER REF] [OK] Generated: {ref_output_path}")
@@ -527,13 +567,6 @@ class MasterVideoAutomation:
             import traceback
             traceback.print_exc()
             return None
-    
-    
-                if 'session' in locals():
-                    session.close()
-            except:
-                pass
-            print(f"[IMAGE WORKER {worker_id}] Worker terminated")
     
     
     def _sequential_video_phase(self, scenes, image_results):
@@ -778,28 +811,19 @@ class MasterVideoAutomation:
         project_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         if parallel and video_mode == 'ai':
-            # Use ParallelInfoDirector for AI-only mode
-            print("[MODE] Using Parallel Info Director")
+            print("[MODE] Parallel Info Director was removed. Falling back to default.")
             
-            director = ParallelInfoDirector(
+        # Use standard InfoContentOrchestrator
+        print("[MODE] Using Standard Info Orchestrator")
+            
+        if not self.info_manager:
+            self.info_manager = InfoContentOrchestrator(
                 output_dir=self.dirs['info'],
-                num_workers=4
+                video_mode=video_mode,
+                headless=self.headless
             )
-            
-            result = director.produce_video(niche=niche)
-            
-        else:
-            # Use standard InfoContentOrchestrator
-            print("[MODE] Using Standard Info Orchestrator")
-            
-            if not self.info_manager:
-                self.info_manager = InfoContentOrchestrator(
-                    output_dir=self.dirs['info'],
-                    video_mode=video_mode,
-                    headless=self.headless
-                )
-            
-            result = self.info_manager.produce_content(niche=niche)
+        
+        result = self.info_manager.produce_content(niche=niche)
         
         # Post-production steps (Flowchart: Retention -> Thumbnail -> Metadata -> Upload)
         if result.get('status') == 'completed':
@@ -1222,6 +1246,13 @@ Examples:
     )
     
     parser.add_argument(
+        '--pool-size',
+        type=int,
+        default=5,
+        help='Number of accounts in the account pool (default: 5)'
+    )
+    
+    parser.add_argument(
         '--summary',
         action='store_true',
         help='Show system capabilities'
@@ -1233,7 +1264,8 @@ Examples:
     manager = MasterVideoAutomation(
         output_dir=args.output,
         headless=args.headless,
-        use_emotional_ai=not args.no_emotion
+        use_emotional_ai=not args.no_emotion,
+        pool_size=args.pool_size
     )
     
     # Show summary

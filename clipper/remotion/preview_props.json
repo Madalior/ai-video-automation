@@ -1,0 +1,27 @@
+{
+  "videoPath": "temp_render_vid.mp4",
+  "transcript": [
+    { "text": "THE", "start": 0.1, "end": 0.3 },
+    { "text": "TEAM", "start": 0.3, "end": 0.5 },
+    { "text": "AT", "start": 0.5, "end": 0.7 },
+    { "text": "META", "start": 0.7, "end": 1.0 },
+    { "text": "ARE", "start": 1.0, "end": 1.2 },
+    { "text": "IMAGINING", "start": 1.2, "end": 1.6 },
+    { "text": "A", "start": 1.6, "end": 1.8 },
+    { "text": "FUTURE", "start": 1.8, "end": 2.4 }
+  ],
+  "trackingData": [],
+  "line1Color": "#CCCCCC",
+  "line2Color": "#FFFFFF",
+  "keywordColor": "#00FF66",
+  "glowIntensity": 1.0,
+  "shadowIntensity": 1.0,
+  "line1FontSize": 34,
+  "line2FontSize": 40,
+  "keywordFontSize": 42,
+  "letterSpacing": 3,
+  "popScaleAmount": 1.08,
+  "lineGap": 2,
+  "captionYPercent": 68,
+  "keywords": ["META", "FUTURE"]
+}

@@ -1,24 +1,29 @@
 # Common Modules Package
-# Simplified __init__.py - only import what exists as classes
+# ═══════════════════════════════════════════════════════════
+# CORE EXPORTS — only files that actually live in flowchart/common/
+# NOTE: trend_finder → 02_niche_discovery/trend_finder.py
+#       enhanced_editor → 04_generation/enhanced_editor.py
+#       smart_uploader  → 06_uploading/smart_uploader.py
+# ═══════════════════════════════════════════════════════════
 
-# Core classes that exist
+# Core classes that live in common/
 from .llm_manager import LLMManager
-from .trend_finder import TrendFinder
 
-# Use try-except for optional modules
-try:
-    from .enhanced_editor import EnhancedVideoEditor
-except ImportError:
-    pass
-
+# Optional modules — use try/except so one missing file doesn't break everything
 try:
     from .ai_metadata_generator import AIMetadataGenerator
 except ImportError:
     pass
 
 try:
-    from .smart_uploader import SmartUploader
+    from .emotional_script_generator import EmotionalScriptGenerator
 except ImportError:
     pass
 
-__all__ = ['LLMManager', 'TrendFinder']
+try:
+    from .identity_cards import CharacterIdentityCard, IdentityCardManager
+except ImportError:
+    pass
+
+__all__ = ['LLMManager', 'AIMetadataGenerator', 'EmotionalScriptGenerator',
+           'CharacterIdentityCard', 'IdentityCardManager']

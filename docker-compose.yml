@@ -1,37 +1,54 @@
 version: '3.8'
 
+# ==============================================================================
+# Going Merry — 100% Cloud-Native Docker Compose
+# Deploy on Azure for Students or Oracle Cloud with a single command:
+# docker compose up -d
+# ==============================================================================
+
 services:
-  video-pipeline:
-    build: .
-    container_name: video-automation
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: going_merry_cloud
+    shm_size: '2gb' # Prevents Chromium memory allocation crashes
     environment:
-      - NICHE=${NICHE:-ASMR}
-      - WORKERS=${WORKERS:-1}
-      - HEADLESS=true
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      - DISPLAY=:99
+      - SCREEN_WIDTH=1280
+      - SCREEN_HEIGHT=800
+      - SCREEN_DEPTH=24
+    ports:
+      - "80:5000"     # Standard HTTP port (enables clean https://app.sarkaricalc.me)
+      - "5000:5000"   # Flask Web Dashboard direct port
+      - "8080:6080"   # Cloudflare-proxied noVNC stream
+      - "6080:6080"   # noVNC Mobile Streaming direct port
     volumes:
       - ./output:/app/output
-      - ./chrome_data:/app/chrome_data
-    networks:
-      - video-net
+      - ./uploader_profiles:/app/uploader_profiles
+      - ./instance:/app/instance
+      - ./.env:/app/.env
     restart: unless-stopped
-
-  # Optional: Add monitoring
-  monitoring:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
-      - video-net
-    profiles:
-      - monitoring
+      - going_merry_net
+
+  # Optional Cloudflare Tunnel:
+  # Gives you instant, free HTTPS (https://app.yourdomain.tech) without opening any ports!
+  # Just paste your token into .env: CLOUDFLARE_TUNNEL_TOKEN=...
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: going_merry_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - going_merry_net
+    depends_on:
+      - app
 
 networks:
-  video-net:
+  going_merry_net:
     driver: bridge
-
-volumes:
-  output-data:
-  chrome-data:

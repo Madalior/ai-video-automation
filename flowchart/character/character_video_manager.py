@@ -18,10 +18,10 @@ from typing import Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-from flowchart.character.script_generator import ScriptGenerator
-from flowchart.character.image_generator import DreaminaGenerator
-from flowchart.character.video_generator import DreaminaVideoGenerator
-from flowchart.character.thumbnail_generator import ThumbnailGenerator
+from flowchart.generator.character.script_generator import ScriptGenerator
+from flowchart.generator.character.image_generator import DreaminaGenerator
+from flowchart.generator.character.video_generator import DreaminaVideoGenerator
+from flowchart.generator.character.thumbnail_generator import ThumbnailGenerator
 
 
 class CharacterVideoManager:
@@ -278,12 +278,19 @@ class CharacterVideoManager:
         
         return result
     
-    def _generate_script(self, video_idea: str, num_scenes: int, project_id: str) -> Dict:
+    def _generate_script(self, video_idea: str, num_scenes: int, project_id: str,
+                         video_format: str = 'long') -> Dict:
         """
         Phase 1: Generate script using ScriptGenerator.
         
+        Args:
+            video_idea: The video concept/idea
+            num_scenes: Number of scenes to generate
+            project_id: Unique project identifier
+            video_format: 'long' for landscape (16:9), 'short'/'shorts'/'reel'/'reels' for portrait (9:16)
+        
         Returns:
-            Dictionary with 'overview' and 'scenes'
+            Dictionary with 'overview', 'scenes', and 'aspect_ratio'
         """
         print(f"\n[Step 1.1] Generating overview for: '{video_idea}'")
         overview = self.script_generator.generate_overview(video_idea)
@@ -291,17 +298,22 @@ class CharacterVideoManager:
         print(f"[Step 1.2] Generating {num_scenes} detailed scenes")
         scenes = self.script_generator.generate_scenes(overview, num_scenes)
         
+        # Determine aspect ratio from video format
+        aspect_ratio = "9:16" if video_format in ("short", "shorts", "reel", "reels") else "16:9"
+        
         # Save script to file
         script_file = os.path.join(self.dirs['scripts'], f"{project_id}_script.json")
         script_data = {
             'overview': overview,
-            'scenes': scenes
+            'scenes': scenes,
+            'aspect_ratio': aspect_ratio,
         }
         with open(script_file, 'w', encoding='utf-8') as f:
             json.dump(script_data, f, indent=2, ensure_ascii=False)
         
         print(f"[SUCCESS] Script saved to: {script_file}")
         print(f"[INFO] Title: {overview.get('title', 'N/A')}")
+        print(f"[INFO] Aspect Ratio: {aspect_ratio}")
         print(f"[INFO] Characters: {', '.join(overview.get('characters', []))}")
         print(f"[INFO] Scenes: {len(scenes)}")
         
@@ -492,7 +504,7 @@ class CharacterVideoManager:
             return self._generate_videos_parallel(scenes, image_lookup, project_id)
         
         # Sequential mode (or chained consistency which requires sequential)
-        from flowchart.common.frame_extractor import extract_frame_at_time
+        from flowchart.common.frame_extractor import extract_last_frame
         
         video_results = []
         reference_chain = []  # Stores extracted frames for chaining
@@ -558,19 +570,19 @@ class CharacterVideoManager:
                     
                     print(f"  [SUCCESS] Video saved: {video_path}")
                     
-                    # Extract frame for next scene (if using chained consistency and not last scene)
+                    # Extract last frame for next scene (if using chained consistency and not last scene)
                     if use_chained_consistency and scene_num < len(scenes):
                         frame_filename = f"{project_id}_scene{scene_num:02d}_chain_ref.png"
                         frame_path = os.path.join(self.dirs['images'], frame_filename)
                         
-                        print(f"  [EXTRACT] Extracting reference frame for Scene {scene_num + 1}...")
-                        extracted_frame = extract_frame_at_time(video_path, 1.0, frame_path)
+                        print(f"  [EXTRACT] Extracting last frame for Scene {scene_num + 1}...")
+                        extracted_frame = extract_last_frame(video_path, frame_path)
                         
                         if extracted_frame:
                             reference_chain.append(extracted_frame)
-                            print(f"  [CHAIN] Frame added to chain for Scene {scene_num + 1}")
+                            print(f"  [CHAIN] Last frame added to chain for Scene {scene_num + 1}")
                         else:
-                            print(f"  [WARNING] Frame extraction failed, Scene {scene_num + 1} will have no reference")
+                            print(f"  [WARNING] Last frame extraction failed, Scene {scene_num + 1} will have no reference")
                 else:
                     raise Exception("Video file not created")
                 

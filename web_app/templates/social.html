@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Connected Social Accounts — Going Merry{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+  <div style="margin-bottom: 24px;">
+    <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 4px;">Connected Social Accounts</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">
+      Going Merry routes all uploads through your local multi-account engine (Playwright + instagrapi) with $0 cost and zero Docker overhead.
+    </p>
+  </div>
+
+  <!-- Engine Status Banner -->
+  <div class="glass-card" style="border-color: rgba(0, 255, 136, 0.3); margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: #00ff88;">⚡ Local Multi-Account Engine Active</h3>
+      <span class="badge" style="background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.4);">
+        ● Zero Docker ($0 Cost)
+      </span>
+    </div>
+    <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 12px;">
+      Each channel runs in its own isolated browser session with persistent cookies. Supports up to 30+ accounts across YouTube Shorts, TikTok, and Instagram Reels with full proxy support.
+    </p>
+    <div style="background: rgba(0, 0, 0, 0.4); border-radius: var(--radius-sm); padding: 12px; font-family: monospace; font-size: 0.85rem; color: var(--text-dim);">
+      <strong>Engine:</strong> Playwright Real-Chrome + instagrapi<br>
+      <strong>Configured Accounts:</strong> {{ local_accounts|length }} registered ({{ local_accounts|selectattr('has_session')|list|length }} logged in)
+    </div>
+  </div>
+
+  <!-- Registered Profiles Table -->
+  <div class="glass-card" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h2 style="font-size: 1.2rem; font-weight: 700; margin: 0;">Multi-Account Fleet (30 Max)</h2>
+      <span style="font-size: 0.85rem; color: var(--text-dim);">CLI: <code>python -m clipper.uploader.cli add --id acc_XX</code></span>
+    </div>
+
+    {% if local_accounts %}
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        {% for acc in local_accounts %}
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 14px 18px;">
+          <div>
+            <div style="font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+              <span>{{ acc.name }}</span>
+              <span style="font-size: 0.75rem; color: var(--text-dim); background: rgba(255, 255, 255, 0.08); padding: 2px 6px; border-radius: 4px;">{{ acc.id }}</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+              Platforms: {{ acc.platforms|join(', ')|upper }}
+              {% if acc.proxy %} | Proxy: {{ acc.proxy }}{% endif %}
+            </div>
+          </div>
+          <div>
+            {% if acc.has_session %}
+              <span class="badge" style="background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.4);">🟢 Ready / Logged In</span>
+            {% else %}
+              <span class="badge" style="background: rgba(255, 187, 0, 0.2); color: #ffbb00; border: 1px solid rgba(255, 187, 0, 0.4);">🟡 Needs 1-Time Login</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        No accounts registered yet. Run <code>python -m clipper.uploader.cli add --id acc_01 --name "Speed Viral Clips"</code> to register your first channel.
+      </p>
+    {% endif %}
+  </div>
+
+  <!-- CLI Quick Reference Card -->
+  <div class="glass-card" style="border-color: rgba(255, 255, 255, 0.1);">
+    <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 8px;">Quick CLI Commands</h3>
+    <div style="background: rgba(0,0,0,0.5); padding: 12px; border-radius: var(--radius-sm); font-family: monospace; font-size: 0.82rem; line-height: 1.8; color: #00f0ff;">
+      # Log in to an account once (Chrome window pops up):<br>
+      python -m clipper.uploader.cli login --id acc_01 --platform youtube<br>
+      python -m clipper.uploader.cli login --id acc_01 --platform instagram<br><br>
+      # Test an upload manually:<br>
+      python -m clipper.uploader.cli upload --id acc_01 --video "output\clip_01_captioned.mp4" --platforms youtube,instagram
+    </div>
+  </div>
+</div>
+{% endblock %}

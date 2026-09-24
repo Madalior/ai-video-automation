@@ -45,10 +45,10 @@ def start_stealth_browser(profile_path=None, headless=False):
         
         options = uc.ChromeOptions()
         
-        # === INCOGNITO MODE for fresh state (skip profile in incognito) ===
-        options.add_argument("--incognito")
-        # Note: user-data-dir is NOT used with incognito - they conflict!
-        # Incognito already provides a fresh session
+        # === PROFILE / INCOGNITO MODE ===
+        # Only use incognito if NO profile_path (they conflict: incognito discards all data)
+        if not profile_path:
+            options.add_argument("--incognito")
         
         # === DISABLE SYNC/BACKUP PROMPTS ===
         prefs = {
@@ -93,28 +93,66 @@ def start_stealth_browser(profile_path=None, headless=False):
         # Detect Chrome version FIRST (critical for correct driver download)
         chrome_version = None
         import subprocess
+        import platform
+        
         try:
-            result = subprocess.run(
-                ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
-                capture_output=True, text=True
-            )
-            if result.returncode == 0:
-                version_line = result.stdout.strip().split()[-1]
-                chrome_version = int(version_line.split('.')[0])
+            if platform.system() == "Windows":
+                # Windows: read from registry
+                result = subprocess.run(
+                    ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
+                    capture_output=True, text=True
+                )
+                if result.returncode == 0:
+                    version_line = result.stdout.strip().split()[-1]
+                    chrome_version = int(version_line.split('.')[0])
+            elif platform.system() == "Linux":
+                # Linux: try chromium-browser or google-chrome
+                for cmd in ['chromium-browser', 'chromium', 'google-chrome', 'google-chrome-stable']:
+                    try:
+                        result = subprocess.run(
+                            [cmd, '--version'],
+                            capture_output=True, text=True, timeout=5
+                        )
+                        if result.returncode == 0:
+                            # Output: "Chromium 120.0.6099.109 snap"
+                            version_str = result.stdout.strip().split()
+                            for part in version_str:
+                                if part[0].isdigit():
+                                    chrome_version = int(part.split('.')[0])
+                                    break
+                            if chrome_version:
+                                break
+                    except FileNotFoundError:
+                        continue
+            elif platform.system() == "Darwin":
+                # macOS
+                result = subprocess.run(
+                    ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '--version'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    chrome_version = int(result.stdout.strip().split()[-1].split('.')[0])
+                    
+            if chrome_version:
                 print(f"[STEALTH] Detected Chrome version: {chrome_version}")
+            else:
+                print("[STEALTH] Could not detect Chrome version, UC will auto-detect")
         except Exception as e:
             print(f"[WARNING] Could not detect Chrome version: {e}")
+
         
         # Initialize undetected Chrome with explicit version
+        uc_kwargs = {
+            'options': options,
+            'use_subprocess': True,
+        }
+        if profile_path:
+            uc_kwargs['user_data_dir'] = profile_path
+        if chrome_version:
+            uc_kwargs['version_main'] = chrome_version
+        
         try:
-            if chrome_version:
-                driver = uc.Chrome(
-                    options=options, 
-                    use_subprocess=True,
-                    version_main=chrome_version  # Force correct driver version
-                )
-            else:
-                driver = uc.Chrome(options=options, use_subprocess=True)
+            driver = uc.Chrome(**uc_kwargs)
         except Exception as e:
             print(f"[ERROR] UC initialization failed: {e}")
             print("[INFO] Falling back to standard Selenium...")
@@ -124,7 +162,7 @@ def start_stealth_browser(profile_path=None, headless=False):
         _inject_extra_stealth(driver)
         
         print("[STEALTH BROWSER] OK - Undetected ChromeDriver initialized")
-        print(f"[STEALTH BROWSER] Profile: {profile_path if profile_path else 'Default'}")
+        print(f"[STEALTH BROWSER] Profile: {profile_path if profile_path else 'Incognito/Temp'}")
         print(f"[STEALTH BROWSER] Headless: {headless}")
         
         return driver
@@ -135,12 +173,11 @@ def start_stealth_browser(profile_path=None, headless=False):
         
         options = Options()
         
-        # Profile setup
+        # Profile setup / Incognito (only use incognito if no profile)
         if profile_path:
             options.add_argument(f"user-data-dir={profile_path}")
-        
-        # === INCOGNITO MODE for fresh state ===
-        options.add_argument("--incognito")
+        else:
+            options.add_argument("--incognito")
         
         # Core anti-detection flags
         options.add_argument("--disable-blink-features=AutomationControlled")

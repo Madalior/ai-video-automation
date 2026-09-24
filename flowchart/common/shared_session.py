@@ -12,6 +12,7 @@ Benefits:
 """
 
 import os
+import sys
 import time
 import random
 import string
@@ -20,10 +21,13 @@ from uuid import uuid4
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from flowchart.common.browser_utils import start_browser, get_new_email, get_otp, universal_shadow_click
+from flowchart.common.browser_utils import start_browser, get_new_email, get_otp, universal_shadow_click, handle_multiple_tabs_popup
 from flowchart.common.session_manager import SessionManager, OverloadDetector
 from flowchart.common.human_behavior import HumanBehavior
 from flowchart.common.smart_reference_manager import SmartReferenceManager
+from flowchart.common.account_manager import AccountManager
+from flowchart.common.reusable_login import ReusableLoginManager
+from flowchart.common.cookie_manager import CookieManager
 
 
 class SharedSessionManager:
@@ -48,7 +52,7 @@ class SharedSessionManager:
         
         Args:
             headless: Run browser in headless mode
-            profile_path: Chrome profile path (None = temp profile)
+            profile_path: Chrome profile path (None = uses persistent default)
             fresh_profile: Create fresh temporary profile
         """
         self.is_temp_profile = False
@@ -62,6 +66,11 @@ class SharedSessionManager:
             os.makedirs(profile_path, exist_ok=True)
             self.is_temp_profile = True
             print(f"[SHARED SESSION] Created fresh Chrome profile: shared_{unique_id}")
+        elif profile_path is None:
+            # ALWAYS use a persistent profile so login cookies survive between runs
+            profile_path = os.path.abspath("chrome_profiles/saved_session")
+            os.makedirs(profile_path, exist_ok=True)
+            print(f"[SHARED SESSION] Using persistent Chrome profile: {profile_path}")
         
         self.driver = start_browser(profile_path, headless, fresh_profile=False)
         self.wait = WebDriverWait(self.driver, 30)
@@ -84,7 +93,16 @@ class SharedSessionManager:
         self.overload_detector = OverloadDetector()
         self.human = HumanBehavior()
         self.ref_manager = SmartReferenceManager(mode='smart_order')
+        # Use FIXED directory for credentials (not per-run Chrome profile)
+        # so saved accounts persist across runs even with fresh_profile=True
+        creds_dir = os.path.abspath("profiles")
+        self.account_mgr = AccountManager(profile_dir=creds_dir)
+        self.reusable_login = ReusableLoginManager(profile_dir=creds_dir)
+        self.cookie_mgr = CookieManager(cookie_dir=creds_dir)
+        self._img_gen = None  # Lazy-loaded DreaminaGenerator
+        self._vid_gen = None  # Lazy-loaded DreaminaVideoGenerator
         
+        print(f"[SHARED SESSION] Cookie Fortress: {self.cookie_mgr.get_status()}")
         print("[SHARED SESSION] Anti-bot & Consistency Managers Active")
     
 
@@ -101,6 +119,31 @@ class SharedSessionManager:
         """
         if self.logged_in:
             print("[SHARED SESSION] Already logged in, reusing session")
+            return True
+        
+        # =====================================================================
+        # COOKIE FORTRESS: Try to restore session from saved cookies FIRST
+        # =====================================================================
+        if self.cookie_mgr.has_cookies():
+            print("[COOKIE FORTRESS] Attempting session restore from saved cookies...")
+            if self.cookie_mgr.import_cookies(self.driver):
+                if self.cookie_mgr.verify_session(self.driver):
+                    print("[COOKIE FORTRESS] ✅ SESSION RESTORED — No login needed!")
+                    self.logged_in = True
+                    # Re-export to refresh the timestamp
+                    self.cookie_mgr.export_cookies(self.driver)
+                    return True
+                else:
+                    print("[COOKIE FORTRESS] Cookies imported but session expired")
+            else:
+                print("[COOKIE FORTRESS] Cookie import failed")
+        
+        # Check if browser session is still alive (profile cookie-based)
+        if self.account_mgr.is_session_alive(self.driver):
+            print("[SHARED SESSION] Session cookie still valid — skipping login!")
+            self.logged_in = True
+            # Export cookies for future runs
+            self.cookie_mgr.export_cookies(self.driver)
             return True
         
         print("[SHARED SESSION] Starting login flow...")
@@ -120,12 +163,16 @@ class SharedSessionManager:
                     time.sleep(2)
                 
                 # Step 1: Email Input
+                # Reuse saved credentials if available, otherwise create new
                 email = None
                 password = None
                 otp = None
                 
                 for retry_attempt in range(2):
-                    email, password = get_new_email() if retry_attempt == 0 else (email, password)
+                    if retry_attempt == 0:
+                        # Use ReusableLoginManager: tries saved creds first, then creates new
+                        email, password = self.reusable_login.get_email_for_login()
+                    # else: keep same email/password for retry
                     if not email:
                         if login_attempt < max_login_attempts - 1:
                             print("[WARNING] Email generation failed, restarting login...")
@@ -171,24 +218,24 @@ class SharedSessionManager:
                     
                     otp = None
                     max_otp_wait = 90
-                    otp_check_interval = 5
-                    otp_waited = 0
+                    popup_interrupt = False
                     
-                    while otp_waited < max_otp_wait and not otp:
-                        # Check for popup while waiting
-                        if self._handle_multiple_tabs_popup():
-                            print("[SHARED SESSION] Popup while waiting for OTP")
-                            email = None
-                            otp = None
-                            break
-                        
-                        otp = get_otp(email, password, max_wait=otp_check_interval)
-                        
-                        if not otp:
-                            otp_waited += otp_check_interval
-                            if otp_waited % 15 == 0:
-                                print(f"[INFO] Still waiting for OTP... ({otp_waited}s/{max_otp_wait}s)")
+                    # Check for popup before waiting for OTP
+                    if self._handle_multiple_tabs_popup():
+                        print("[SHARED SESSION] Popup before OTP wait")
+                        popup_interrupt = True
                     
+                    if not popup_interrupt:
+                        # Single call with full timeout — get_otp_from_inbox handles
+                        # its own polling internally. Do NOT call it repeatedly with
+                        # short timeouts, because each call clears the inbox first
+                        # and would delete the OTP before it can be read.
+                        otp = self.reusable_login.get_otp_from_inbox(email, password, max_wait=max_otp_wait)
+                    
+                    if popup_interrupt:
+                        print("[INFO] Restarting login because popup interrupted OTP.")
+                        continue
+
                     if otp:
                         break
                     else:
@@ -218,17 +265,19 @@ class SharedSessionManager:
                     return self._wait_for_manual_login()
                 
                 # Enter OTP with 2s delay
+                # Enter OTP with 2s delay
                 print(f"[INFO] Entering OTP: {otp}")
                 print("[ANTI-BOT] Waiting 2.0s before entering OTP...")
                 time.sleep(2.0)
                 
                 try:
-                    otp_input = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='pinInput']")))
-                    otp_input.clear()
+                    # Robust OTP Entry
+                    otp_input = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[name='pinInput']")))
+                    otp_input.click()
+                    time.sleep(0.5)
                     otp_input.send_keys(otp)
-                    # Trigger events manually to ensure state update
-                    self.driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true })); arguments[0].dispatchEvent(new Event('change', { bubbles: true }));", otp_input)
                     print(f"[SUCCESS] OTP entered: {otp}")
+                    time.sleep(1)
                 except Exception as e:
                     print(f"[ERROR] Failed to enter OTP: {e}")
                     if login_attempt < max_login_attempts - 1:
@@ -241,23 +290,29 @@ class SharedSessionManager:
                 
                 # Step 3: Verify
                 try:
-                    # Try finding the button containing "Next" or "Verify" text
-                    verify_btn = self.wait.until(EC.element_to_be_clickable(
-                        (By.XPATH, "//button[.//span[contains(text(), 'Next') or contains(text(), 'Verify')]]")
-                    ))
+                    # Use button with aria-label="Verify" (Exact match from user HTML)
+                    verify_btn = self.wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Verify']")))
                     self.driver.execute_script("arguments[0].click();", verify_btn)
-                    print("[SUCCESS] Verify button clicked")
+                    print("[SUCCESS] Verify button clicked (via aria-label)")
                 except Exception as e1:
-                    print(f"[WARNING] Primary verify button not found: {e1}")
+                    print(f"[WARNING] aria-label Verify button not found: {e1}")
                     try:
-                        # Fallback: Try any button with "Next" or "Verify" in it
-                        verify_btn = self.wait.until(EC.element_to_be_clickable(
-                            (By.XPATH, "//button[contains(text(), 'Next') or contains(text(), 'Verify') or contains(@aria-label, 'Next') or contains(@aria-label, 'Verify')]")
-                        ))
-                        verify_btn.click()
-                        print("[SUCCESS] Verify button clicked (fallback)")
+                        # Fallback: Text content
+                        verify_btn = self.wait.until(EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Next') or contains(text(), 'Verify')]")))
+                        self.driver.execute_script("arguments[0].click();", verify_btn)
+                        print("[SUCCESS] Verify button clicked (fallback text)")
                     except Exception as e2:
-                        print(f"[WARNING] Fallback verify button also failed: {e2}")
+                        print(f"[WARNING] Text fallback verify failed: {e2}")
+                        try:
+                            # Fallback: Try any button with "Next" or "Verify" in it
+                            verify_btn = self.wait.until(EC.element_to_be_clickable(
+                                (By.XPATH, "//button[contains(text(), 'Next') or contains(text(), 'Verify') or contains(@aria-label, 'Next') or contains(@aria-label, 'Verify')]")
+                            ))
+                            verify_btn.click()
+                            print("[SUCCESS] Verify button clicked (fallback generic)")
+                        except Exception as e3:
+                            print(f"[WARNING] Fallback verify button also failed: {e3}")
+                            print("[INFO] Continuing anyway, may require manual intervention")
                         print("[INFO] Continuing anyway, may require manual intervention")
                 
                 # Step 4: Name & Agree
@@ -307,15 +362,31 @@ class SharedSessionManager:
                 time.sleep(random.uniform(1, 2))
                 self.wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(@class,'agree-button')]"))).click()
                 
+                # Wait for Google to finalize after agree
+                time.sleep(5)
+                
+                # Handle any popup that appears during finalization
+                if self._handle_multiple_tabs_popup():
+                    print("[SHARED SESSION] Handled popup during account finalization")
+                    time.sleep(3)
+                
+                # Wait for account creation to fully complete
+                time.sleep(10)
+                
                 print("[SUCCESS] Shared session login successful!")
                 print(f"[SHARED SESSION] Account: {email}")
                 
-                # Store credentials
+                # Store credentials in memory and on disk for reuse
                 self.email = email
                 self.password = password
                 self.logged_in = True
+                self.reusable_login.on_login_success(email, password)
+                self.account_mgr.save_credentials(email, password)
                 
-                time.sleep(5)
+                # COOKIE FORTRESS: Export cookies immediately after successful login
+                print("[COOKIE FORTRESS] Saving session cookies for future reuse...")
+                self.cookie_mgr.export_cookies(self.driver)
+                
                 return True
                 
             except Exception as e:
@@ -357,49 +428,11 @@ class SharedSessionManager:
         return False
     
     def _handle_multiple_tabs_popup(self):
-        """Detect and handle the 'Let's try something else' popup."""
-        try:
-            time.sleep(1)
-            
-            click_script = """
-            function sleep(ms) {
-                const start = Date.now();
-                while (Date.now() - start < ms) {}
-            }
-            
-            let btn = document.querySelector("button[jsname='clYohf']");
-            
-            if (!btn) {
-                const all = document.querySelectorAll("button");
-                for (let b of all) {
-                    const text = b.textContent || '';
-                    if (text.includes("Sign up") || text.includes("sign in")) {
-                        btn = b;
-                        break;
-                    }
-                }
-            }
-            
-            if (btn) {
-                sleep(500);
-                btn.click();
-                return true;
-            }
-            return false;
-            """
-            
-            result = self.driver.execute_script(click_script)
-            
-            if result:
-                print("[DETECTED] Multiple tabs popup handled")
-                time.sleep(3)
-                return True
-            else:
-                return False
-                
-        except Exception as e:
-            print(f"[WARN] Error checking for popup: {e}")
-            return False
+        """
+        Detects and handles the 'Let's try something else' popup.
+        Delegates to the shared utility in browser_utils.
+        """
+        return handle_multiple_tabs_popup(self.driver)
     
     def get_driver(self):
         """
@@ -481,6 +514,50 @@ class SharedSessionManager:
         """Context manager cleanup."""
         self.close()
 
+    @property
+    def image_generator(self):
+        """Lazy-loaded DreaminaGenerator that shares our browser session."""
+        if self._img_gen is None:
+            from flowchart.character.image_generator import DreaminaGenerator
+            # Create generator WITHOUT shared_session to avoid circular delegation
+            # (DreaminaGenerator with shared_session calls back to SharedSessionManager.generate_image)
+            gen = DreaminaGenerator.__new__(DreaminaGenerator)
+            gen.driver = self.driver
+            gen.wait = self.wait
+            gen.profile_path = self.profile_path
+            gen.headless = self.headless
+            gen.shared_session = None
+            gen._owns_driver = False  # Don't close our driver
+            gen.is_temp_profile = False
+            gen.session_manager = self.session_manager
+            gen.overload_detector = self.overload_detector
+            gen.human = self.human
+            self._img_gen = gen
+            print("[SHARED SESSION] DreaminaGenerator initialized (shared driver)")
+        return self._img_gen
+
+    @property
+    def video_generator(self):
+        """Lazy-loaded DreaminaVideoGenerator that shares our browser session."""
+        if self._vid_gen is None:
+            from flowchart.character.video_generator import DreaminaVideoGenerator
+            # Create generator WITHOUT shared_session to avoid circular delegation
+            gen = DreaminaVideoGenerator.__new__(DreaminaVideoGenerator)
+            gen.driver = self.driver
+            gen.wait = self.wait
+            gen.profile_path = self.profile_path
+            gen.headless = self.headless
+            gen.shared_session = None
+            gen._owns_driver = False  # Don't close our driver
+            gen.is_temp_profile = False
+            gen.session_manager = self.session_manager
+            gen.overload_detector = self.overload_detector
+            gen.human = self.human
+            gen.ref_manager = self.ref_manager
+            self._vid_gen = gen
+            print("[SHARED SESSION] DreaminaVideoGenerator initialized (shared driver)")
+        return self._vid_gen
+
     def upload_reference(self, path):
         """
         Upload reference image for character consistency.
@@ -541,7 +618,7 @@ class SharedSessionManager:
                 time.sleep(1)
             print("[SUCCESS] Assuming upload finished.")
 
-    def upload_multiple_references(self, image_paths):
+    def upload_multiple_references(self, image_paths, scene_context=None):
         """
         Upload up to 3 reference images for Veo 3.1.
         
@@ -550,9 +627,13 @@ class SharedSessionManager:
         - Reference 2: Background/scene style  
         - Reference 3: Previous frame for continuity
         
+        Smart auto-chain: if scene_context has independent=True,
+        the ID card primary reference is prioritized.
+        
         Args:
             image_paths: List of up to 3 image paths (strings)
                         Empty/None values are skipped
+            scene_context: Optional dict with 'independent', 'id_card_primary' keys
         
         Returns:
             Number of successfully uploaded images
@@ -560,6 +641,17 @@ class SharedSessionManager:
         if not image_paths:
             print("[INFO] No reference images to upload")
             return 0
+        
+        # Smart auto-chain: override references for independent scenes
+        if scene_context and scene_context.get('independent'):
+            id_card_ref = scene_context.get('id_card_primary')
+            if id_card_ref and os.path.exists(id_card_ref):
+                print(f"[SMART CHAIN] Independent scene -> using ID card primary reference")
+                image_paths = [id_card_ref]  # Override with ID card
+            else:
+                print(f"[SMART CHAIN] Independent scene but no ID card primary, using provided refs")
+        elif scene_context:
+            print(f"[SMART CHAIN] Chained scene -> using continuity reference")
         
         # Limit to 3 images (Veo 3.1 maximum)
         valid_paths = [p for p in image_paths if p and os.path.exists(p)][:3]
@@ -572,135 +664,297 @@ class SharedSessionManager:
         uploaded_count = 0
         
         for idx, path in enumerate(valid_paths, 1):
-            print(f"\\n  [{idx}/{len(valid_paths)}] Uploading: {os.path.basename(path)}")
+            print(f"\n  [{idx}/{len(valid_paths)}] Uploading: {os.path.basename(path)}")
             
             try:
                 self.upload_reference(path)
                 uploaded_count += 1
-                print(f"  ✓ Upload {idx} successful")
+                print(f"  [OK] Upload {idx} successful")
                 
                 # Brief delay between uploads (except after last)
                 if idx < len(valid_paths):
                     time.sleep(2)
                     
             except Exception as e:
-                print(f"  ✗ Upload {idx} failed: {e}")
+                print(f"  [FAIL] Upload {idx} failed: {e}")
                 # Continue with remaining uploads
         
-        print(f"\\n[SUCCESS] Uploaded {uploaded_count}/{len(valid_paths)} reference images")
+        print(f"\n[SUCCESS] Uploaded {uploaded_count}/{len(valid_paths)} reference images")
     
     # =========================================================================
     # CORE GENERATION METHODS (Consolidated)
     # =========================================================================
 
-    def generate_image(self, prompt, output_path, reference_image=None):
+    def generate_image(self, prompt, output_path, reference_image=None, max_retries=2, scene_context=None):
         """
-        Full Image Generation Flow.
+        Generate image using DreaminaGenerator's proven flow.
+        
+        Delegates to DreaminaGenerator which uses the correct menu text
+        ("Generate images (Pro)") and element screenshot saving.
         
         Args:
             prompt: Text prompt
             output_path: Path to save the image
             reference_image: Optional path to reference image (character consistency)
+            max_retries: Maximum number of retry attempts (default: 2)
+            scene_context: Optional dict with smart auto-chain data:
+                          - independent: bool (use ID card primary instead of chain)
+                          - id_card_primary: str (path to ID card primary reference)
             
         Returns:
             bool: True if successful
         """
-        print(f"\\n[SHARED SESSION] Starting Image Generation: {prompt[:30]}...")
+        print(f"\n[SHARED SESSION] Image Generation via DreaminaGenerator: {prompt[:30]}...")
         
-        try:
-            # 1. Ensure Login
-            if not self.login():
-                print("[ERROR] Login failed, aborting generation")
-                return False
-            
-            # 2. Reset / New Chat
-            if not self.reset_for_next_operation():
-                print("[ERROR] Failed to reset interface")
-                return False
-
-            # 3. Select Image Tool
-            if not self.click_menu_item_by_text("Image (Pro)"):
-                print("[ERROR] Failed to select Image (Pro) tool")
-                return False
-            
-            # 4. Upload Reference (if any)
-            if reference_image:
-                self.upload_reference(reference_image)
-            
-            # 5. Inject Prompt
-            self.inject_prompt(prompt)
-            
-            # 6. Submit
-            if not self.submit_generation():
-                print("[ERROR] Failed to submit generation")
-                return False
-            
-            # 7. Wait & Save
-            return self.save_result(output_path)
-            
-        except Exception as e:
-            print(f"[ERROR] Image generation failed: {e}")
+        # Smart auto-chain: override reference for independent scenes
+        if scene_context and scene_context.get('independent'):
+            id_card_ref = scene_context.get('id_card_primary')
+            if id_card_ref and os.path.exists(id_card_ref):
+                print(f"[SMART CHAIN] Independent scene -> ID card primary reference")
+                reference_image = id_card_ref
+        
+        # Ensure logged in first
+        if not self.login():
+            print("[ERROR] Login failed, aborting generation")
             return False
+        
+        # Delegate to DreaminaGenerator (uses shared driver, no circular loop)
+        return self.image_generator.generate_image(prompt, output_path, reference_image, max_retries)
 
-    def generate_video(self, prompt, output_path, reference_image_paths=None):
+    def generate_video(self, prompt, output_path, reference_image_paths=None, max_retries=2, scene_context=None):
         """
-        Full Video Generation Flow.
+        Generate video using DreaminaVideoGenerator's proven flow.
+        
+        Delegates to DreaminaVideoGenerator which uses the correct video tool
+        selection (Veo), smart reference management, and blob->base64 download.
         
         Args:
             prompt: Text prompt
             output_path: Path to save the video
             reference_image_paths: List of paths (or single path) for consistency
+            max_retries: Maximum number of retry attempts (default: 2)
+            scene_context: Optional dict with smart auto-chain data:
+                          - independent: bool (use ID card primary instead of chain)
+                          - id_card_primary: str (path to ID card primary reference)
             
         Returns:
             bool: True if successful
         """
-        print(f"\\n[SHARED SESSION] Starting Video Generation: {prompt[:30]}...")
+        print(f"\n[SHARED SESSION] Video Generation via DreaminaVideoGenerator: {prompt[:30]}...")
         
-        try:
-            # 1. Ensure Login
-            if not self.login():
-                print("[ERROR] Login failed, aborting generation")
-                return False
-            
-            # 2. Reset / New Chat
-            if not self.reset_for_next_operation():
-                print("[ERROR] Failed to reset interface")
-                return False
-
-            # 3. Select Video Tool (Veo 3)
-            # Try specific Veo 3 menu items, fallback to generic Video
-            if not self.click_menu_item_by_text("Video (Veo 3)"):
-                if not self.click_menu_item_by_text("Video"):
-                    print("[ERROR] Failed to select Video tool")
-                    return False
-            
-            # 4. Upload References (Smart Handling)
-            if reference_image_paths:
-                # Handle single path vs list
-                paths = reference_image_paths if isinstance(reference_image_paths, list) else [reference_image_paths]
-                self.upload_multiple_references(paths)
-            
-            # 5. Inject Prompt
-            self.inject_prompt(prompt)
-            
-            # 6. Submit
-            if not self.submit_generation():
-                print("[ERROR] Failed to submit generation")
-                return False
-            
-            # 7. Wait & Download
-            return self.download_video(output_path)
-            
-        except Exception as e:
-            print(f"[ERROR] Video generation failed: {e}")
+        # Smart auto-chain: override references for independent scenes
+        if scene_context and scene_context.get('independent'):
+            id_card_ref = scene_context.get('id_card_primary')
+            if id_card_ref and os.path.exists(id_card_ref):
+                print(f"[SMART CHAIN] Independent scene -> ID card primary reference")
+                reference_image_paths = [id_card_ref]
+        
+        # Ensure logged in first
+        if not self.login():
+            print("[ERROR] Login failed, aborting generation")
             return False
+        
+        # Delegate to DreaminaVideoGenerator (uses shared driver, no circular loop)
+        return self.video_generator.generate_video(
+            prompt=prompt,
+            reference_image_paths=reference_image_paths,
+            output_path=output_path,
+            max_retries=max_retries
+        )
 
     # =========================================================================
     # HELPER METHODS (Ported from Generators)
     # =========================================================================
 
+    def click_start_button(self):
+        """Click the Start button with retry logic and touch overlay handling."""
+        # Human-like delay before clicking
+        delay = random.uniform(2, 4)
+        print(f"[ANTI-BOT] Waiting {delay:.1f}s before clicking Start button...")
+        time.sleep(delay)
+        
+        print("[INFO] Searching for Start button and touch overlay...")
+        
+        # JavaScript logic with proper event dispatching for Lit components
+        js_click_script = """
+        // Helper: Dispatch proper mouse events (mousedown → mouseup → click)
+        function realClick(element) {
+            if (!element) return false;
+            
+            // Scroll into view
+            element.scrollIntoView({block: 'center', behavior: 'instant'});
+            
+            // Get element center coordinates
+            const rect = element.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            
+            const eventOptions = {
+                bubbles: true,
+                cancelable: true,
+                composed: true, // Critical for Shadow DOM/Lit events
+                view: window,
+                detail: 1,
+                clientX: x,
+                clientY: y
+            };
+            
+            // Dispatch full mouse event sequence (what real clicks do)
+            element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+            element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+            element.dispatchEvent(new MouseEvent('click', eventOptions));
+            
+            // Also try pointerdown/up for touch-enabled components
+            element.dispatchEvent(new PointerEvent('pointerdown', eventOptions));
+            element.dispatchEvent(new PointerEvent('pointerup', eventOptions));
+            
+            return true;
+        }
+        
+        // Deep search for button in Shadow DOM
+        const btn = (function findElementEverywhere(selector) {
+            const findInElement = (root) => {
+                const el = root.querySelector(selector);
+                if (el) return el;
+                const shadowHosts = root.querySelectorAll('*');
+                for (const host of shadowHosts) {
+                    if (host.shadowRoot) {
+                        const found = findInElement(host.shadowRoot);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            };
+            return findInElement(document);
+        })('#button');
+
+        if (btn) {
+            // Try clicking touch overlay first (Lit pattern)
+            const touchArea = btn.querySelector('.touch');
+            if (touchArea) {
+                if (realClick(touchArea)) return "touch_clicked";
+            }
+            
+            // Try the label
+            const labelArea = btn.querySelector('.label');
+            if (labelArea) {
+                if (realClick(labelArea)) return "label_clicked";
+            }
+            
+            // Fall back to button itself
+            if (realClick(btn)) return "button_clicked";
+        }
+        
+        return null;
+        """
+        
+        for i in range(10):  # 10 Retries
+            try:
+                result = self.driver.execute_script(js_click_script)
+                
+                if result:
+                    print(f"[SUCCESS] {result} performed.")
+                    return True
+                    
+                print(f"[INFO] Retry {i+1}/10: Button/Touch area not found yet...")
+            except Exception as e:
+                print(f"[WARNING] Error during click attempt: {e}")
+                
+            time.sleep(2)
+
+        print("[ERROR] Could not click the button after 10 retries.")
+        # Proceed anyway as it might not be there
+        return False
+
+    def open_video_tool(self):
+        """Open the video generation tool menu."""
+        print("[INFO] Step 1: Opening Tool Menu...")
+        # Open the initial menu anchor
+        universal_shadow_click(self.driver, "#tool-selector-menu-anchor")
+        
+        # Wait for the menu overlay to render
+        time.sleep(2) 
+
+        print("[INFO] Step 2: Deep Searching for 'Generate a video'...")
+        deep_click_script = """
+        // Helper: Robust click with composed events
+        function realClick(element) {
+            if (!element) return false;
+            
+            element.scrollIntoView({block: 'center', behavior: 'instant'});
+            const rect = element.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            
+            const eventOptions = {
+                bubbles: true,
+                cancelable: true,
+                composed: true,
+                view: window,
+                detail: 1,
+                clientX: x,
+                clientY: y
+            };
+            
+            element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+            element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+            element.dispatchEvent(new MouseEvent('click', eventOptions));
+            element.dispatchEvent(new PointerEvent('pointerdown', eventOptions));
+            element.dispatchEvent(new PointerEvent('pointerup', eventOptions));
+            return true;
+        }
+
+        function findAllInShadow(root, tagName, list = []) {
+            const items = root.querySelectorAll(tagName);
+            items.forEach(i => list.push(i));
+            const hosts = root.querySelectorAll('*');
+            for (const host of hosts) {
+                if (host.shadowRoot) { findAllInShadow(host.shadowRoot, tagName, list); }
+            }
+            return list;
+        }
+
+        const allItems = findAllInShadow(document, 'md-menu-item');
+        for (let item of allItems) {
+            // Check slotted headline text
+            const headline = item.querySelector('[slot="headline"]');
+            
+            // Match 'veo' or 'video' (case insensitive)
+            if (headline && (
+                headline.textContent.toLowerCase().includes('veo') || 
+                headline.textContent.toLowerCase().includes('video')
+            )) {
+                // 1. Try clicking the host element (md-menu-item)
+                console.log("Found menu item, attempting click on host...");
+                realClick(item);
+                
+                // 2. Try clicking the internal list item (inside shadow root)
+                if (item.shadowRoot) {
+                    const internalLi = item.shadowRoot.querySelector('li');
+                    if (internalLi) {
+                        console.log("Found internal li, clicking...");
+                        realClick(internalLi);
+                    }
+                }
+                
+                // 3. Try clicking the headline text itself
+                realClick(headline);
+                
+                return true;
+            }
+        }
+        return false;
+        """
+        
+        if self.driver.execute_script(deep_click_script):
+            print("[SUCCESS] 'Generate a video' clicked.")
+            return True
+        else:
+            print("[ERROR] Could not find the video menu item even with deep search.")
+            return False
+        
     def click_menu_item_by_text(self, text="Image (Pro)"):
-        """Click menu item by text with retry logic and Shadow DOM traversal."""
+        """Click menu item by text with fuzzy matching and Shadow DOM traversal."""
         delay = random.uniform(2, 4)
         print(f"[ANTI-BOT] Waiting {delay:.1f}s before clicking menu item...")
         time.sleep(delay)
@@ -708,55 +962,58 @@ class SharedSessionManager:
         print(f"[INFO] Searching for menu item: '{text}'...")
 
         js_logic = """
-        const textToFind = arguments[0];
+        const targetText = arguments[0].toLowerCase().trim();
         
-        function findElementByText(root, text) {
-            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-            let node;
-            while (node = walker.nextNode()) {
-                if (node.textContent.includes(text)) {
-                    return node.parentElement;
-                }
+        function findAllInShadow(root, selector, list = []) {
+            const items = root.querySelectorAll(selector);
+            items.forEach(i => list.push(i));
+            const hosts = root.querySelectorAll('*');
+            for (const host of hosts) {
+                if (host.shadowRoot) { findAllInShadow(host.shadowRoot, selector, list); }
             }
-            const all = root.querySelectorAll('*');
-            for (const el of all) {
-                if (el.shadowRoot) {
-                    const found = findElementByText(el.shadowRoot, text);
-                    if (found) return found;
-                }
-            }
-            return null;
+            return list;
         }
 
-        const element = findElementByText(document, textToFind);
-        if (element) {
-            const menuItem = element.closest('md-menu-item') || element;
-            const clickEv = new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                composed: true
-            });
+        const menuItems = findAllInShadow(document, 'md-menu-item');
+        const availableItems = [];
+        
+        for (let item of menuItems) {
+            const itemText = item.innerText.toLowerCase().trim();
+            availableItems.push(item.innerText.trim());
             
-            const start = Date.now();
-            while (Date.now() - start < 500) {}
-            
-            menuItem.focus();
-            menuItem.dispatchEvent(clickEv);
-            return true;
+            // Try exact match or fuzzy match
+            if (itemText === targetText || itemText.includes(targetText) || targetText.includes(itemText)) {
+                console.log("Found matching menu item:", item.innerText.trim());
+                
+                const clickEv = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true
+                });
+                
+                item.focus();
+                item.dispatchEvent(clickEv);
+                return { success: true, text: item.innerText.trim() };
+            }
         }
-        return false;
+        
+        return { success: false, available: availableItems };
         """
 
         for i in range(5):
             try:
-                success = self.driver.execute_script(js_logic, text)
-                if success:
-                    print(f"[SUCCESS] Successfully clicked '{text}'")
+                result = self.driver.execute_script(js_logic, text)
+                if result and result.get('success'):
+                    print(f"[SUCCESS] Successfully clicked '{result['text']}' (matched '{text}')")
                     return True
+                else:
+                    items = result.get('available', []) if result else []
+                    if items:
+                        print(f"[INFO] Available menu items: {', '.join(items)}")
             except Exception as e:
                 print(f"[WARNING] Error during attempt {i+1}: {e}")
             
-            print(f"[INFO] Retry {i+1}/5: Element not found or not interactable...")
+            print(f"[INFO] Retry {i+1}/5: Element '{text}' not found. Retrying...")
             time.sleep(4)
 
         print(f"[ERROR] Failed to find and click '{text}' after retries.")
@@ -997,5 +1254,120 @@ class SharedSessionManager:
                 
             time.sleep(10)
 
-        print("[ERROR] Timeout reached: Video was never found or failed to download.")
-        return False
+
+if __name__ == "__main__":
+    import argparse
+    import traceback
+
+    parser = argparse.ArgumentParser(
+        description="SharedSessionManager - Single-worker browser automation for image & video generation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python -m flowchart.common.shared_session
+  python -m flowchart.common.shared_session --image-only --prompt "A cyberpunk city"
+  python -m flowchart.common.shared_session --video-only --prompt "Flying cars in neon streets"
+  python -m flowchart.common.shared_session --headless --output-dir my_output
+        """
+    )
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    parser.add_argument("--image-only", action="store_true", help="Only generate an image (skip video)")
+    parser.add_argument("--video-only", action="store_true", help="Only generate a video (skip image)")
+    parser.add_argument("--prompt", type=str, default=None, help="Custom prompt for generation")
+    parser.add_argument("--output-dir", type=str, default="output/shared_session_test", help="Output directory")
+    parser.add_argument("--fresh-profile", action="store_true", default=True, help="Use a fresh Chrome profile (default: True)")
+    args = parser.parse_args()
+
+    # Default prompts
+    default_img_prompt = "A futuristic cyberpunk detective ID card, neon blue and pink, high detail, digital art"
+    default_vid_prompt = "The cyberpunk detective walking through a rainy neon city, cinematic lighting, 4k"
+
+    img_prompt = args.prompt or default_img_prompt
+    vid_prompt = args.prompt or default_vid_prompt
+
+    output_dir = os.path.abspath(args.output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+
+    img_output = os.path.join(output_dir, "generated_image.png")
+    vid_output = os.path.join(output_dir, "generated_video.mp4")
+
+    print("=" * 60)
+    print("  SHARED SESSION MANAGER - Standalone Runner")
+    print("=" * 60)
+    print(f"  Mode:       {'Image Only' if args.image_only else 'Video Only' if args.video_only else 'Full Pipeline (Image + Video)'}")
+    print(f"  Headless:   {args.headless}")
+    print(f"  Output Dir: {output_dir}")
+    print("=" * 60)
+
+    session = None
+    try:
+        # 1. Initialize
+        print("\n[STEP 1/4] Initializing browser session...")
+        session = SharedSessionManager(
+            headless=args.headless,
+            fresh_profile=args.fresh_profile
+        )
+
+        # 2. Login
+        print("\n[STEP 2/4] Logging in to Google Enterprise account...")
+        if not session.login():
+            print("[FATAL] Login failed after all retries. Exiting.")
+            sys.exit(1)
+        print("[OK] Login successful!\n")
+
+        # 3. Generate Image
+        if not args.video_only:
+            print("[STEP 3/4] Generating Image...")
+            print(f"  Prompt: {img_prompt[:80]}...")
+            print(f"  Output: {img_output}")
+            
+            if session.generate_image(img_prompt, img_output):
+                print(f"[OK] Image saved to: {img_output}")
+            else:
+                print("[FAIL] Image generation failed.")
+                if not args.image_only:
+                    print("[INFO] Continuing to video generation anyway...")
+        else:
+            print("[STEP 3/4] Skipping image generation (--video-only)")
+
+        # 4. Generate Video
+        if not args.image_only:
+            print("\n[STEP 4/4] Generating Video...")
+            print(f"  Prompt: {vid_prompt[:80]}...")
+            print(f"  Output: {vid_output}")
+            
+            # Use the generated image as a reference for character consistency
+            refs = [img_output] if os.path.exists(img_output) else None
+            if refs:
+                print(f"  Reference: {os.path.basename(img_output)} (character consistency)")
+            
+            if session.generate_video(vid_prompt, vid_output, reference_image_paths=refs):
+                print(f"[OK] Video saved to: {vid_output}")
+            else:
+                print("[FAIL] Video generation failed.")
+        else:
+            print("\n[STEP 4/4] Skipping video generation (--image-only)")
+
+        # Summary
+        print("\n" + "=" * 60)
+        print("  RESULTS")
+        print("=" * 60)
+        if not args.video_only and os.path.exists(img_output):
+            size_kb = os.path.getsize(img_output) / 1024
+            print(f"  ✓ Image: {img_output} ({size_kb:.1f} KB)")
+        if not args.image_only and os.path.exists(vid_output):
+            size_mb = os.path.getsize(vid_output) / (1024 * 1024)
+            print(f"  ✓ Video: {vid_output} ({size_mb:.1f} MB)")
+        print("=" * 60)
+
+    except KeyboardInterrupt:
+        print("\n[INTERRUPTED] Stopped by user (Ctrl+C)")
+    except Exception as e:
+        print(f"\n[ERROR] Fatal exception: {e}")
+        traceback.print_exc()
+    finally:
+        if session:
+            print("\n[CLEANUP] Closing browser session...")
+            session.close()
+            print("[DONE] Session closed.")
+
