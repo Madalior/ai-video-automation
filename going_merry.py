@@ -548,7 +548,7 @@ def process_single_clip(
             bus.emit("stage.clip.completed", {"job_id": job_id, "clip_index": i, "video": final_path, "resumed": True})
             if upload and not (checkpoint and checkpoint.get_clip_progress(i) and checkpoint.get_clip_progress(i).get("uploaded")) and not preview:
                 bus.emit("stage.7.upload", {"job_id": job_id, "clip_index": i, "status": "starting"})
-                up_ok = step_upload(final_path, clip, platform if platform != "all" else "shorts", account_id=account_id)
+                up_ok = step_upload(final_path, clip, platform, account_id=account_id)
                 if checkpoint:
                     checkpoint.save_clip_progress(i, {"uploaded": up_ok})
                 bus.emit("stage.7.upload", {"job_id": job_id, "clip_index": i, "status": "completed", "success": up_ok})
@@ -745,7 +745,7 @@ def process_single_clip(
     # 7. Upload (optional)
     if upload and final and not preview:
         bus.emit("stage.7.upload", {"job_id": job_id, "clip_index": i, "status": "starting"})
-        up_ok = step_upload(final, clip, platform if platform != "all" else "shorts", account_id=account_id)
+        up_ok = step_upload(final, clip, platform, account_id=account_id)
         if checkpoint:
             checkpoint.save_clip_progress(i, {"uploaded": up_ok})
         bus.emit("stage.7.upload", {"job_id": job_id, "clip_index": i, "status": "completed", "success": up_ok})
@@ -1037,7 +1037,7 @@ Examples:
     parser.add_argument("--overlay",    default=None,   type=str,   help="Custom overlay text badge")
     parser.add_argument("--clips",      default=1,      type=int,   help="Number of clips to generate (default: 1)")
     parser.add_argument("--platform",   default="all",  type=str,
-                        choices=["tiktok", "reels", "shorts", "all"],
+                        choices=["tiktok", "reels", "shorts", "instagram", "youtube", "all"],
                         help="Target platform (default: all)")
     parser.add_argument("--min",        default=20.0,   type=float, help="Min clip duration seconds (default: 20)")
     parser.add_argument("--max",        default=90.0,   type=float, help="Max clip duration seconds (default: 90)")
