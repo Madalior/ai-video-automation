@@ -28,6 +28,7 @@ services:
     volumes:
       - ./web_app:/app/web_app
       - ./clipper:/app/clipper
+      - ./going_merry.py:/app/going_merry.py
       - ./start_cloud.sh:/app/start_cloud.sh
       - ./output:/app/output
       - ./uploader_profiles:/app/uploader_profiles

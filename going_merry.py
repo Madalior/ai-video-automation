@@ -1056,6 +1056,8 @@ Examples:
     parser.add_argument("--find-song", "--test-song", default=None, nargs="?", const="phonk", type=str,
                         help="Test the song finder: find trending songs for emotion/genre (e.g. 'phonk', 'fonk', 'hype', 'chill')")
 
+    parser.add_argument("--account-id",     default="acc_01", type=str, help="Target account persona ID (e.g. acc_c71c624f)")
+
     args = parser.parse_args()
 
     if args.find_song is not None:
@@ -1085,6 +1087,7 @@ Examples:
         job_id       = args.job_id,
         resume       = not args.no_resume,
         workers      = args.workers,
+        account_id   = args.account_id,
     )
 
 
