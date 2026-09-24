@@ -106,7 +106,13 @@ def connect_platform(acc_id, platform):
         env = os.environ.copy()
         if "DISPLAY" not in env:
             env["DISPLAY"] = ":99"
-        subprocess.Popen(cmd, env=env, cwd=str(PROJECT_ROOT))
+        try:
+            log_path = PROJECT_ROOT / "instance" / f"login_{acc_id}_{platform}.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_file = open(log_path, "a", encoding="utf-8")
+            subprocess.Popen(cmd, env=env, cwd=str(PROJECT_ROOT), stdout=log_file, stderr=log_file)
+        except Exception:
+            subprocess.Popen(cmd, env=env, cwd=str(PROJECT_ROOT))
         
         return jsonify({
             "success": True,

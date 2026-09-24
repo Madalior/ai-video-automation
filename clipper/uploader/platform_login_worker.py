@@ -54,13 +54,18 @@ PLATFORM_CONFIG = {
 
 def get_safe_profile_dir(account_id: str, platform: str) -> Path:
     """
-    Returns an isolated profile directory in LocalAppData outside OneDrive.
-    Prevents OneDrive ERROR_SHARING_VIOLATION (0x20) and ProcessSingleton lock conflicts.
+    Returns an isolated profile directory:
+    - On Linux / Docker: /app/uploader_profiles/sessions/<account_id>/<platform>_profile
+    - On Windows: LocalAppData outside OneDrive to prevent sharing violations
     """
-    local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
-    safe_dir = Path(local_app_data) / "GoingMerry" / "profiles" / account_id / f"{platform}_profile"
+    if sys.platform != "win32":
+        safe_dir = PROJECT_ROOT / "uploader_profiles" / "sessions" / account_id / f"{platform}_profile"
+    else:
+        local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
+        safe_dir = Path(local_app_data) / "GoingMerry" / "profiles" / account_id / f"{platform}_profile"
     safe_dir.mkdir(parents=True, exist_ok=True)
     return safe_dir
+
 
 
 def _clean_stale_locks(profile_dir: Path):
@@ -182,14 +187,20 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                 "no_viewport": True,
                 "ignore_default_args": ["--enable-automation"],
                 "user_agent": DEFAULT_USER_AGENT,
-                "args": [
-                    '--disable-blink-features=AutomationControlled',
-                    '--no-first-run',
-                    '--no-default-browser-check',
-                    '--disable-infobars',
-                    '--start-maximized',
-                ]
-            }
+            launch_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--no-first-run',
+                '--no-default-browser-check',
+                '--disable-infobars',
+                '--start-maximized',
+            ]
+            if sys.platform != "win32":
+                launch_args.extend([
+                    '--no-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                ])
+            launch_kwargs["args"] = launch_args
             if use_channel:
                 launch_kwargs["channel"] = use_channel
                 print(f"[{platform.upper()}_WORKER] Launching Real {browser_name} (channel='{use_channel}')...")
