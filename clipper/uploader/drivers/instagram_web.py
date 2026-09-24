@@ -67,6 +67,13 @@ class InstagramWebUploader:
                 "message": "Session expired or not logged in. Please run the 1-time login command."
             }
 
+        shots_dir = Path("/app/output")
+        shots_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.page.screenshot(path=str(shots_dir / "ig_step1_nav.png"))
+        except Exception:
+            pass
+
         # Dismiss common popups (Save Info / Notifications)
         for popup_text in ["Not Now", "Not now", "Cancel"]:
             try:
@@ -89,9 +96,13 @@ class InstagramWebUploader:
             if post_sub.is_visible():
                 post_sub.click(timeout=3000)
         except PlaywrightTimeoutError:
+            try: self.page.screenshot(path=str(shots_dir / "ig_err_no_create.png"))
+            except Exception: pass
             return {"status": "error", "message": "Could not find 'Create' button on Instagram."}
 
         self.page.wait_for_timeout(1500)
+        try: self.page.screenshot(path=str(shots_dir / "ig_step2_create_dialog.png"))
+        except Exception: pass
 
         # 3. Upload File
         print(f"[INSTAGRAM_BOT] Uploading video: {video_file.name}...")
@@ -99,7 +110,9 @@ class InstagramWebUploader:
         file_input.wait_for(state="attached", timeout=15000)
         file_input.set_input_files(str(video_file))
 
-        self.page.wait_for_timeout(3000)
+        self.page.wait_for_timeout(4000)
+        try: self.page.screenshot(path=str(shots_dir / "ig_step3_file_attached.png"))
+        except Exception: pass
 
         # Handle 'Video posts are now shared as reels' modal if it appears
         ok_btn = self.page.locator("button:has-text('OK'), button:has-text('Continue')").first
@@ -117,6 +130,9 @@ class InstagramWebUploader:
         except Exception as e:
             print(f"[INSTAGRAM_BOT] Next 1 notice: {e}")
 
+        try: self.page.screenshot(path=str(shots_dir / "ig_step4_crop.png"))
+        except Exception: pass
+
         # 5. Click 'Next' (Filter/Cover screen)
         try:
             next_btn2 = self.page.locator("div[role='button']:has-text('Next'), button:has-text('Next')").first
@@ -125,6 +141,9 @@ class InstagramWebUploader:
             self.page.wait_for_timeout(2500)
         except Exception as e:
             print(f"[INSTAGRAM_BOT] Next 2 notice: {e}")
+
+        try: self.page.screenshot(path=str(shots_dir / "ig_step5_cover.png"))
+        except Exception: pass
 
         # 6. Add Caption
         print("[INSTAGRAM_BOT] Setting Caption...")
@@ -137,6 +156,9 @@ class InstagramWebUploader:
         except Exception as cap_err:
             print(f"[INSTAGRAM_BOT] Caption set notice: {cap_err}")
 
+        try: self.page.screenshot(path=str(shots_dir / "ig_step6_caption_set.png"))
+        except Exception: pass
+
         # 7. Click 'Share'
         print("[INSTAGRAM_BOT] Clicking Share...")
         share_btn = self.page.locator("div[role='button']:has-text('Share'), button:has-text('Share')").last
@@ -144,17 +166,60 @@ class InstagramWebUploader:
         try:
             share_btn.click(force=True, timeout=8000)
         except Exception:
-            # JavaScript direct click bypasses any pointer-intercepting overlay
             self.page.evaluate("(btn) => btn.click()", share_btn.element_handle())
 
-        # Wait for 'Reel shared' confirmation
-        print("[INSTAGRAM_BOT] Waiting for upload and processing to finish...")
-        self.page.wait_for_timeout(12000)
+        # Wait for 'Reel shared' confirmation (poll up to 120 seconds)
+        print("[INSTAGRAM_BOT] Video uploading to Meta servers... Waiting for confirmation (up to 120s)...")
+        shared_confirmed = False
+        start_wait = time.time()
+        while time.time() - start_wait < 120:
+            self.page.wait_for_timeout(3000)
+            elapsed = int(time.time() - start_wait)
+            try:
+                # 1. Check for specific success text or checkmark
+                success_locators = self.page.locator(
+                    "span:has-text('Your reel has been shared'), "
+                    "span:has-text('Your post has been shared'), "
+                    "div:has-text('Your reel has been shared'), "
+                    "div:has-text('Your post has been shared'), "
+                    "img[alt*='Animated checkmark'], "
+                    "img[alt*='checkmark']"
+                )
+                if success_locators.count() > 0:
+                    shared_confirmed = True
+                    print(f"[INSTAGRAM_BOT] ✅ Detected confirmation: 'Your reel has been shared' after {elapsed}s!")
+                    break
 
-        print("[INSTAGRAM_BOT] ✅ Reel shared successfully on Instagram!")
-        return {
-            "status": "success",
-            "platform": "instagram",
-            "caption": full_caption
-        }
+                # 2. Check if 'has been shared' appears in dialog text
+                dialog = self.page.locator("div[role='dialog']").first
+                if dialog.is_visible():
+                    d_text = dialog.inner_text().lower()
+                    if "has been shared" in d_text or "reel shared" in d_text:
+                        shared_confirmed = True
+                        print(f"[INSTAGRAM_BOT] ✅ Detected confirmation in dialog text after {elapsed}s!")
+                        break
+
+                if elapsed % 15 < 4:
+                    print(f"[INSTAGRAM_BOT] Still uploading/processing... ({elapsed}s elapsed)")
+            except Exception:
+                pass
+
+        try: self.page.screenshot(path=str(shots_dir / "ig_step7_after_share.png"))
+        except Exception: pass
+
+        if shared_confirmed:
+            self.page.wait_for_timeout(3000)
+            print("[INSTAGRAM_BOT] ✅ Reel shared successfully on Instagram!")
+            return {
+                "status": "success",
+                "platform": "instagram",
+                "caption": full_caption
+            }
+        else:
+            print("[INSTAGRAM_BOT] ⚠️ Share button clicked, but confirmation checkmark was not verified within 120s.")
+            return {
+                "status": "unverified",
+                "platform": "instagram",
+                "message": "Share was clicked; confirmation dialog timed out. Check ig_step7_after_share.png for state."
+            }
 
