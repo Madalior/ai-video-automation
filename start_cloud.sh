@@ -28,6 +28,12 @@ sleep 1
 
 # 3. Start Fluxbox (Window Manager to ensure popups & active windows focus properly)
 echo "🪟 Starting Fluxbox window manager..."
+mkdir -p /root/.fluxbox
+cat << 'EOF' > /root/.fluxbox/apps
+[app] (name=.*)
+  [Maximized] {yes}
+[end]
+EOF
 fluxbox &
 sleep 1
 

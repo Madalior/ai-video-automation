@@ -181,18 +181,14 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
             browser_name = "Chromium"
 
         with sync_playwright() as p:
-            launch_kwargs = {
-                "user_data_dir": str(safe_profile),
-                "headless": False,
-                "no_viewport": True,
-                "ignore_default_args": ["--enable-automation"],
-                "user_agent": DEFAULT_USER_AGENT,
             launch_args = [
                 '--disable-blink-features=AutomationControlled',
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--disable-infobars',
                 '--start-maximized',
+                '--window-size=1280,800',
+                '--window-position=0,0',
             ]
             if sys.platform != "win32":
                 launch_args.extend([
@@ -200,7 +196,14 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                     '--disable-dev-shm-usage',
                     '--disable-gpu',
                 ])
-            launch_kwargs["args"] = launch_args
+            launch_kwargs = {
+                "user_data_dir": str(safe_profile),
+                "headless": False,
+                "no_viewport": True,
+                "ignore_default_args": ["--enable-automation"],
+                "user_agent": DEFAULT_USER_AGENT,
+                "args": launch_args,
+            }
             if use_channel:
                 launch_kwargs["channel"] = use_channel
                 print(f"[{platform.upper()}_WORKER] Launching Real {browser_name} (channel='{use_channel}')...")
@@ -275,8 +278,9 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                                     if "instagram.com" in current_url and "/login" not in current_url:
                                         prof = page.locator("a[href*='/'][role='link'] img[alt*='profile picture']").first
                                         alt = prof.get_attribute("alt") if prof.count() > 0 else None
-                                        if alt and "'" in alt:
-                                            detected_handle = f"@{alt.split(\"'s profile picture\")[0].strip()}"
+                                        if alt and "'s profile picture" in alt:
+                                            handle_part = alt.split("'s profile picture")[0].strip()
+                                            detected_handle = f"@{handle_part}"
                                 except Exception:
                                     pass
 
