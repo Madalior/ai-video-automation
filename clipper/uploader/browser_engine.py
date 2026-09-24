@@ -57,9 +57,23 @@ class BrowserEngine:
             self.profile_mgr.add_account(account_id)
             account = self.profile_mgr.get_account(account_id)
 
-        # Ensure active execution profile lives in LocalAppData outside OneDrive sync locks
-        local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
-        safe_session_dir = Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "uploader_session"
+        # Workspace session directory
+        session_dir = self.profile_mgr.base_dir / "sessions" / account_id
+        session_dir.mkdir(parents=True, exist_ok=True)
+
+        if sys.platform != "win32":
+            safe_session_dir = session_dir / "uploader_session"
+            use_channel = None
+        else:
+            local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
+            safe_session_dir = Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "uploader_session"
+            edge_exe_candidates = [
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            ]
+            has_edge = any(os.path.exists(p) for p in edge_exe_candidates)
+            use_channel = "msedge" if has_edge else "chrome"
+
         safe_session_dir.mkdir(parents=True, exist_ok=True)
 
         # Clear stale locks
@@ -82,30 +96,32 @@ class BrowserEngine:
             "--disable-features=IsolateOrigins,site-per-process",
             "--start-maximized"
         ]
-
-        edge_exe_candidates = [
-            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        ]
-        has_edge = any(os.path.exists(p) for p in edge_exe_candidates)
-        use_channel = "msedge" if has_edge else "chrome"
+        if sys.platform != "win32":
+            chrome_args.extend([
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ])
 
         playwright = sync_playwright().start()
         try:
-            # Prefer clean Microsoft Edge / Chrome installation
-            context = playwright.chromium.launch_persistent_context(
-                user_data_dir=str(safe_session_dir),
-                channel=use_channel,
-                headless=headless,
-                proxy=proxy_config,
-                args=chrome_args,
-                slow_mo=slow_mo,
-                viewport=None,  # Inherits window size
-                user_agent=DEFAULT_USER_AGENT,
-                locale="en-US",
-                timezone_id="America/New_York",
-                permissions=["clipboard-read", "clipboard-write"]
-            )
+            launch_kwargs = {
+                "user_data_dir": str(safe_session_dir),
+                "headless": headless,
+                "args": chrome_args,
+                "slow_mo": slow_mo,
+                "viewport": None,
+                "user_agent": DEFAULT_USER_AGENT,
+                "locale": "en-US",
+                "timezone_id": "America/New_York",
+                "permissions": ["clipboard-read", "clipboard-write"]
+            }
+            if proxy_config:
+                launch_kwargs["proxy"] = proxy_config
+            if use_channel:
+                launch_kwargs["channel"] = use_channel
+
+            context = playwright.chromium.launch_persistent_context(**launch_kwargs)
 
             # Mask navigator.webdriver
             page = context.pages[0] if context.pages else context.new_page()
@@ -116,20 +132,23 @@ class BrowserEngine:
             """)
 
             # Load any saved cookies from workspace or localappdata into context
+            local_app_data = os.environ.get("LOCALAPPDATA", "")
             cookie_candidates = [
-                safe_session_dir / "cookies.json",
-                session_dir / "cookies.json",
-                Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "instagram_profile" / "cookies.json",
-                session_dir / "instagram_profile" / "cookies.json",
+                self.profile_mgr.base_dir / "accounts" / f"{account_id}_instagram_cookies.json",
                 self.profile_mgr.base_dir / "accounts" / f"{account_id}_cookies.json",
+                session_dir / "instagram_profile" / "cookies.json",
+                session_dir / "cookies.json",
+                safe_session_dir / "cookies.json",
             ]
+            if local_app_data:
+                cookie_candidates.append(Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "instagram_profile" / "cookies.json")
+
             for ck_file in cookie_candidates:
                 if ck_file.exists():
                     try:
                         with open(ck_file, "r", encoding="utf-8") as f:
                             saved_cookies = json.load(f)
                         if isinstance(saved_cookies, list) and saved_cookies:
-                            # Playwright context.add_cookies accepts cookies with name, value, domain/url
                             valid_cookies = []
                             for c in saved_cookies:
                                 if isinstance(c, dict) and "name" in c and "value" in c:
@@ -141,9 +160,13 @@ class BrowserEngine:
                                     }
                                     if "secure" in c: cookie_entry["secure"] = c["secure"]
                                     if "httpOnly" in c: cookie_entry["httpOnly"] = c["httpOnly"]
+                                    s_site = c.get("sameSite")
+                                    if s_site in ["Strict", "Lax", "None"]:
+                                        cookie_entry["sameSite"] = s_site
                                     valid_cookies.append(cookie_entry)
                             if valid_cookies:
                                 context.add_cookies(valid_cookies)
+                                print(f"[BROWSER_ENGINE] Loaded {len(valid_cookies)} cookies from {ck_file.name}")
                             break
                     except Exception as ce:
                         print(f"[BROWSER_ENGINE] Notice loading cookies from {ck_file}: {ce}")

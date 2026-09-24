@@ -31,6 +31,7 @@ services:
       - ./start_cloud.sh:/app/start_cloud.sh
       - ./output:/app/output
       - ./uploader_profiles:/app/uploader_profiles
+      - ./campaigns:/app/campaigns
       - ./instance:/app/instance
       - ./.env:/app/.env
     restart: unless-stopped
