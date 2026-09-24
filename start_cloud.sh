@@ -61,6 +61,12 @@ echo "========================================================"
 # 6. Initialize database tables if needed
 python -c "from web_app.app import app, db; app.app_context().push(); db.create_all()" || true
 
+# 6b. Ensure Remotion video rendering dependencies are ready
+if [ -d "/app/clipper/remotion" ] && [ ! -d "/app/clipper/remotion/node_modules/@remotion" ]; then
+    echo "📦 Initializing Remotion rendering dependencies..."
+    (cd /app/clipper/remotion && npm install --legacy-peer-deps && npx remotion browser ensure) || true
+fi
+
 # 7. Start the Web Dashboard
 if command -v gunicorn >/dev/null 2>&1; then
     exec gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 8 --timeout 120 "web_app.app:create_app()"

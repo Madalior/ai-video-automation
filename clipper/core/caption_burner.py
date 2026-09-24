@@ -336,7 +336,8 @@ class CaptionBurner:
         cmd = [
             "npx", "remotion", "render",
             "src/index.ts", "ViralCaptionComponent", out_abs,
-            "--props", f"temp_props_{render_id}.json"
+            "--props", f"temp_props_{render_id}.json",
+            "--gl=angle"
         ]
         if max_frames:
             cmd.extend(["--frames", f"0-{max_frames}"])

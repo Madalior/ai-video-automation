@@ -344,7 +344,9 @@ def step_burn_captions(
     )
 
     if not captioned:
-        log(f"[yellow]⚠️  Caption render failed — returning un-captioned clip[/yellow]")
+        log(f"[yellow]⚠️  Caption render failed — falling back to FFmpeg overlay badge[/yellow]")
+        if overlay_text:
+            return step_add_overlay(video_path, overlay_text, output_path)
         return video_path
 
     log(f"      ✅ Captions burned: {os.path.basename(captioned)}")
