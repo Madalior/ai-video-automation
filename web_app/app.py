@@ -104,5 +104,10 @@ def event_history():
 with app.app_context():
     db.create_all()
 
+def create_app():
+    """Application factory for WSGI servers."""
+    return app
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+

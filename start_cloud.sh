@@ -53,12 +53,12 @@ echo "  Flask Dashboard starting on: http://0.0.0.0:5000"
 echo "========================================================"
 
 # 6. Initialize database tables if needed
-python -c "from web_app.app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()" || true
+python -c "from web_app.app import app, db; app.app_context().push(); db.create_all()" || true
 
 # 7. Start the Web Dashboard
-# Use python app.py or gunicorn if available
 if command -v gunicorn >/dev/null 2>&1; then
-    exec gunicorn --bind 0.0.0.0:5000 --workers 2 --threads 4 "web_app.app:create_app()"
+    exec gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 8 --timeout 120 "web_app.app:create_app()"
 else
-    exec python -c "from web_app.app import create_app; app = create_app(); app.run(host='0.0.0.0', port=5000)"
+    exec python -c "from web_app.app import app; app.run(host='0.0.0.0', port=5000, threaded=True)"
 fi
+
