@@ -921,7 +921,6 @@ def sail(
             clips = [Clip(
                 start=0.0,
                 end=clip_end,
-                duration=clip_end,
                 score=95,
                 hook=camp_hook,
                 title=f"{camp_name} — High Retention",

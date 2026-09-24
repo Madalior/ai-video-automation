@@ -48,6 +48,8 @@ class Clip:
     platform: str = "shorts"
     emotion: str = "chill"
     music_vibe: str = ""
+    reason: str = ""
+    clip_type: str = "insight"
 
     @property
     def duration(self) -> float:
