@@ -148,10 +148,16 @@ class InstagramWebUploader:
         # 6. Add Caption
         print("[INSTAGRAM_BOT] Setting Caption...")
         try:
-            caption_area = self.page.locator("div[aria-label*='caption'], div[contenteditable='true']").first
+            caption_area = self.page.locator("div[aria-label*='caption'], div[role='textbox'], div[contenteditable='true']").first
             caption_area.wait_for(state="visible", timeout=10000)
             caption_area.click()
-            caption_area.fill(full_caption)
+            self.page.wait_for_timeout(500)
+            try:
+                caption_area.fill(full_caption)
+            except Exception:
+                pass
+            # Also insert via keyboard to ensure contenteditable receives text
+            self.page.keyboard.insert_text(full_caption)
             self.page.wait_for_timeout(1000)
         except Exception as cap_err:
             print(f"[INSTAGRAM_BOT] Caption set notice: {cap_err}")
