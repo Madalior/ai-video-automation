@@ -20,6 +20,8 @@ services:
       - SCREEN_WIDTH=1280
       - SCREEN_HEIGHT=800
       - SCREEN_DEPTH=24
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "80:5000"     # Standard HTTP port (enables clean https://app.sarkaricalc.me)
       - "5000:5000"   # Flask Web Dashboard direct port

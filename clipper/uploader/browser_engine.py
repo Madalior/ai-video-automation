@@ -84,9 +84,49 @@ class BrowserEngine:
                 except Exception:
                     pass
 
+        # Resolve Proxy: Account Proxy > Environment Proxy > Auto-Detect Home SOCKS5 Tunnel
         proxy_config = None
-        if account.get("proxy"):
-            proxy_config = {"server": account["proxy"]}
+        custom_proxy = account.get("proxy") or os.environ.get("UPLOAD_PROXY") or os.environ.get("INSTAGRAM_PROXY")
+        use_home_tunnel = os.environ.get("USE_HOME_TUNNEL", "true").lower() in ["true", "1", "yes"]
+
+        if custom_proxy:
+            proxy_config = {"server": custom_proxy}
+            print(f"[BROWSER] 🌐 Using configured proxy: {custom_proxy}")
+        elif use_home_tunnel:
+            # Check if local home tunnel is responsive on host.docker.internal, 172.17.0.1, or 127.0.0.1
+            tunnel_port = int(os.environ.get("SOCKS_TUNNEL_PORT", 1080))
+            candidates = ["host.docker.internal", "172.17.0.1", "127.0.0.1"]
+            tunnel_host = None
+            
+            import socket
+            for h in candidates:
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.4)
+                    res = s.connect_ex((h, tunnel_port))
+                    s.close()
+                    if res == 0:
+                        tunnel_host = h
+                        break
+                except Exception:
+                    pass
+
+            if tunnel_host:
+                proxy_config = {"server": f"socks5://{tunnel_host}:{tunnel_port}"}
+                print(f"[BROWSER] 🛡️ Stealth Home Gateway ACTIVE! Routing browser via Home SOCKS5 ({tunnel_host}:{tunnel_port})")
+            else:
+                strict_residential = os.environ.get("STRICT_RESIDENTIAL_IP", "true").lower() in ["true", "1", "yes"]
+                if strict_residential and not os.environ.get("ALLOW_DATACENTER_IP"):
+                    print("\n" + "=" * 70)
+                    print("[BROWSER] 🛑 BLOCKED: Strict Residential IP Protection Triggered!")
+                    print("[BROWSER] The Home SOCKS5 Tunnel (port 1080) is offline.")
+                    print("[BROWSER] Connecting from Azure's datacenter IP will cause Instagram shadowbans.")
+                    print("[BROWSER] 👉 Run this 1-line command on your PC to upload safely:")
+                    print("          ssh -R 0.0.0.0:1080 azure")
+                    print("=" * 70 + "\n")
+                    raise RuntimeError("Upload blocked by Residential IP Guard: Home tunnel on port 1080 is offline. Run 'ssh -R 0.0.0.0:1080 azure' on your PC to upload safely.")
+                else:
+                    print("[BROWSER] ⚠️ Home tunnel offline. Proceeding with direct connection (Datacenter IP).")
 
         chrome_args = [
             "--disable-blink-features=AutomationControlled",

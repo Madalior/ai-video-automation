@@ -212,28 +212,18 @@ function buildGlowShadow(
   const shadow = shadowIntensity;
 
   return [
-    // ─── Drop Shadow stack (drawn behind the text, before the glow) ───
-    // A tight, hard black shadow to give the text a crisp edge against the glow
+    // ─── Crisp Edge Outline (4-way hard shadow, 0 blur = zero CPU penalty) ───
     `2px 2px 0px rgba(0,0,0, 1)`,
+    `-2px -2px 0px rgba(0,0,0, 1)`,
+    `2px -2px 0px rgba(0,0,0, 1)`,
+    `-2px 2px 0px rgba(0,0,0, 1)`,
     
-    // ─── Deep Glow layers (simulates Radius=1000, Exposure=0.30) ───
-    // Tight inner bloom (low opacity so the base text stays sharp!)
-    `0 0 ${5 * glow}px rgba(${r},${g},${b}, 0.4)`,
-    `0 0 ${10 * glow}px rgba(${r},${g},${b}, 0.3)`,
-    // Medium bloom  
-    `0 0 ${20 * glow}px rgba(${r},${g},${b}, 0.2)`,
-    `0 0 ${40 * glow}px rgba(${r},${g},${b}, 0.15)`,
-    // Wide bloom
-    `0 0 ${80 * glow}px rgba(${r},${g},${b}, 0.1)`,
-    `0 0 ${120 * glow}px rgba(${r},${g},${b}, 0.05)`,
+    // ─── Streamlined Glow bloom (crisp inner bloom + ambient neon aura) ───
+    `0 0 ${12 * glow}px rgba(${r},${g},${b}, 0.85)`,
+    `0 0 ${32 * glow}px rgba(${r},${g},${b}, 0.50)`,
 
-    // ─── Drop Shadow stack (3 layers, Softness 50, 200, 200) ───
-    // Drop Shadow 1: Softness=50
-    `0 0 ${25 * shadow}px rgba(0,0,0, 0.9)`,
-    // Drop Shadow 2: Softness=200
-    `0 0 ${100 * shadow}px rgba(0,0,0, 0.7)`,
-    // Drop Shadow 3: Softness=200
-    `0 0 ${100 * shadow}px rgba(0,0,0, 0.5)`,
+    // ─── High-Contrast Drop Shadow (soft background separation) ───
+    `0 4px ${16 * shadow}px rgba(0,0,0, 0.95)`,
   ].join(", ");
 }
 

@@ -6,6 +6,7 @@ Powered by: Remotion (React-based programmatic video rendering)
 import os
 import json
 import subprocess
+import time
 from typing import Optional
 from pathlib import Path
 
@@ -326,12 +327,28 @@ class CaptionBurner:
         if style_overrides:
             props.update(style_overrides)
 
-        # ── 7. Write props JSON ───────────────────────────────────────────────
+        # ── 7. Check for Distributed GPU Cluster (Lightning AI / Dedicated GPUs) ────
+        from clipper.core.gpu_cluster import cluster
+        if cluster.get_configured_workers():
+            remote_out = cluster.render_single(
+                video_path=video_path,
+                props=props,
+                output_path=out_abs,
+                max_frames=max_frames
+            )
+            if remote_result := remote_out:
+                if safe_video_path.exists():
+                    try: os.remove(safe_video_path)
+                    except Exception: pass
+                return remote_result
+            print("[CAPTIONS] ⚠️ GPU Cluster nodes offline — falling back to local render...")
+
+        # ── 8. Write props JSON for local render ──────────────────────────────
         props_file = self.remotion_dir / f"temp_props_{render_id}.json"
         with open(props_file, "w", encoding="utf-8") as f:
             json.dump(props, f, ensure_ascii=False)
 
-        # ── 8. Run Remotion render ────────────────────────────────────────────
+        # ── 9. Run Local Remotion render ──────────────────────────────────────
         print(f"[CAPTIONS] Invoking Remotion render...")
         cmd = [
             "npx", "remotion", "render",
@@ -371,6 +388,48 @@ class CaptionBurner:
                     os.remove(safe_video_path)
                 except Exception:
                     pass
+
+    def _render_remote(
+        self,
+        video_path: str,
+        props: dict,
+        output_path: str,
+        remote_url: str,
+        max_frames: Optional[int] = None
+    ) -> Optional[str]:
+        """
+        Offloads Remotion render job to a remote GPU node (e.g. Lightning AI).
+        Returns output_path if successful, None otherwise.
+        """
+        import requests
+        endpoint = remote_url.rstrip("/")
+        if not endpoint.endswith("/render"):
+            endpoint = f"{endpoint}/render"
+
+        print(f"[CAPTIONS] ⚡ Offloading Remotion render to remote GPU worker: {endpoint}...")
+        try:
+            start_t = time.time()
+            with open(video_path, "rb") as vf:
+                files = {"video": (os.path.basename(video_path), vf, "video/mp4")}
+                data = {"props_json": json.dumps(props, ensure_ascii=False)}
+                if max_frames:
+                    data["max_frames"] = str(max_frames)
+
+                res = requests.post(endpoint, files=files, data=data, timeout=600)
+
+            if res.status_code == 200:
+                with open(output_path, "wb") as out_f:
+                    out_f.write(res.content)
+                elapsed = time.time() - start_t
+                size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                print(f"[CAPTIONS] ✅ Remote GPU render completed in {elapsed:.1f}s: {os.path.basename(output_path)} ({size_mb:.1f} MB)")
+                return output_path
+            else:
+                print(f"[CAPTIONS] ⚠️ Remote worker returned HTTP {res.status_code}: {res.text[:300]}")
+                return None
+        except Exception as e:
+            print(f"[CAPTIONS] ⚠️ Remote render failed: {e}")
+            return None
 
     def _filter_and_shift_words(
         self,

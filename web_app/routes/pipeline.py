@@ -286,3 +286,41 @@ def stop_pipeline(job_id):
             bus.emit("pipeline.error", {"job_id": job_id, "error": "Cancelled by operator"})
             return jsonify({"success": True, "message": f"Job {job_id} cancelled."})
     return jsonify({"success": False, "message": "Job not found or already completed."}), 404
+
+
+@pipeline_bp.route("/api/cluster/status", methods=["GET"])
+def cluster_status():
+    """Returns real-time health and GPU availability of all configured Lightning AI workers."""
+    from clipper.core.gpu_cluster import cluster
+    status = cluster.get_cluster_status()
+    return jsonify({
+        "success": True,
+        "workers_configured": len(cluster.get_configured_workers()),
+        "cluster": status
+    }), 200
+
+
+@pipeline_bp.route("/api/cluster/register", methods=["POST"])
+def register_worker():
+    """Enables remote Lightning AI workers to auto-register upon startup."""
+    data = request.get_json() or {}
+    url = data.get("url", "").strip()
+    name = data.get("name", "").strip()
+    auth_token = data.get("auth_token", "")
+    
+    expected_token = os.getenv("CLUSTER_SECRET_TOKEN", "going_merry_gpu_secret_2026")
+    if auth_token != expected_token:
+        return jsonify({"success": False, "error": "Invalid cluster auth token"}), 401
+        
+    if not url:
+        return jsonify({"success": False, "error": "Missing worker url"}), 400
+        
+    from clipper.core.gpu_cluster import cluster
+    cluster.register_worker(url, name=name)
+    return jsonify({
+        "success": True, 
+        "message": f"Worker {name or url} registered successfully",
+        "active_workers": cluster.get_configured_workers()
+    }), 200
+
+

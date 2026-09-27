@@ -6,6 +6,7 @@ Bypasses Meta Graph API business verification.
 """
 
 import time
+import random
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
@@ -20,6 +21,11 @@ class InstagramWebUploader:
 
     def __init__(self, page: Page):
         self.page = page
+
+    def _human_jitter(self, min_sec: float = 1.5, max_sec: float = 3.5):
+        """Randomized pause to mimic natural human behavioral latency."""
+        jitter_ms = int(random.uniform(min_sec, max_sec) * 1000)
+        self.page.wait_for_timeout(jitter_ms)
 
     def is_logged_in(self) -> bool:
         """Checks if current session is authenticated into Instagram."""
@@ -84,13 +90,21 @@ class InstagramWebUploader:
             except Exception:
                 pass
 
-        # 2. Click 'Create' (+) button
+        # 2. Click 'Create' (+) button with natural browsing simulation
+        print("[INSTAGRAM_BOT] Simulating natural browsing before Create...")
+        try:
+            self.page.mouse.wheel(0, random.randint(180, 420))
+            self._human_jitter(1.8, 3.2)
+        except Exception:
+            pass
+
         print("[INSTAGRAM_BOT] Opening Create Dialog...")
         create_btn = self.page.locator("svg[aria-label='New post'], span:has-text('Create'), div[role='button']:has-text('Create'), a:has-text('Create')").first
         try:
             create_btn.wait_for(state="visible", timeout=15000)
+            self._human_jitter(0.8, 1.6)
             create_btn.click()
-            self.page.wait_for_timeout(1500)
+            self._human_jitter(1.2, 2.4)
             # If sub-menu appears (Post / Live video), click Post
             post_sub = self.page.locator("span:has-text('Post'), div:has-text('Post')").first
             if post_sub.is_visible():
@@ -145,28 +159,32 @@ class InstagramWebUploader:
         try: self.page.screenshot(path=str(shots_dir / "ig_step5_cover.png"))
         except Exception: pass
 
-        # 6. Add Caption
-        print("[INSTAGRAM_BOT] Setting Caption...")
+        # 6. Add Caption with humanized typing cadence
+        print("[INSTAGRAM_BOT] Setting Caption (human typing cadence)...")
         try:
             caption_area = self.page.locator("div[aria-label*='caption'], div[role='textbox'], div[contenteditable='true']").first
             caption_area.wait_for(state="visible", timeout=10000)
             caption_area.click()
-            self.page.wait_for_timeout(500)
-            try:
-                caption_area.fill(full_caption)
-            except Exception:
-                pass
-            # Also insert via keyboard to ensure contenteditable receives text
-            self.page.keyboard.insert_text(full_caption)
-            self.page.wait_for_timeout(1000)
+            self._human_jitter(0.8, 1.8)
+            
+            # Type words with natural micro-delays
+            words = full_caption.split(" ")
+            for idx, w in enumerate(words):
+                chunk = w + (" " if idx < len(words) - 1 else "")
+                self.page.keyboard.insert_text(chunk)
+                if random.random() < 0.2:
+                    self.page.wait_for_timeout(random.randint(50, 180))
+            
+            self._human_jitter(2.0, 3.5)
         except Exception as cap_err:
             print(f"[INSTAGRAM_BOT] Caption set notice: {cap_err}")
 
         try: self.page.screenshot(path=str(shots_dir / "ig_step6_caption_set.png"))
         except Exception: pass
 
-        # 7. Click 'Share'
-        print("[INSTAGRAM_BOT] Clicking Share...")
+        # 7. Click 'Share' with natural human delay
+        print("[INSTAGRAM_BOT] Clicking Share (human latency)...")
+        self._human_jitter(2.5, 4.5)
         share_btn = self.page.locator("div[role='button']:has-text('Share'), button:has-text('Share')").last
         share_btn.wait_for(state="visible", timeout=15000)
         try:
