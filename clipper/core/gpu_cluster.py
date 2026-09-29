@@ -39,6 +39,27 @@ class GPUClusterManager:
         self._worker_index = 0
         self._worker_lock = threading.Lock()
         self._dynamic_workers = set()
+        self.token = os.getenv("CLUSTER_SECRET_TOKEN", "going_merry_gpu_secret_2026")
+        self._persist_file = Path("data") / "cluster_workers.json"
+        self._load_persisted_workers()
+
+    def _load_persisted_workers(self):
+        try:
+            if self._persist_file.exists():
+                with open(self._persist_file, "r") as f:
+                    saved = json.load(f)
+                    if isinstance(saved, list):
+                        self._dynamic_workers.update(saved)
+        except Exception:
+            pass
+
+    def _save_persisted_workers(self):
+        try:
+            self._persist_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._persist_file, "w") as f:
+                json.dump(list(self._dynamic_workers), f)
+        except Exception:
+            pass
 
     def register_worker(self, url: str, name: str = None):
         """Dynamically registers a worker URL (e.g. from remote self-announcement)."""
@@ -47,6 +68,7 @@ class GPUClusterManager:
             w_clean = w_clean[:-7]
         with self._worker_lock:
             self._dynamic_workers.add(w_clean)
+            self._save_persisted_workers()
         print(f"[CLUSTER] 🟢 Registered dynamic worker: {w_clean} ({name or 'unnamed'})")
 
     def get_configured_workers(self) -> List[str]:
@@ -190,11 +212,15 @@ class GPUClusterManager:
             start_t = time.time()
             with open(video_path, "rb") as vf:
                 files = {"video": (os.path.basename(video_path), vf, "video/mp4")}
-                data = {"props_json": json.dumps(props, ensure_ascii=False)}
+                data = {
+                    "props_json": json.dumps(props, ensure_ascii=False),
+                    "auth_token": self.token
+                }
                 if max_frames:
                     data["max_frames"] = str(max_frames)
+                headers = {"X-Cluster-Token": self.token}
                 
-                res = requests.post(endpoint, files=files, data=data, timeout=600)
+                res = requests.post(endpoint, files=files, data=data, headers=headers, timeout=600)
                 
             if res.status_code == 200:
                 with open(output_path, "wb") as out_f:
