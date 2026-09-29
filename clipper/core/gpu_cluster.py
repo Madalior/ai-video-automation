@@ -114,9 +114,36 @@ class GPUClusterManager:
         status_list.sort(key=lambda x: x["id"])
         return status_list
 
+    def wake_up_studio_if_needed(self) -> bool:
+        """Uses lightning-sdk to wake up a sleeping studio on a T4 GPU automatically."""
+        api_key = os.getenv("LIGHTNING_API_KEY")
+        studio_name = os.getenv("LIGHTNING_STUDIO_NAME", "scratch-studio-devbox")
+        teamspace = os.getenv("LIGHTNING_TEAMSPACE")
+        if not api_key:
+            return False
+
+        try:
+            print(f"[CLUSTER] ⚡ Checking Lightning Studio '{studio_name}' state...")
+            from lightning_sdk import Studio, Machine
+            studio = Studio(name=studio_name, teamspace=teamspace)
+            if getattr(studio, "status", "").lower() != "running":
+                print(f"[CLUSTER] ⚡ Studio '{studio_name}' is sleeping. Waking up on T4 GPU...")
+                studio.start(Machine.T4)
+                print(f"[CLUSTER] 🟢 Studio '{studio_name}' successfully awakened on T4 GPU!")
+                time.sleep(3)
+            return True
+        except Exception as e:
+            print(f"[CLUSTER] ⚠️ Auto-wakeup notice: {e}")
+            return False
+
     def get_next_healthy_worker(self) -> Optional[str]:
         """Returns the next healthy worker using round-robin routing."""
         workers = self.get_configured_workers()
+        if not workers and os.getenv("LIGHTNING_API_KEY"):
+            # Attempt to wake up studio via SDK if configured
+            self.wake_up_studio_if_needed()
+            workers = self.get_configured_workers()
+
         if not workers:
             return None
 
@@ -132,6 +159,17 @@ class GPUClusterManager:
                         return worker_url
                 except Exception:
                     continue
+        
+        # If all workers offline but SDK is configured, try waking it up
+        if os.getenv("LIGHTNING_API_KEY"):
+            if self.wake_up_studio_if_needed():
+                for w in workers:
+                    try:
+                        res = requests.get(f"{w}/health", timeout=3.0)
+                        if res.status_code == 200:
+                            return w
+                    except Exception:
+                        pass
         return None
 
     def render_single(
