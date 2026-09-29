@@ -230,7 +230,7 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="0.0.0.0", help="Host interface (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
     parser.add_argument("--name", default="Worker Node", help="Human-readable worker name (e.g. Worker 1)")
-    parser.add_argument("--master-url", default="http://20.6.130.6:5000", help="Azure master URL (default: http://20.6.130.6:5000)")
+    parser.add_argument("--master-url", default="https://app.sarkaricalc.me", help="Azure master URL (default: https://app.sarkaricalc.me)")
     parser.add_argument("--public-url", default=None, help="This worker's public Lightning URL")
     parser.add_argument("--token", default=AUTH_TOKEN, help="Shared cluster security token")
     args = parser.parse_args()
