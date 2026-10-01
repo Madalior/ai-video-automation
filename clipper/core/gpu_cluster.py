@@ -137,6 +137,39 @@ class GPUClusterManager:
         status_list.sort(key=lambda x: x["id"])
         return status_list
 
+    def trigger_kaggle_worker_if_needed(self) -> bool:
+        """Uses official Kaggle API to autonomously dispatch a 30h/wk free T4 GPU worker container."""
+        username = os.getenv("KAGGLE_USERNAME")
+        key = os.getenv("KAGGLE_KEY")
+        kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
+        
+        if not ((username and key) or kaggle_json.exists()):
+            return False
+
+        try:
+            print("[CLUSTER] ⚡ No active GPU workers. Dispatching autonomous Kaggle T4 GPU worker...")
+            from kaggle.api.kaggle_api_extended import KaggleApi
+            api = KaggleApi()
+            api.authenticate()
+
+            kernel_dir = Path(__file__).resolve().parent.parent.parent / "kaggle_worker"
+            meta_file = kernel_dir / "kernel-metadata.json"
+            if meta_file.exists():
+                with open(meta_file, "r") as f:
+                    meta = json.load(f)
+                effective_user = username or (json.load(open(kaggle_json)).get("username") if kaggle_json.exists() else None)
+                if effective_user and "YOUR_KAGGLE_USERNAME" in meta.get("id", ""):
+                    meta["id"] = f"{effective_user}/going-merry-gpu-worker"
+                    with open(meta_file, "w") as f:
+                        json.dump(meta, f, indent=2)
+
+            api.kernel_push(str(kernel_dir))
+            print("[CLUSTER] 🟢 Kaggle T4 GPU worker successfully pushed and started in cloud!")
+            return True
+        except Exception as e:
+            print(f"[CLUSTER] ⚠️ Kaggle auto-trigger notice: {e}")
+            return False
+
     def wake_up_studio_if_needed(self) -> bool:
         """Uses lightning-sdk to wake up a sleeping studio on a T4 GPU automatically."""
         api_key = os.getenv("LIGHTNING_API_KEY")
@@ -162,10 +195,19 @@ class GPUClusterManager:
     def get_next_healthy_worker(self) -> Optional[str]:
         """Returns the next healthy worker using round-robin routing."""
         workers = self.get_configured_workers()
-        if not workers and os.getenv("LIGHTNING_API_KEY"):
-            # Attempt to wake up studio via SDK if configured
-            self.wake_up_studio_if_needed()
-            workers = self.get_configured_workers()
+        if not workers:
+            # 1. Try Kaggle 30h/week free T4 GPU first
+            if self.trigger_kaggle_worker_if_needed():
+                print("[CLUSTER] ⏳ Waiting up to 60s for Kaggle GPU worker to register...")
+                for _ in range(12):
+                    time.sleep(5)
+                    workers = self.get_configured_workers()
+                    if workers:
+                        break
+            # 2. Fall back to Lightning AI
+            elif os.getenv("LIGHTNING_API_KEY"):
+                self.wake_up_studio_if_needed()
+                workers = self.get_configured_workers()
 
         if not workers:
             return None
