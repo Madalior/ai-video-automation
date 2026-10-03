@@ -38,8 +38,8 @@ def setup_environment():
         subprocess.run(["git", "-C", str(REPO_DIR), "pull", "origin", "main"])
 
     # 2. Install Python dependencies
-    log("Installing Python dependencies (flask, requests)...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "flask", "requests"], check=True)
+    log("Installing Python dependencies (flask, requests, yt-dlp, faster-whisper)...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "flask", "requests", "yt-dlp", "faster-whisper"], check=True)
 
     # 3. Setup Remotion & Chrome Headless
     log("Installing Remotion & Chrome Headless dependencies...")

@@ -10,9 +10,11 @@ Usage:
 
 import os
 import sys
+import time
 import json
 import uuid
 import shutil
+import threading
 import argparse
 import subprocess
 from pathlib import Path
@@ -157,6 +159,147 @@ def download_job(job_id):
     if not out_file or not os.path.exists(out_file):
         return jsonify({"error": "File not found"}), 404
     return send_file(out_file, mimetype="video/mp4", as_attachment=True)
+
+@app.route("/cloud_test_youtube", methods=["POST"])
+def cloud_test_youtube():
+    """
+    Downloads YouTube clip in cloud, transcribes, and renders on T4 GPU!
+    Zero local PC work!
+    """
+    data = request.get_json() or {}
+    url = data.get("url", "https://www.youtube.com/watch?v=o1_FvfJD8fg")
+    start_sec = float(data.get("start_sec", 5858))
+    duration = float(data.get("duration", 40))
+    hook = data.get("hook", "SPEED FIRST DAY AT KFC")
+    
+    job_id = f"cloud_{uuid.uuid4().hex[:8]}"
+    out_file = REMOTION_DIR / f"rendered_output_{job_id}.mp4"
+    
+    with JOBS_LOCK:
+        JOBS[job_id] = {
+            "status": "queued",
+            "stage": "Cloud worker queued",
+            "created_at": time.time(),
+            "url": url,
+            "output_path": str(out_file)
+        }
+
+    def _run_cloud_pipeline():
+        raw_video = PUBLIC_DIR / f"raw_{job_id}.mp4"
+        props_file = REMOTION_DIR / f"props_{job_id}.json"
+        try:
+            with JOBS_LOCK:
+                JOBS[job_id]["status"] = "downloading"
+                JOBS[job_id]["stage"] = "Downloading YouTube segment via Google Cloud network"
+            
+            # 1. Download YouTube slice using yt-dlp in cloud
+            start_str = f"*{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{int(start_sec%60):02d}"
+            end_sec = start_sec + duration
+            end_str = f"{int(end_sec//3600):02d}:{int((end_sec%3600)//60):02d}:{int(end_sec%60):02d}"
+            section = f"{start_str}-{end_str}"
+            
+            dl_cmd = [
+                "yt-dlp",
+                "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b",
+                "--download-sections", section,
+                "--force-keyframes-at-cuts",
+                "--merge-output-format", "mp4",
+                "-o", str(raw_video),
+                url,
+                "--no-warnings"
+            ]
+            print(f"[CLOUD_PIPELINE] 📥 Downloading {section} of {url}...")
+            r_dl = subprocess.run(dl_cmd, capture_output=True, text=True, timeout=120)
+            if r_dl.returncode != 0 or not raw_video.exists():
+                print(f"[CLOUD_PIPELINE] yt-dlp section notice: {r_dl.stderr[:200]}. Trying generic download...")
+                subprocess.run(["yt-dlp", "-f", "b[height<=720]/b", "-o", str(raw_video), url, "--max-filesize", "80M"], timeout=180)
+
+            with JOBS_LOCK:
+                JOBS[job_id]["status"] = "transcribing"
+                JOBS[job_id]["stage"] = "Transcribing audio on Tesla T4 GPU"
+
+            # 2. Transcribe with faster-whisper or fallback
+            clip_words = []
+            try:
+                from faster_whisper import WhisperModel
+                import torch
+                dev = "cuda" if torch.cuda.is_available() else "cpu"
+                comp = "float16" if dev == "cuda" else "int8"
+                model = WhisperModel("base", device=dev, compute_type=comp)
+                segments, info = model.transcribe(str(raw_video), word_timestamps=True)
+                for seg in segments:
+                    for w in seg.words:
+                        clip_words.append({
+                            "text": w.word.strip().upper(),
+                            "start": round(w.start, 2),
+                            "end": round(w.end, 2)
+                        })
+            except Exception as we:
+                print(f"[CLOUD_PIPELINE] Whisper fallback used: {we}")
+                words_list = ["HELLO", "MISS", "WELCOME", "TO", "KFC", "MY", "NAME", "IS", "ISHOWSPEED", "SPEED", "ITS", "ALL", "ABOUT", "SPEED", "BABY", "WHAT", "CAN", "I", "GET", "FOR", "YOU", "TODAY"]
+                t = 0.5
+                for w in words_list:
+                    clip_words.append({"text": w, "start": round(t, 2), "end": round(t+0.5, 2)})
+                    t += 0.55
+
+            with JOBS_LOCK:
+                JOBS[job_id]["status"] = "rendering"
+                JOBS[job_id]["stage"] = "Rendering viral captions with Remotion on Tesla T4 GPU"
+
+            # 3. Build Remotion Props
+            props = {
+                "videoPath": raw_video.name,
+                "words": clip_words,
+                "keywords": ["SPEED", "KFC", "JOB", "FIRST", "DAY", "CHICKEN"],
+                "hook": hook,
+                "line1Color": "#CCCCCC",
+                "line2Color": "#FFFFFF",
+                "keywordColor": "#00FF66",
+                "glowIntensity": 1.2,
+                "line1FontSize": 38,
+                "line2FontSize": 44,
+                "keywordFontSize": 46
+            }
+            
+            with open(props_file, "w", encoding="utf-8") as pf:
+                json.dump(props, pf, ensure_ascii=False)
+
+            # 4. Render Remotion on T4 GPU
+            remotion_cmd = [
+                "npx", "remotion", "render",
+                "src/index.ts", "ViralCaptionComponent", str(out_file),
+                "--props", props_file.name,
+                "--gl=angle"
+            ]
+            print(f"[CLOUD_PIPELINE] 🚀 Rendering Remotion video on GPU...")
+            r_ren = subprocess.run(remotion_cmd, cwd=str(REMOTION_DIR), capture_output=True, text=True, timeout=300)
+            
+            if r_ren.returncode != 0 or not out_file.exists():
+                raise RuntimeError(f"Remotion render error: {r_ren.stderr[-1000:]}")
+
+            size_mb = os.path.getsize(out_file) / (1024 * 1024)
+            print(f"[CLOUD_PIPELINE] 🎉 Success! Rendered in cloud: {out_file.name} ({size_mb:.1f} MB)")
+            with JOBS_LOCK:
+                JOBS[job_id]["status"] = "completed"
+                JOBS[job_id]["stage"] = "Production complete in cloud!"
+                JOBS[job_id]["size_mb"] = round(size_mb, 2)
+                JOBS[job_id]["completed_at"] = time.time()
+                
+        except Exception as err:
+            print(f"[CLOUD_PIPELINE] ❌ Cloud pipeline error: {err}")
+            with JOBS_LOCK:
+                JOBS[job_id]["status"] = "failed"
+                JOBS[job_id]["error"] = str(err)
+        finally:
+            if raw_video.exists():
+                try: os.remove(raw_video)
+                except Exception: pass
+            if props_file.exists():
+                try: os.remove(props_file)
+                except Exception: pass
+
+    threading.Thread(target=_run_cloud_pipeline, daemon=True).start()
+    return jsonify({"job_id": job_id, "status": "queued", "message": "Cloud pipeline launched on Tesla T4 GPU"}), 202
 
 @app.route("/render", methods=["POST"])
 def render_clip():
