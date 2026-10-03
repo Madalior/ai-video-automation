@@ -12,6 +12,7 @@ Features:
 """
 
 import os
+import sys
 import time
 import json
 import requests
@@ -19,6 +20,17 @@ import threading
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 class GPUClusterManager:
     """Manages a pool of remote GPU render workers (e.g. on Lightning AI)."""
@@ -249,32 +261,83 @@ class GPUClusterManager:
         if not worker_url:
             return None
 
-        endpoint = f"{worker_url}/render"
         print(f"[CLUSTER] 🚀 Routing job to {worker_url}...")
+        headers = {"X-Cluster-Token": self.token}
+        data = {
+            "props_json": json.dumps(props, ensure_ascii=False),
+            "auth_token": self.token
+        }
+        if max_frames:
+            data["max_frames"] = str(max_frames)
+
         try:
             start_t = time.time()
+            # 1. Try async job submission first (avoids Cloudflare 100s timeout)
+            async_endpoint = f"{worker_url}/render_async"
+            use_sync = False
+            
             with open(video_path, "rb") as vf:
                 files = {"video": (os.path.basename(video_path), vf, "video/mp4")}
-                data = {
-                    "props_json": json.dumps(props, ensure_ascii=False),
-                    "auth_token": self.token
-                }
-                if max_frames:
-                    data["max_frames"] = str(max_frames)
-                headers = {"X-Cluster-Token": self.token}
+                res = requests.post(async_endpoint, files=files, data=data, headers=headers, timeout=60)
+            
+            if res.status_code == 202:
+                job_id = res.json().get("job_id")
+                print(f"[CLUSTER] ⏳ Async job queued (ID: {job_id}). Polling progress...")
+                poll_url = f"{worker_url}/status/{job_id}"
                 
-                res = requests.post(endpoint, files=files, data=data, headers=headers, timeout=600)
-                
-            if res.status_code == 200:
-                with open(output_path, "wb") as out_f:
-                    out_f.write(res.content)
-                elapsed = time.time() - start_t
-                size_mb = os.path.getsize(output_path) / (1024 * 1024)
-                print(f"[CLUSTER] ✅ Finished on {worker_url} in {elapsed:.1f}s ({size_mb:.1f} MB)")
-                return output_path
+                while True:
+                    time.sleep(3)
+                    try:
+                        s_res = requests.get(poll_url, headers=headers, timeout=10)
+                        if s_res.status_code != 200:
+                            continue
+                        job_data = s_res.json()
+                        status = job_data.get("status")
+                        if status == "completed":
+                            dl_url = f"{worker_url}/download/{job_id}"
+                            dl_res = requests.get(dl_url, headers=headers, stream=True, timeout=120)
+                            if dl_res.status_code == 200:
+                                os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+                                with open(output_path, "wb") as out_f:
+                                    for chunk in dl_res.iter_content(chunk_size=16384):
+                                        out_f.write(chunk)
+                                elapsed = time.time() - start_t
+                                size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                                print(f"[CLUSTER] ✅ Finished on {worker_url} in {elapsed:.1f}s ({size_mb:.1f} MB)")
+                                return output_path
+                            else:
+                                print(f"[CLUSTER] ⚠️ Download failed: HTTP {dl_res.status_code}")
+                                return None
+                        elif status == "failed":
+                            print(f"[CLUSTER] ⚠️ Render job failed on worker: {job_data.get('error')}")
+                            return None
+                        else:
+                            elapsed = time.time() - start_t
+                            print(f"[CLUSTER] ⏳ Rendering on GPU... ({elapsed:.0f}s elapsed)")
+                    except Exception as pe:
+                        print(f"[CLUSTER] ⚠️ Poll notice: {pe}")
+            elif res.status_code in (404, 405):
+                use_sync = True
             else:
-                print(f"[CLUSTER] ⚠️ Worker {worker_url} error: HTTP {res.status_code}")
-                return None
+                print(f"[CLUSTER] ⚠️ Worker returned HTTP {res.status_code}, falling back to sync...")
+                use_sync = True
+
+            if use_sync:
+                endpoint = f"{worker_url}/render"
+                with open(video_path, "rb") as vf:
+                    files = {"video": (os.path.basename(video_path), vf, "video/mp4")}
+                    res = requests.post(endpoint, files=files, data=data, headers=headers, timeout=600)
+                if res.status_code == 200:
+                    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+                    with open(output_path, "wb") as out_f:
+                        out_f.write(res.content)
+                    elapsed = time.time() - start_t
+                    size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                    print(f"[CLUSTER] ✅ Finished on {worker_url} in {elapsed:.1f}s ({size_mb:.1f} MB)")
+                    return output_path
+                else:
+                    print(f"[CLUSTER] ⚠️ Worker {worker_url} error: HTTP {res.status_code}")
+                    return None
         except Exception as e:
             print(f"[CLUSTER] ⚠️ Communication failure with {worker_url}: {e}")
             return None

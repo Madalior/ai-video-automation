@@ -1,5 +1,5 @@
 {
-  "id": "YOUR_KAGGLE_USERNAME/going-merry-gpu-worker",
+  "id": "vibezzzak/going-merry-gpu-worker",
   "title": "Going Merry GPU Worker",
   "code_file": "render_worker.py",
   "language": "python",

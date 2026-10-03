@@ -34,13 +34,204 @@ def check_gpu():
 
 AUTH_TOKEN = os.getenv("CLUSTER_SECRET_TOKEN", "going_merry_gpu_secret_2026")
 
+JOBS = {}
+JOBS_LOCK = threading.Lock()
+
 @app.before_request
 def verify_token():
-    if request.path in ["/health", "/", "/favicon.ico"]:
+    if request.path in ["/health", "/", "/favicon.ico"] or request.path.startswith("/status/") or request.path.startswith("/download/"):
         return None
     token = request.headers.get("X-Cluster-Token") or request.form.get("auth_token") or request.args.get("auth_token")
     if AUTH_TOKEN and token != AUTH_TOKEN:
         return jsonify({"error": "Unauthorized"}), 401
+
+def _run_render_job(job_id, temp_input_path, temp_props_path, output_path, max_frames):
+    with JOBS_LOCK:
+        JOBS[job_id]["status"] = "rendering"
+    try:
+        cmd = [
+            "npx", "remotion", "render",
+            "src/index.ts", "ViralCaptionComponent", str(output_path),
+            "--props", os.path.basename(temp_props_path),
+            "--gl=angle"
+        ]
+        if max_frames:
+            cmd.extend(["--frames", f"0-{int(max_frames)}"])
+            
+        print(f"\n[GPU_WORKER] 🚀 Starting render job {job_id}...")
+        r = subprocess.run(
+            cmd,
+            cwd=str(REMOTION_DIR),
+            capture_output=True,
+            text=True,
+            shell=(os.name == "nt")
+        )
+        if r.returncode != 0 or not output_path.exists():
+            print(f"[GPU_WORKER] ❌ Render failed:\n{r.stderr[-2000:]}")
+            with JOBS_LOCK:
+                JOBS[job_id]["status"] = "failed"
+                JOBS[job_id]["error"] = r.stderr[-1000:]
+        else:
+            size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            print(f"[GPU_WORKER] ✅ Render complete: {output_path.name} ({size_mb:.1f} MB)")
+            with JOBS_LOCK:
+                JOBS[job_id]["status"] = "completed"
+                JOBS[job_id]["size_mb"] = round(size_mb, 2)
+                JOBS[job_id]["output_path"] = str(output_path)
+    except Exception as e:
+        print(f"[GPU_WORKER] ❌ Job exception: {e}")
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "failed"
+            JOBS[job_id]["error"] = str(e)
+    finally:
+        if temp_input_path.exists():
+            try: os.remove(temp_input_path)
+            except Exception: pass
+        if temp_props_path.exists():
+            try: os.remove(temp_props_path)
+            except Exception: pass
+
+@app.route("/render_async", methods=["POST"])
+def render_async():
+    """Async render endpoint: saves files and starts background render, returns job_id in <1s."""
+    if "video" not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
+    
+    video_file = request.files["video"]
+    props_str = request.form.get("props_json", "{}")
+    max_frames = request.form.get("max_frames", None)
+    
+    job_id = uuid.uuid4().hex[:8]
+    temp_input_name = f"temp_render_vid_{job_id}.mp4"
+    temp_input_path = PUBLIC_DIR / temp_input_name
+    temp_props_name = f"temp_props_{job_id}.json"
+    temp_props_path = REMOTION_DIR / temp_props_name
+    output_filename = f"rendered_output_{job_id}.mp4"
+    output_path = REMOTION_DIR / output_filename
+
+    try:
+        video_file.save(str(temp_input_path))
+        try:
+            props = json.loads(props_str)
+        except Exception:
+            props = {}
+        props["videoPath"] = temp_input_name
+        with open(temp_props_path, "w", encoding="utf-8") as f:
+            json.dump(props, f, ensure_ascii=False)
+
+        with JOBS_LOCK:
+            JOBS[job_id] = {
+                "status": "queued",
+                "created_at": time.time(),
+                "output_path": str(output_path)
+            }
+
+        t = threading.Thread(
+            target=_run_render_job,
+            args=(job_id, temp_input_path, temp_props_path, output_path, max_frames),
+            daemon=True
+        )
+        t.start()
+
+        return jsonify({"job_id": job_id, "status": "queued"}), 202
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/status/<job_id>", methods=["GET"])
+def get_job_status(job_id):
+    """Returns status of an async render job."""
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job), 200
+
+@app.route("/download/<job_id>", methods=["GET"])
+def download_job(job_id):
+    """Streams the completed MP4 file."""
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+    if not job or job.get("status") != "completed":
+        return jsonify({"error": "Not ready or failed"}), 400
+    out_file = job.get("output_path")
+    if not out_file or not os.path.exists(out_file):
+        return jsonify({"error": "File not found"}), 404
+    return send_file(out_file, mimetype="video/mp4", as_attachment=True)
+
+@app.route("/render", methods=["POST"])
+def render_clip():
+    """Synchronous render endpoint (legacy fallback)."""
+    if "video" not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
+    
+    video_file = request.files["video"]
+    props_str = request.form.get("props_json", "{}")
+    max_frames = request.form.get("max_frames", None)
+    
+    job_id = uuid.uuid4().hex[:8]
+    temp_input_name = f"temp_render_vid_{job_id}.mp4"
+    temp_input_path = PUBLIC_DIR / temp_input_name
+    temp_props_name = f"temp_props_{job_id}.json"
+    temp_props_path = REMOTION_DIR / temp_props_name
+    output_filename = f"rendered_output_{job_id}.mp4"
+    output_path = REMOTION_DIR / output_filename
+
+    try:
+        video_file.save(str(temp_input_path))
+        try:
+            props = json.loads(props_str)
+        except Exception:
+            props = {}
+        props["videoPath"] = temp_input_name
+        with open(temp_props_path, "w", encoding="utf-8") as f:
+            json.dump(props, f, ensure_ascii=False)
+            
+        cmd = [
+            "npx", "remotion", "render",
+            "src/index.ts", "ViralCaptionComponent", str(output_path),
+            "--props", temp_props_name,
+            "--gl=angle"
+        ]
+        if max_frames:
+            cmd.extend(["--frames", f"0-{int(max_frames)}"])
+            
+        print(f"\n[GPU_WORKER] 🚀 Starting render job {job_id}...")
+        r = subprocess.run(
+            cmd,
+            cwd=str(REMOTION_DIR),
+            capture_output=True,
+            text=True,
+            shell=(os.name == "nt")
+        )
+        
+        if r.returncode != 0 or not output_path.exists():
+            print(f"[GPU_WORKER] ❌ Render failed:\n{r.stderr[-2000:]}")
+            return jsonify({
+                "error": "Remotion render failed",
+                "details": r.stderr[-2000:]
+            }), 500
+            
+        size_mb = os.path.getsize(output_path) / (1024 * 1024)
+        print(f"[GPU_WORKER] ✅ Render complete: {output_filename} ({size_mb:.1f} MB)")
+        
+        return send_file(
+            str(output_path),
+            mimetype="video/mp4",
+            as_attachment=True,
+            download_name=f"captioned_{job_id}.mp4"
+        )
+        
+    except Exception as e:
+        print(f"[GPU_WORKER] ❌ Server exception: {e}")
+        return jsonify({"error": str(e)}), 500
+        
+    finally:
+        if temp_input_path.exists():
+            try: os.remove(temp_input_path)
+            except Exception: pass
+        if temp_props_path.exists():
+            try: os.remove(temp_props_path)
+            except Exception: pass
 
 @app.route("/", methods=["GET"])
 def index():
