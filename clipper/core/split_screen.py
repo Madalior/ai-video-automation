@@ -238,7 +238,7 @@ class SmartReframer:
                 ]
                 r = subprocess.run(cmd, cwd=temp_dir, capture_output=True, text=True, timeout=600)
                 if r.returncode == 0 and os.path.exists(output_path):
-                    print(f"[REFRAMER] ✅ Done (smooth single pass): {os.path.basename(output_path)}")
+                    print(f"[REFRAMER] [OK] Done (smooth single pass): {os.path.basename(output_path)}")
                     return output_path
                 else:
                     print(f"[REFRAMER] Single-pass notice: {r.stderr[-300:]}. Falling back to adaptive segments...")
@@ -338,13 +338,13 @@ class SmartReframer:
             ]
             r2 = subprocess.run(cmd2, cwd=temp_dir, capture_output=True, text=True, timeout=600)
             if r2.returncode == 0 and os.path.exists(output_path):
-                print(f"[REFRAMER] ✅ Done: {os.path.basename(output_path)}")
+                print(f"[REFRAMER] [OK] Done: {os.path.basename(output_path)}")
                 return output_path
             else:
-                print(f"[REFRAMER] ❌ Concat error:\n{r2.stderr[-500:]}")
+                print(f"[REFRAMER] [ERROR] Concat error:\n{r2.stderr[-500:]}")
                 return None
         except Exception as e:
-            print(f"[REFRAMER] ❌ Error: {e}")
+            print(f"[REFRAMER] [ERROR] Error: {e}")
             return None
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
