@@ -193,32 +193,54 @@ def cloud_test_youtube():
                 JOBS[job_id]["stage"] = "Downloading YouTube segment via Google Cloud network"
             
             # 1. Download YouTube slice using yt-dlp in cloud
+            #    Request 1080p to avoid pixelation when rendering at 1080x1920
             start_str = f"*{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{int(start_sec%60):02d}"
             end_sec = start_sec + duration
             end_str = f"{int(end_sec//3600):02d}:{int((end_sec%3600)//60):02d}:{int(end_sec%60):02d}"
             section = f"{start_str}-{end_str}"
             
+            raw_dl = PUBLIC_DIR / f"raw_dl_{job_id}.mp4"  # intermediate before re-encode
             dl_cmd = [
                 "yt-dlp",
-                "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b",
+                "-f", "bv*[height>=720][height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height>=720]+ba/b[height>=720]/b",
                 "--download-sections", section,
                 "--force-keyframes-at-cuts",
                 "--merge-output-format", "mp4",
-                "-o", str(raw_video),
+                "-o", str(raw_dl),
                 url,
                 "--no-warnings"
             ]
             print(f"[CLOUD_PIPELINE] 📥 Downloading {section} of {url}...")
             r_dl = subprocess.run(dl_cmd, capture_output=True, text=True, timeout=120)
-            if r_dl.returncode != 0 or not raw_video.exists():
+            if r_dl.returncode != 0 or not raw_dl.exists():
                 print(f"[CLOUD_PIPELINE] yt-dlp section notice: {r_dl.stderr[:200]}. Trying generic download...")
-                subprocess.run(["yt-dlp", "-f", "b[height<=720]/b", "-o", str(raw_video), url, "--max-filesize", "80M"], timeout=180)
+                subprocess.run(["yt-dlp", "-f", "b[height>=720]/b", "-o", str(raw_dl), url, "--max-filesize", "80M"], timeout=180)
+            
+            # 2. Re-encode to fix keyframe alignment glitches from --download-sections
+            #    This eliminates broken frames at cut boundaries that cause visual artifacts
+            print(f"[CLOUD_PIPELINE] 🔧 Re-encoding to fix keyframe alignment...")
+            reencode_cmd = [
+                "ffmpeg", "-y", "-i", str(raw_dl),
+                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart",
+                "-pix_fmt", "yuv420p",
+                str(raw_video)
+            ]
+            r_enc = subprocess.run(reencode_cmd, capture_output=True, text=True, timeout=120)
+            if r_enc.returncode != 0 or not raw_video.exists():
+                print(f"[CLOUD_PIPELINE] ⚠️ Re-encode failed, using raw download: {r_enc.stderr[:200]}")
+                shutil.copy2(str(raw_dl), str(raw_video))
+            # Clean up intermediate download
+            if raw_dl.exists():
+                try: os.remove(raw_dl)
+                except Exception: pass
 
             with JOBS_LOCK:
                 JOBS[job_id]["status"] = "transcribing"
                 JOBS[job_id]["stage"] = "Transcribing audio on Tesla T4 GPU"
 
-            # 2. Transcribe with faster-whisper or fallback
+            # 3. Transcribe with faster-whisper or fallback
             clip_words = []
             try:
                 from faster_whisper import WhisperModel
@@ -246,10 +268,10 @@ def cloud_test_youtube():
                 JOBS[job_id]["status"] = "rendering"
                 JOBS[job_id]["stage"] = "Rendering viral captions with Remotion on Tesla T4 GPU"
 
-            # 3. Build Remotion Props
+            # 4. Build Remotion Props (key must be "transcript" to match captionsSchema)
             props = {
                 "videoPath": raw_video.name,
-                "words": clip_words,
+                "transcript": clip_words,
                 "keywords": ["SPEED", "KFC", "JOB", "FIRST", "DAY", "CHICKEN"],
                 "hook": hook,
                 "line1Color": "#CCCCCC",
@@ -264,7 +286,7 @@ def cloud_test_youtube():
             with open(props_file, "w", encoding="utf-8") as pf:
                 json.dump(props, pf, ensure_ascii=False)
 
-            # 4. Render Remotion on T4 GPU
+            # 5. Render Remotion on T4 GPU
             remotion_cmd = [
                 "npx", "remotion", "render",
                 "src/index.ts", "ViralCaptionComponent", str(out_file),
@@ -301,80 +323,7 @@ def cloud_test_youtube():
     threading.Thread(target=_run_cloud_pipeline, daemon=True).start()
     return jsonify({"job_id": job_id, "status": "queued", "message": "Cloud pipeline launched on Tesla T4 GPU"}), 202
 
-@app.route("/render", methods=["POST"])
-def render_clip():
-    """Synchronous render endpoint (legacy fallback)."""
-    if "video" not in request.files:
-        return jsonify({"error": "No video file provided"}), 400
-    
-    video_file = request.files["video"]
-    props_str = request.form.get("props_json", "{}")
-    max_frames = request.form.get("max_frames", None)
-    
-    job_id = uuid.uuid4().hex[:8]
-    temp_input_name = f"temp_render_vid_{job_id}.mp4"
-    temp_input_path = PUBLIC_DIR / temp_input_name
-    temp_props_name = f"temp_props_{job_id}.json"
-    temp_props_path = REMOTION_DIR / temp_props_name
-    output_filename = f"rendered_output_{job_id}.mp4"
-    output_path = REMOTION_DIR / output_filename
-
-    try:
-        video_file.save(str(temp_input_path))
-        try:
-            props = json.loads(props_str)
-        except Exception:
-            props = {}
-        props["videoPath"] = temp_input_name
-        with open(temp_props_path, "w", encoding="utf-8") as f:
-            json.dump(props, f, ensure_ascii=False)
-            
-        cmd = [
-            "npx", "remotion", "render",
-            "src/index.ts", "ViralCaptionComponent", str(output_path),
-            "--props", temp_props_name,
-            "--gl=angle"
-        ]
-        if max_frames:
-            cmd.extend(["--frames", f"0-{int(max_frames)}"])
-            
-        print(f"\n[GPU_WORKER] 🚀 Starting render job {job_id}...")
-        r = subprocess.run(
-            cmd,
-            cwd=str(REMOTION_DIR),
-            capture_output=True,
-            text=True,
-            shell=(os.name == "nt")
-        )
-        
-        if r.returncode != 0 or not output_path.exists():
-            print(f"[GPU_WORKER] ❌ Render failed:\n{r.stderr[-2000:]}")
-            return jsonify({
-                "error": "Remotion render failed",
-                "details": r.stderr[-2000:]
-            }), 500
-            
-        size_mb = os.path.getsize(output_path) / (1024 * 1024)
-        print(f"[GPU_WORKER] ✅ Render complete: {output_filename} ({size_mb:.1f} MB)")
-        
-        return send_file(
-            str(output_path),
-            mimetype="video/mp4",
-            as_attachment=True,
-            download_name=f"captioned_{job_id}.mp4"
-        )
-        
-    except Exception as e:
-        print(f"[GPU_WORKER] ❌ Server exception: {e}")
-        return jsonify({"error": str(e)}), 500
-        
-    finally:
-        if temp_input_path.exists():
-            try: os.remove(temp_input_path)
-            except Exception: pass
-        if temp_props_path.exists():
-            try: os.remove(temp_props_path)
-            except Exception: pass
+# NOTE: Duplicate /render route removed — single authoritative /render endpoint is below (line ~432)
 
 @app.route("/", methods=["GET"])
 def index():
