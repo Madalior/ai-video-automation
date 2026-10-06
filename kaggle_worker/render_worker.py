@@ -29,10 +29,10 @@ def log(msg: str):
 def setup_environment():
     log("⚡ Initializing Kaggle T4 GPU Environment...")
     
-    # 1. Clone repository if not present
+    # 1. Clone repository if not present (shallow clone for speed)
     if not REPO_DIR.exists():
         log("Cloning Going Merry repository...")
-        subprocess.run(["git", "clone", "https://github.com/Madalior/ai-video-automation.git", str(REPO_DIR)], check=True)
+        subprocess.run(["git", "clone", "--depth", "1", "https://github.com/Madalior/ai-video-automation.git", str(REPO_DIR)], check=True)
     else:
         log("Pulling latest updates...")
         subprocess.run(["git", "-C", str(REPO_DIR), "pull", "origin", "main"])
@@ -95,9 +95,16 @@ def start_services():
         log("❌ Failed to obtain Cloudflare tunnel URL")
         return
 
-    # Auto-register with Azure Master
-    log(f"📡 Registering with Azure Master: {MASTER_URL}...")
+    # Broadcast to ntfy.sh immediately so local system can auto-discover
     import requests
+    try:
+        requests.post("https://ntfy.sh/going_merry_kaggle_t4", data=tunnel_url, timeout=5)
+        log(f"📡 Broadcasted tunnel URL to ntfy: {tunnel_url}")
+    except Exception as e:
+        log(f"⚠️ Broadcast notice: {e}")
+
+    # Auto-register with Azure Master (non-blocking / quick retry)
+    log(f"📡 Registering with Azure Master: {MASTER_URL}...")
     reg_url = f"{MASTER_URL.rstrip('/')}/api/cluster/register"
     payload = {
         "url": tunnel_url,
@@ -105,22 +112,15 @@ def start_services():
         "auth_token": CLUSTER_TOKEN
     }
     
-    registered = False
-    for attempt in range(5):
+    for attempt in range(2):
         try:
-            r = requests.post(reg_url, json=payload, timeout=10)
+            r = requests.post(reg_url, json=payload, timeout=3)
             if r.status_code == 200:
                 log(f"🟢 SUCCESS! Registered with Master: {r.text}")
-                registered = True
                 break
-            else:
-                log(f"⚠️ Registration attempt {attempt+1} failed: HTTP {r.status_code}")
-        except Exception as e:
-            log(f"⚠️ Registration attempt {attempt+1} error: {e}")
-        time.sleep(3)
-
-    if not registered:
-        log("⚠️ Could not reach Master directly, keeping tunnel alive.")
+        except Exception:
+            pass
+        time.sleep(1)
 
     log("=" * 60)
     log("🟢 KAGGLE GPU WORKER IS LIVE AND READY FOR RENDERS!")

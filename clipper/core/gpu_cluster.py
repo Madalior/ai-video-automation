@@ -94,6 +94,17 @@ class GPUClusterManager:
             workers.extend([u.strip() for u in raw_urls.split(",") if u.strip()])
         elif single_url:
             workers.append(single_url.strip())
+
+        # Auto-discover active Kaggle worker from broadcast channel
+        try:
+            r = requests.get("https://ntfy.sh/going_merry_kaggle_t4/raw?poll=1", timeout=1.5)
+            if r.status_code == 200 and "trycloudflare.com" in r.text:
+                for line in r.text.strip().splitlines():
+                    line = line.strip()
+                    if "trycloudflare.com" in line and line.startswith("http"):
+                        workers.append(line)
+        except Exception:
+            pass
             
         # Clean and deduplicate URLs
         clean_workers = []

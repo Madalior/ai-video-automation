@@ -355,9 +355,14 @@ class Transcriber:
         # Filter words within the chunk and adjust timestamps
         valid_words = []
         for w in transcript.words:
-            if w.end < offset_sec:
+            if w.end <= offset_sec:
                 continue
-            if duration_sec and w.start > offset_sec + duration_sec:
+            if w.start < offset_sec:
+                overlap = w.end - offset_sec
+                dur = max(0.01, w.end - w.start)
+                if (overlap / dur) < 0.55 or overlap < 0.15:
+                    continue
+            if duration_sec and w.start >= offset_sec + duration_sec:
                 break
             
             # Shift timestamps to start at 0

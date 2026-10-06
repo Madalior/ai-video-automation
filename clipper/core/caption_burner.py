@@ -260,9 +260,9 @@ class CaptionBurner:
         detector = CaptionKeywordDetector()
         keywords = detector.detect(clip_words, max_keywords=6)
 
-        # ── 3. Uppercase all words + tag keywords ─────────────────────────────
         for w in clip_words:
             w["text"] = w["text"].upper().strip().strip(".,!?'\"")
+        clip_words = [w for w in clip_words if w["text"]]
 
         # ── 4. Copy video to Remotion /public ────────────────────────────────
         import shutil
@@ -448,6 +448,14 @@ class CaptionBurner:
             # Skip words outside the clip window
             if end <= offset_sec:
                 continue
+
+            # If word started before clip, only keep it if majority is inside the clip
+            if start < offset_sec:
+                overlap = end - offset_sec
+                dur = max(0.01, end - start)
+                if (overlap / dur) < 0.55 or overlap < 0.15:
+                    continue
+
             if start >= end_sec:
                 break
 

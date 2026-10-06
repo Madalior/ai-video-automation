@@ -193,11 +193,14 @@ def cloud_test_youtube():
                 JOBS[job_id]["stage"] = "Downloading YouTube segment via Google Cloud network"
             
             # 1. Download YouTube slice using yt-dlp in cloud
-            #    Request 1080p to avoid pixelation when rendering at 1080x1920
-            start_str = f"*{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{int(start_sec%60):02d}"
+            def _sec_to_ts(s: float) -> str:
+                h = int(s // 3600)
+                m = int((s % 3600) // 60)
+                sec = s % 60
+                return f"{h:02d}:{m:02d}:{sec:06.3f}"
+
             end_sec = start_sec + duration
-            end_str = f"{int(end_sec//3600):02d}:{int((end_sec%3600)//60):02d}:{int(end_sec%60):02d}"
-            section = f"{start_str}-{end_str}"
+            section = f"*{_sec_to_ts(start_sec)}-{_sec_to_ts(end_sec)}"
             
             raw_dl = PUBLIC_DIR / f"raw_dl_{job_id}.mp4"  # intermediate before re-encode
             dl_cmd = [

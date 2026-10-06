@@ -86,6 +86,10 @@ function classifyFrames(
   data: z.infer<typeof frameDataSchema>[],
   threshold: number
 ): ClassifiedFrame[] {
+  let lastCenterX = 0.5;
+  let lastLeftX = 0.3;
+  let lastRightX = 0.7;
+
   return data.map((pt) => {
     const faces = pt.faces || [];
     const f = pt.f;
@@ -94,16 +98,25 @@ function classifyFrames(
       const dist = Math.abs(faces[0].x - faces[1].x);
       if (dist > threshold) {
         const sorted = [...faces].sort((a, b) => a.x - b.x);
-        return { frame: f, mode: "split" as FrameMode, centerX: (sorted[0].x + sorted[1].x) / 2, leftX: sorted[0].x, rightX: sorted[1].x };
+        lastLeftX = sorted[0].x;
+        lastRightX = sorted[1].x;
+        lastCenterX = (sorted[0].x + sorted[1].x) / 2;
+        return { frame: f, mode: "split" as FrameMode, centerX: lastCenterX, leftX: lastLeftX, rightX: lastRightX };
       } else {
         const avg = (faces[0].x + faces[1].x) / 2;
+        lastCenterX = avg;
+        lastLeftX = avg;
+        lastRightX = avg;
         return { frame: f, mode: "single" as FrameMode, centerX: avg, leftX: avg, rightX: avg };
       }
     } else if (faces.length === 1) {
+      lastCenterX = faces[0].x;
+      lastLeftX = faces[0].x;
+      lastRightX = faces[0].x;
       return { frame: f, mode: "single" as FrameMode, centerX: faces[0].x, leftX: faces[0].x, rightX: faces[0].x };
     } else {
-      const x = pt.x ?? 0.5;
-      return { frame: f, mode: "single" as FrameMode, centerX: x, leftX: x, rightX: x };
+      const x = pt.x ?? lastCenterX;
+      return { frame: f, mode: "single" as FrameMode, centerX: x, leftX: lastLeftX, rightX: lastRightX };
     }
   });
 }

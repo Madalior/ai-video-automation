@@ -121,23 +121,18 @@ class ClipCutter:
                 out_path,
             ]
         else:
-            # Trim only, keep original aspect ratio for Remotion dynamic pan
-            vf = f"[0:v]trim=start={start}:end={end},setpts=PTS-STARTPTS[v]"
-
+            # Clean cut with accurate seek and fresh timestamps
             cmd = [
                 "ffmpeg",
-                "-ss", str(start),
+                "-ss", f"{start:.3f}",
                 "-i", source_path,
-                "-t", str(duration),
-                "-filter_complex", vf,
-                "-map", "[v]",
-                "-map", "0:a",
-                "-af", f"atrim=start={start}:end={end},asetpts=PTS-STARTPTS",
+                "-t", f"{duration:.3f}",
                 "-c:v", "libx264",
                 "-preset", "fast",
-                "-crf", "23",
+                "-crf", "22",
                 "-c:a", "aac",
-                "-b:a", "128k",
+                "-b:a", "192k",
+                "-avoid_negative_ts", "make_zero",
                 "-movflags", "+faststart",
                 "-y",
                 out_path,

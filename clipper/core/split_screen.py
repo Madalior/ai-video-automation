@@ -106,107 +106,196 @@ class SmartReframer:
     def _render_dynamic_adaptive(self, source_path: str, output_path: str, frames: list, turns: list, fps: float, src_w: int, src_h: int) -> Optional[str]:
         """
         Intelligent Scene-Adaptive Reframer:
-        1. When only 1 person is in shot -> Single 9:16 vertical crop with smooth head tracking (NO duplicate split).
+        1. When only 1 person is in shot -> Single 9:16 vertical crop with smooth head tracking.
         2. When 2 distinct people are in shot -> Stacked 2-speaker vertical split (Top: Speaker 1, Bottom: Speaker 2).
-        3. Between different speakers/scenes -> Instant Jump Cut (NO slow dragging across room).
+        3. Between different speakers/scenes -> Instant Jump Cut without sluggish dragging.
+        4. Buttery-smooth camera motion with exact framerate preservation (no dropped frames/stutter).
         """
+        import tempfile
+        import shutil
+
         target_aspect = OUT_W / OUT_H
-        single_w = int(src_h * target_aspect) # 405 for 720p
-        split_w  = int(src_h * (OUT_W / (OUT_H / 2))) # 810 for 720p
+        single_w = int(src_h * target_aspect)
+        single_w = min(single_w, src_w)
+        split_w  = int(src_h * (OUT_W / (OUT_H / 2)))
         split_w  = min(split_w, src_w // 2)
 
-        # 1. Classify frames into modes
-        modes = []
+        vid_info = self._get_video_info(source_path)
+        if not vid_info:
+            return None
+        total_vid_frames = max(1, int(fps * vid_info["duration"]))
+
+        # Exact framerate string to prevent frame drops/stutter (never int(fps)!)
+        fps_arg = f"{fps:.3f}" if abs(fps - round(fps)) > 0.01 else str(int(round(fps)))
+
+        # 1. Build smooth per-frame single trajectory and classify modes
+        last_x1 = 0.5
+        last_x2 = 0.5
+
+        sparse_points = {}
         for p in frames:
+            f_num = p.get("f", 0)
             faces = p.get("faces", [])
             if len(faces) >= 2:
                 dist = abs(faces[0]["x"] - faces[1]["x"])
                 if dist > 0.22:
                     sorted_f = sorted(faces, key=lambda it: it["x"])
-                    modes.append(("split", p["f"], sorted_f[0]["x"], sorted_f[1]["x"]))
+                    last_x1 = sorted_f[0]["x"]
+                    last_x2 = sorted_f[1]["x"]
+                    sparse_points[f_num] = ("split", last_x1, last_x2)
                 else:
                     avg_x = (faces[0]["x"] + faces[1]["x"]) / 2
-                    modes.append(("single", p["f"], avg_x, avg_x))
+                    last_x1 = avg_x
+                    last_x2 = avg_x
+                    sparse_points[f_num] = ("single", avg_x, avg_x)
             elif len(faces) == 1:
-                modes.append(("single", p["f"], faces[0]["x"], faces[0]["x"]))
+                last_x1 = faces[0]["x"]
+                last_x2 = faces[0]["x"]
+                sparse_points[f_num] = ("single", last_x1, last_x2)
             else:
-                modes.append(("single", p["f"], 0.5, 0.5))
+                # Maintain last known face position to avoid random center snap
+                sparse_points[f_num] = ("single", last_x1, last_x2)
 
-        if not modes:
-            return None
+        if not sparse_points:
+            sparse_points[0] = ("single", 0.5, 0.5)
 
-        # 2. Group into contiguous segments
-        raw_segments = []
-        curr_mode = modes[0][0]
-        start_f = modes[0][1]
-        f1_acc, f2_acc = [modes[0][2]], [modes[0][3]]
+        sorted_f_keys = sorted(sparse_points.keys())
 
-        for m, f_idx, x1, x2 in modes[1:]:
-            if m != curr_mode:
-                raw_segments.append((curr_mode, start_f, f_idx, sum(f1_acc)/len(f1_acc), sum(f2_acc)/len(f2_acc)))
-                curr_mode = m
-                start_f = f_idx
-                f1_acc, f2_acc = [x1], [x2]
+        # Interpolate mode and target_x to all frames of the video
+        per_frame_mode = []
+        per_frame_target_x = []
+        for fn in range(total_vid_frames):
+            if fn in sparse_points:
+                m, x1, x2 = sparse_points[fn]
+            elif fn <= sorted_f_keys[0]:
+                m, x1, x2 = sparse_points[sorted_f_keys[0]]
+            elif fn >= sorted_f_keys[-1]:
+                m, x1, x2 = sparse_points[sorted_f_keys[-1]]
             else:
-                f1_acc.append(x1)
-                f2_acc.append(x2)
-        raw_segments.append((curr_mode, start_f, modes[-1][1], sum(f1_acc)/len(f1_acc), sum(f2_acc)/len(f2_acc)))
+                lo = max(k for k in sorted_f_keys if k <= fn)
+                hi = min(k for k in sorted_f_keys if k >= fn)
+                if lo == hi:
+                    m, x1, x2 = sparse_points[lo]
+                else:
+                    t = (fn - lo) / (hi - lo)
+                    m = sparse_points[lo][0]
+                    x1 = sparse_points[lo][1] + t * (sparse_points[hi][1] - sparse_points[lo][1])
+                    x2 = sparse_points[lo][2] + t * (sparse_points[hi][2] - sparse_points[lo][2])
+            per_frame_mode.append(m)
+            per_frame_target_x.append(x1)
 
-        # 3. Clean short flickers with 1.5s stability threshold
-        clean_segments = []
-        for s in raw_segments:
-            dur = (s[2] - s[1]) / fps
-            if dur < 1.5 and clean_segments:
-                prev = clean_segments[-1]
-                clean_segments[-1] = (prev[0], prev[1], s[2], prev[3], prev[4])
+        # Smooth camera movement with gentle exponential moving average (alpha=0.08)
+        smooth_cam_x = []
+        cam_x = per_frame_target_x[0]
+        alpha = 0.08
+        for tx in per_frame_target_x:
+            diff = abs(tx - cam_x)
+            if diff > 0.35: # Jump cut threshold (scene change / speaker switch)
+                cam_x = tx
             else:
-                clean_segments.append(s)
+                cam_x += alpha * (tx - cam_x)
+            smooth_cam_x.append(cam_x)
 
-        total_vid_frames = int(fps * self._get_video_info(source_path)["duration"])
-        final_segments = []
-        for i, s in enumerate(clean_segments):
-            start_frame = 0 if i == 0 else clean_segments[i-1][2]
-            end_frame   = total_vid_frames if i == len(clean_segments)-1 else s[2]
-            final_segments.append((s[0], start_frame, end_frame, s[3], s[4]))
+        # Convert normalized cam_x to pixel crop_x bounded inside [0, src_w - single_w]
+        smooth_pixel_x = []
+        max_crop_x = max(0, src_w - single_w)
+        for cx in smooth_cam_x:
+            px = int(cx * src_w - single_w // 2)
+            px = max(0, min(px, max_crop_x))
+            smooth_pixel_x.append(px)
 
-        print(f"[REFRAMER] Processing {len(final_segments)} glitch-free dynamic scene segments...")
+        # Check if entire clip is single-speaker
+        has_split = any(m == "split" for m in per_frame_mode)
 
-        # 4. Render segments individually and join with concat demuxer to avoid transition glitches
-        import tempfile
-        import shutil
-
-        temp_dir = tempfile.mkdtemp(prefix="reframe_segments_")
-        seg_files = []
-        
+        temp_dir = tempfile.mkdtemp(prefix="reframe_workspace_")
         try:
-            for idx, s in enumerate(final_segments):
+            # FAST-PATH: Solo speaker (pure single mode) -> Render in 1 single pass with sendcmd!
+            if not has_split:
+                print(f"[REFRAMER] Solo speaker detected. Rendering continuous smooth dynamic crop (FPS: {fps_arg})...")
+                cmd_file_path = os.path.join(temp_dir, "crop_cmd.txt")
+                frame_dur = 1.0 / fps
+                with open(cmd_file_path, "w") as cf:
+                    for i, cx in enumerate(smooth_pixel_x):
+                        t_start = i * frame_dur
+                        t_end = t_start + frame_dur
+                        cf.write(f"{t_start:.4f}-{t_end:.4f} [enter] crop x {cx};\n")
+
+                filt = (
+                    f"[0:v]sendcmd=f='crop_cmd.txt',"
+                    f"crop={single_w}:{src_h}:'x':0[cropped];"
+                    f"[cropped]scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=decrease,"
+                    f"pad={OUT_W}:{OUT_H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[out]"
+                )
+                cmd = [
+                    "ffmpeg", "-y", "-i", os.path.abspath(source_path),
+                    "-filter_complex", filt,
+                    "-map", "[out]", "-map", "0:a?",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                    "-c:a", "aac", "-b:a", "192k",
+                    "-r", fps_arg,
+                    "-movflags", "+faststart",
+                    os.path.abspath(output_path)
+                ]
+                r = subprocess.run(cmd, cwd=temp_dir, capture_output=True, text=True, timeout=600)
+                if r.returncode == 0 and os.path.exists(output_path):
+                    print(f"[REFRAMER] ✅ Done (smooth single pass): {os.path.basename(output_path)}")
+                    return output_path
+                else:
+                    print(f"[REFRAMER] Single-pass notice: {r.stderr[-300:]}. Falling back to adaptive segments...")
+
+            # MULTI-SPEAKER / SCENE-ADAPTIVE PATH
+            print(f"[REFRAMER] Multi-speaker detected. Segmenting with smooth transitions (FPS: {fps_arg})...")
+            raw_segments = []
+            curr_mode = per_frame_mode[0]
+            start_f = 0
+            for idx in range(1, total_vid_frames):
+                if per_frame_mode[idx] != curr_mode:
+                    raw_segments.append((curr_mode, start_f, idx))
+                    curr_mode = per_frame_mode[idx]
+                    start_f = idx
+            raw_segments.append((curr_mode, start_f, total_vid_frames))
+
+            clean_segments = []
+            for s in raw_segments:
+                dur = (s[2] - s[1]) / fps
+                if dur < 1.5 and clean_segments:
+                    prev = clean_segments[-1]
+                    clean_segments[-1] = (prev[0], prev[1], s[2])
+                else:
+                    clean_segments.append(s)
+
+            seg_files = []
+            for idx, s in enumerate(clean_segments):
                 seg_path = os.path.join(temp_dir, f"seg_{idx:03d}.mp4")
                 f_start = s[1]
-                f_end   = s[2]
-                mode    = s[0]
-                
+                f_end = s[2]
+                mode = s[0]
+
                 if mode == "single":
-                    cx = int(s[3] * src_w)
-                    crop_x = max(0, min(cx - single_w // 2, src_w - single_w))
+                    cmd_file_name = f"crop_cmd_{idx:03d}.txt"
+                    cmd_file_path = os.path.join(temp_dir, cmd_file_name)
+                    frame_dur = 1.0 / fps
+                    with open(cmd_file_path, "w") as cf:
+                        for i in range(f_start, f_end):
+                            cx = smooth_pixel_x[i] if i < len(smooth_pixel_x) else smooth_pixel_x[-1]
+                            t_start = (i - f_start) * frame_dur
+                            t_end = t_start + frame_dur
+                            cf.write(f"{t_start:.4f}-{t_end:.4f} [enter] crop x {cx};\n")
+
                     filt = (
                         f"trim=start_frame={f_start}:end_frame={f_end},setpts=PTS-STARTPTS,"
-                        f"crop={single_w}:{src_h}:{crop_x}:0,"
+                        f"sendcmd=f='{cmd_file_name}',"
+                        f"crop={single_w}:{src_h}:'x':0,"
                         f"scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=decrease,"
                         f"pad={OUT_W}:{OUT_H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
                     )
-                    cmd = [
-                        "ffmpeg", "-y", "-i", source_path,
-                        "-vf", filt, "-an",
-                        "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-                        "-r", str(int(fps)),
-                        seg_path
-                    ]
                 else: # split
-                    cx1 = int(s[3] * src_w)
-                    cx2 = int(s[4] * src_w)
-                    crop_x1 = max(0, min(cx1 - split_w // 2, src_w - split_w))
-                    crop_x2 = max(0, min(cx2 - split_w // 2, src_w - split_w))
-                    
+                    split_faces_1 = [sparse_points[k][1] for k in sparse_points if f_start <= k <= f_end and sparse_points[k][0] == "split"]
+                    split_faces_2 = [sparse_points[k][2] for k in sparse_points if f_start <= k <= f_end and sparse_points[k][0] == "split"]
+                    x1 = sum(split_faces_1)/len(split_faces_1) if split_faces_1 else 0.3
+                    x2 = sum(split_faces_2)/len(split_faces_2) if split_faces_2 else 0.7
+                    crop_x1 = max(0, min(int(x1 * src_w - split_w // 2), src_w - split_w))
+                    crop_x2 = max(0, min(int(x2 * src_w - split_w // 2), src_w - split_w))
                     filt = (
                         f"[0:v]split[a][b];"
                         f"[a]trim=start_frame={f_start}:end_frame={f_end},setpts=PTS-STARTPTS,"
@@ -218,47 +307,42 @@ class SmartReframer:
                         f"scale={OUT_W}:960:force_original_aspect_ratio=increase,crop={OUT_W}:960,setsar=1[bot];"
                         f"[top][bot]vstack=inputs=2,setsar=1"
                     )
-                    cmd = [
-                        "ffmpeg", "-y", "-i", source_path,
-                        "-filter_complex", filt, "-an",
-                        "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-                        "-r", str(int(fps)),
-                        seg_path
-                    ]
-                    
-                print(f"  [REFRAMER] Rendering Seg {idx} ({mode}, {f_end-f_start} frames)...")
-                r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-                if r.returncode == 0:
+
+                cmd = [
+                    "ffmpeg", "-y", "-i", os.path.abspath(source_path),
+                    "-filter_complex" if mode == "split" else "-vf", filt,
+                    "-an",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                    "-r", fps_arg,
+                    seg_path
+                ]
+                r = subprocess.run(cmd, cwd=temp_dir, capture_output=True, text=True, timeout=300)
+                if r.returncode == 0 and os.path.exists(seg_path):
                     seg_files.append(seg_path)
                 else:
-                    print(f"[REFRAMER] ❌ FFmpeg error on seg {idx}:\n{r.stderr[-500:]}")
+                    print(f"[REFRAMER] ❌ Error on seg {idx}:\n{r.stderr[-500:]}")
                     return None
 
-            # 5. Join segments using concat demuxer
             concat_list = os.path.join(temp_dir, "concat.txt")
             with open(concat_list, "w") as f:
                 for sp in seg_files:
-                    # Windows paths need forward slashes for FFmpeg concat file
-                    abs_path = os.path.abspath(sp).replace("\\", "/")
-                    f.write(f"file '{abs_path}'\n")
+                    abs_p = os.path.abspath(sp).replace("\\", "/")
+                    f.write(f"file '{abs_p}'\n")
 
-            print(f"[REFRAMER] Joining {len(seg_files)} segments seamlessly...")
             cmd2 = [
                 "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_list,
-                "-i", source_path, "-map", "0:v", "-map", "1:a?",
-                "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
-                "-movflags", "+faststart", "-shortest",
-                output_path
+                "-i", os.path.abspath(source_path), "-map", "0:v", "-map", "1:a?",
+                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart",
+                os.path.abspath(output_path)
             ]
-            
-            r2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=600)
+            r2 = subprocess.run(cmd2, cwd=temp_dir, capture_output=True, text=True, timeout=600)
             if r2.returncode == 0 and os.path.exists(output_path):
                 print(f"[REFRAMER] ✅ Done: {os.path.basename(output_path)}")
                 return output_path
             else:
-                print(f"[REFRAMER] ❌ Concat FFmpeg error:\n{r2.stderr[-1000:]}")
+                print(f"[REFRAMER] ❌ Concat error:\n{r2.stderr[-500:]}")
                 return None
-                
         except Exception as e:
             print(f"[REFRAMER] ❌ Error: {e}")
             return None

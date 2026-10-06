@@ -237,10 +237,13 @@ class Downloader:
         """
         print(f"[DOWNLOADER] Sniping video section: {start_sec}s to {end_sec}s")
 
-        # Format as HH:MM:SS
-        start_str = f"*{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{int(start_sec%60):02d}"
-        end_str = f"{int(end_sec//3600):02d}:{int((end_sec%3600)//60):02d}:{int(end_sec%60):02d}"
-        section = f"{start_str}-{end_str}"
+        def _sec_to_ts(s: float) -> str:
+            h = int(s // 3600)
+            m = int((s % 3600) // 60)
+            sec = s % 60
+            return f"{h:02d}:{m:02d}:{sec:06.3f}"
+
+        section = f"*{_sec_to_ts(start_sec)}-{_sec_to_ts(end_sec)}"
 
         cmd = [
             "yt-dlp",
@@ -278,9 +281,14 @@ class Downloader:
         if os.path.exists(full_vid):
             print("[DOWNLOADER] Cutting locally with ffmpeg...")
             cut_cmd = [
-                "ffmpeg", "-y", "-i", full_vid,
-                "-ss", str(start_sec), "-to", str(end_sec),
-                "-c:v", "copy", "-c:a", "copy", output_path
+                "ffmpeg", "-y",
+                "-ss", f"{start_sec:.3f}",
+                "-to", f"{end_sec:.3f}",
+                "-i", full_vid,
+                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-c:a", "aac", "-b:a", "192k",
+                "-avoid_negative_ts", "make_zero",
+                output_path
             ]
             subprocess.run(cut_cmd, capture_output=True, timeout=60)
             
