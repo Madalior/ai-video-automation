@@ -38,8 +38,11 @@ These files represent the perfected, finalized dynamic reframing, face tracking,
 
 ## 📁 PRESERVED MODULES IN THIS SNAPSHOT
 1. `opencv_renderer.py` — High-performance OpenCV implementation of `build_scene_timeline`, `render_video`, and static-camera split-screen.
-2. `split_screen.py` — `SmartReframer` class with FFmpeg concat pipeline and 1.5s stability threshold.
-3. `face_tracker.py` — YOLOv8 face detector with `OneEuroFilter` (`min_cutoff=0.004, beta=0.005`).
-4. `speaker_detector.py` — PyAnnote 3.1 speaker diarization pipeline.
-5. `SmartReframer.tsx` — Remotion composition implementation for client-side animated reframing.
-6. `clip_cutter.py` — Lossless FFmpeg clip cutter with keyframe alignment.
+2. `mediapipe_tracker.py` — MediaPipe Full-Range face tracker (`model_selection=1`, 0-5m range, confidence 0.45, 5-frame occlusion grace, alpha 0.3) tested on live streams.
+3. `streamer_webcam_renderer.py` — Dedicated streamer reaction split-screen renderer (Step 5198: Top 1080×960 talent, Bottom 1080×960 corner facecam zoom).
+4. `irl_stream_renderer.py` — Dedicated IRL stream 100% full-screen dynamic 9:16 reframe renderer (Step 5215: EMA alpha=0.08 smoothing, crew filter).
+5. `split_screen.py` — `SmartReframer` class with FFmpeg concat pipeline and 1.5s stability threshold.
+6. `face_tracker.py` — YOLOv8 face detector with `OneEuroFilter` (`min_cutoff=0.004, beta=0.005`).
+7. `speaker_detector.py` — PyAnnote 3.1 speaker diarization pipeline.
+8. `SmartReframer.tsx` — Remotion composition implementation for client-side animated reframing.
+9. `clip_cutter.py` — Lossless FFmpeg clip cutter with keyframe alignment.
