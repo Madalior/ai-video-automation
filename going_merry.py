@@ -610,27 +610,34 @@ def process_single_clip(
         else:
             # 3.5 Speaker Diarization
             speakers_json = str(cache_dir / f"clip_{i:02d}_speakers.json")
-            try:
-                from clipper.core.speaker_detector import SpeakerDetector
-                log(f"\n[bold][3.5/7] 🗣️  Detecting speakers (pyannote)...[/bold]")
-                detector = SpeakerDetector()
-                detector.detect(raw_clip, speakers_json)
-            except Exception as e:
-                log(f"[yellow]⚠️  Speaker detection failed: {e}. Smart reframing will fall back to center crop.[/yellow]")
+            if os.path.exists(speakers_json) and os.path.getsize(speakers_json) > 100:
+                log(f"   ⏩ Reusing existing speaker diarization: {os.path.basename(speakers_json)}")
+            else:
+                try:
+                    from clipper.core.speaker_detector import SpeakerDetector
+                    log(f"\n[bold][3.5/7] 🗣️  Detecting speakers (pyannote)...[/bold]")
+                    detector = SpeakerDetector()
+                    detector.detect(raw_clip, speakers_json)
+                except Exception as e:
+                    log(f"[yellow]⚠️  Speaker detection failed: {e}. Smart reframing will fall back to center crop.[/yellow]")
 
             # 4. Face Tracking & Smart Reframing
             bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "starting"})
             tracking_json = str(cache_dir / f"clip_{i:02d}_tracking.json")
-            try:
-                from clipper.core.face_tracker import FaceTracker
-                log(f"\n[bold][4a/7] 👁️  Tracking faces (YOLO)...[/bold]")
-                tracker = FaceTracker()
-                tracker.track(raw_clip, tracking_json)
+            if os.path.exists(tracking_json) and os.path.getsize(tracking_json) > 100:
+                log(f"   ⏩ Reusing existing YOLO face tracking: {os.path.basename(tracking_json)}")
                 bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "completed"})
-            except Exception as e:
-                log(f"[red]❌ Face tracking failed: {e}[/red]")
-                bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "failed", "error": str(e)})
-                return None
+            else:
+                try:
+                    from clipper.core.face_tracker import FaceTracker
+                    log(f"\n[bold][4a/7] 👁️  Tracking faces (YOLO)...[/bold]")
+                    tracker = FaceTracker()
+                    tracker.track(raw_clip, tracking_json)
+                    bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "completed"})
+                except Exception as e:
+                    log(f"[red]❌ Face tracking failed: {e}[/red]")
+                    bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "failed", "error": str(e)})
+                    return None
 
             formatted_out = str(output_dir / f"clip_{i:02d}_reframed.mp4")
             log(f"\n[bold][4b/7] 🎬  Smart Reframing (Dynamic Layout)...[/bold]")
