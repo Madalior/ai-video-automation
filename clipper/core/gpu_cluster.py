@@ -289,7 +289,7 @@ class GPUClusterManager:
             
             with open(video_path, "rb") as vf:
                 files = {"video": (os.path.basename(video_path), vf, "video/mp4")}
-                res = requests.post(async_endpoint, files=files, data=data, headers=headers, timeout=60)
+                res = requests.post(async_endpoint, files=files, data=data, headers=headers, timeout=300)
             
             if res.status_code == 202:
                 job_id = res.json().get("job_id")
