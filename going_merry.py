@@ -519,6 +519,7 @@ def process_single_clip(
     job_id: str,
     resume: bool = True,
     account_id: str = "acc_01",
+    split_screen: bool = False,
 ) -> Optional[str]:
     from clipper.core.event_bus import bus
 
@@ -635,20 +636,43 @@ def process_single_clip(
             log(f"\n[bold][4b/7] 🎬  Smart Reframing (Dynamic Layout)...[/bold]")
             bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "starting"})
             try:
-                from clipper.core.split_screen import SmartReframer
-                reframer = SmartReframer()
-                formatted = reframer.reframe(
-                    source_path=raw_clip, 
-                    output_path=formatted_out, 
-                    tracking_json=tracking_json, 
-                    speakers_json=speakers_json
+                from clipper.opencv_renderer import render_video
+                layout_desc = "Split Screen (Webcam/Reaction)" if split_screen else "100% Full-Screen Dynamic Cut (Podcast/IRL)"
+                log(f"   📐 Preserved Layout Engine: [cyan]{layout_desc}[/cyan]")
+                render_video(
+                    source_path=raw_clip,
+                    tracking_path=tracking_json,
+                    diarization_path=speakers_json,
+                    output_path=formatted_out,
+                    allow_split=split_screen
                 )
+                if os.path.exists(formatted_out) and os.path.getsize(formatted_out) > 1024:
+                    formatted = formatted_out
+                else:
+                    from clipper.core.split_screen import SmartReframer
+                    reframer = SmartReframer()
+                    formatted = reframer.reframe(
+                        source_path=raw_clip, 
+                        output_path=formatted_out, 
+                        tracking_json=tracking_json, 
+                        speakers_json=speakers_json
+                    )
                 if not formatted:
                     formatted = raw_clip
                 bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "completed", "path": formatted})
             except Exception as e:
-                log(f"[yellow]⚠️  Smart reframing error: {e}[/yellow]")
-                formatted = raw_clip
+                log(f"[yellow]⚠️  Preserved renderer fallback to SmartReframer: {e}[/yellow]")
+                try:
+                    from clipper.core.split_screen import SmartReframer
+                    reframer = SmartReframer()
+                    formatted = reframer.reframe(
+                        source_path=raw_clip, 
+                        output_path=formatted_out, 
+                        tracking_json=tracking_json, 
+                        speakers_json=speakers_json
+                    )
+                except Exception:
+                    formatted = raw_clip
                 bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "fallback"})
 
     if checkpoint:
@@ -968,7 +992,8 @@ def sail(
                     i, clip, len(clips), url, video_file, cache_dir, output_dir,
                     transcript, overlay, preview_frames, music, music_query,
                     upload, platform, preview, user_id, clip_id,
-                    checkpoint, job_id, resume, account_id
+                    checkpoint, job_id, resume, account_id,
+                    split_screen=split_screen
                 ): i
                 for i, clip in enumerate(clips, 1)
             }
@@ -991,7 +1016,8 @@ def sail(
                 i, clip, len(clips), url, video_file, cache_dir, output_dir,
                 transcript, overlay, preview_frames, music, music_query,
                 upload, platform, preview, user_id, clip_id,
-                checkpoint, job_id, resume, account_id
+                checkpoint, job_id, resume, account_id,
+                split_screen=split_screen
             )
             if res:
                 final_videos.append(res)

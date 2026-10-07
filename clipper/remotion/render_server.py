@@ -21,6 +21,10 @@ from pathlib import Path
 from flask import Flask, request, send_file, jsonify
 
 REMOTION_DIR = Path(__file__).resolve().parent
+REPO_DIR = REMOTION_DIR.parent.parent
+if str(REPO_DIR) not in sys.path:
+    sys.path.insert(0, str(REPO_DIR))
+
 PUBLIC_DIR = REMOTION_DIR / "public"
 PUBLIC_DIR.mkdir(exist_ok=True)
 
@@ -263,9 +267,52 @@ def cloud_test_youtube():
                 print(f"[CLOUD_PIPELINE] Whisper fallback used: {we}")
                 words_list = ["HELLO", "MISS", "WELCOME", "TO", "KFC", "MY", "NAME", "IS", "ISHOWSPEED", "SPEED", "ITS", "ALL", "ABOUT", "SPEED", "BABY", "WHAT", "CAN", "I", "GET", "FOR", "YOU", "TODAY"]
                 t = 0.5
-                for w in words_list:
-                    clip_words.append({"text": w, "start": round(t, 2), "end": round(t+0.5, 2)})
-                    t += 0.55
+            # 3.5 Smart Reframing to 9:16 vertical via preserved tracking engine
+            tracking_data = []
+            try:
+                probe = subprocess.run(
+                    ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", str(raw_video)],
+                    capture_output=True, text=True
+                )
+                is_vert = False
+                if "x" in probe.stdout:
+                    pw, ph = [int(v) for v in probe.stdout.strip().split("x")]
+                    if ph > pw:
+                        is_vert = True
+
+                if not is_vert:
+                    print(f"[CLOUD_PIPELINE] 📐 Running preserved 9:16 tracking & reframing...")
+                    from clipper.core.face_tracker import FaceTracker
+                    from clipper.opencv_renderer import render_video
+                    
+                    tracking_json_path = str(REMOTION_DIR / f"tracking_{job_id}.json")
+                    tracker = FaceTracker()
+                    tracking_data = tracker.track(str(raw_video), tracking_json_path)
+                    
+                    reframed_video = PUBLIC_DIR / f"reframed_{job_id}.mp4"
+                    dummy_speakers = REMOTION_DIR / f"dummy_speakers_{job_id}.json"
+                    with open(dummy_speakers, "w") as df:
+                        json.dump({"speaker_turns": []}, df)
+                    
+                    split_mode = bool(data.get("split_screen", False))
+                    render_video(
+                        source_path=str(raw_video),
+                        tracking_path=tracking_json_path,
+                        diarization_path=str(dummy_speakers),
+                        output_path=str(reframed_video),
+                        allow_split=split_mode
+                    )
+                    if dummy_speakers.exists():
+                        try: os.remove(dummy_speakers)
+                        except Exception: pass
+                    if os.path.exists(tracking_json_path):
+                        try: os.remove(tracking_json_path)
+                        except Exception: pass
+                        
+                    if reframed_video.exists() and os.path.getsize(reframed_video) > 1024:
+                        raw_video = reframed_video
+            except Exception as re_err:
+                print(f"[CLOUD_PIPELINE] ⚠️ Reframer notice: {re_err}")
 
             with JOBS_LOCK:
                 JOBS[job_id]["status"] = "rendering"
@@ -275,6 +322,7 @@ def cloud_test_youtube():
             props = {
                 "videoPath": raw_video.name,
                 "transcript": clip_words,
+                "trackingData": tracking_data,
                 "keywords": ["SPEED", "KFC", "JOB", "FIRST", "DAY", "CHICKEN"],
                 "hook": hook,
                 "line1Color": "#CCCCCC",
