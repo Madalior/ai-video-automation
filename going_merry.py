@@ -593,54 +593,63 @@ def process_single_clip(
     except Exception:
         pass
 
+    formatted = None
     tracking_json = None
-    if is_already_vertical:
-        formatted = raw_clip
-        tracking_json = "skip"
-    else:
-        # 3.5 Speaker Diarization
-        speakers_json = str(cache_dir / f"clip_{i:02d}_speakers.json")
-        try:
-            from clipper.core.speaker_detector import SpeakerDetector
-            log(f"\n[bold][3.5/7] 🗣️  Detecting speakers (pyannote)...[/bold]")
-            detector = SpeakerDetector()
-            detector.detect(raw_clip, speakers_json)
-        except Exception as e:
-            log(f"[yellow]⚠️  Speaker detection failed: {e}. Smart reframing will fall back to center crop.[/yellow]")
+    if resume and checkpoint:
+        saved = checkpoint.get_clip_progress(i)
+        if saved and saved.get("formatted") and os.path.exists(saved["formatted"]):
+            formatted = saved["formatted"]
+            tracking_json = saved.get("tracking_json")
+            log(f"      ⏩ Restored reframed 9:16 video from checkpoint: {os.path.basename(formatted)}")
 
-        # 4. Face Tracking & Smart Reframing
-        bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "starting"})
-        tracking_json = str(cache_dir / f"clip_{i:02d}_tracking.json")
-        try:
-            from clipper.core.face_tracker import FaceTracker
-            log(f"\n[bold][4a/7] 👁️  Tracking faces (YOLO)...[/bold]")
-            tracker = FaceTracker()
-            tracker.track(raw_clip, tracking_json)
-            bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "completed"})
-        except Exception as e:
-            log(f"[red]❌ Face tracking failed: {e}[/red]")
-            bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "failed", "error": str(e)})
-            return None
-
-        formatted_out = str(output_dir / f"clip_{i:02d}_reframed.mp4")
-        log(f"\n[bold][4b/7] 🎬  Smart Reframing (Dynamic Layout)...[/bold]")
-        bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "starting"})
-        try:
-            from clipper.core.split_screen import SmartReframer
-            reframer = SmartReframer()
-            formatted = reframer.reframe(
-                source_path=raw_clip, 
-                output_path=formatted_out, 
-                tracking_json=tracking_json, 
-                speakers_json=speakers_json
-            )
-            if not formatted:
-                formatted = raw_clip
-            bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "completed", "path": formatted})
-        except Exception as e:
-            log(f"[yellow]⚠️  Smart reframing error: {e}[/yellow]")
+    if not formatted:
+        if is_already_vertical:
             formatted = raw_clip
-            bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "fallback"})
+            tracking_json = "skip"
+        else:
+            # 3.5 Speaker Diarization
+            speakers_json = str(cache_dir / f"clip_{i:02d}_speakers.json")
+            try:
+                from clipper.core.speaker_detector import SpeakerDetector
+                log(f"\n[bold][3.5/7] 🗣️  Detecting speakers (pyannote)...[/bold]")
+                detector = SpeakerDetector()
+                detector.detect(raw_clip, speakers_json)
+            except Exception as e:
+                log(f"[yellow]⚠️  Speaker detection failed: {e}. Smart reframing will fall back to center crop.[/yellow]")
+
+            # 4. Face Tracking & Smart Reframing
+            bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "starting"})
+            tracking_json = str(cache_dir / f"clip_{i:02d}_tracking.json")
+            try:
+                from clipper.core.face_tracker import FaceTracker
+                log(f"\n[bold][4a/7] 👁️  Tracking faces (YOLO)...[/bold]")
+                tracker = FaceTracker()
+                tracker.track(raw_clip, tracking_json)
+                bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "completed"})
+            except Exception as e:
+                log(f"[red]❌ Face tracking failed: {e}[/red]")
+                bus.emit("stage.4.tracking", {"job_id": job_id, "clip_index": i, "status": "failed", "error": str(e)})
+                return None
+
+            formatted_out = str(output_dir / f"clip_{i:02d}_reframed.mp4")
+            log(f"\n[bold][4b/7] 🎬  Smart Reframing (Dynamic Layout)...[/bold]")
+            bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "starting"})
+            try:
+                from clipper.core.split_screen import SmartReframer
+                reframer = SmartReframer()
+                formatted = reframer.reframe(
+                    source_path=raw_clip, 
+                    output_path=formatted_out, 
+                    tracking_json=tracking_json, 
+                    speakers_json=speakers_json
+                )
+                if not formatted:
+                    formatted = raw_clip
+                bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "completed", "path": formatted})
+            except Exception as e:
+                log(f"[yellow]⚠️  Smart reframing error: {e}[/yellow]")
+                formatted = raw_clip
+                bus.emit("stage.5.reframe", {"job_id": job_id, "clip_index": i, "status": "fallback"})
 
     if checkpoint:
         checkpoint.save_clip_progress(i, {"formatted": formatted, "tracking_json": tracking_json})
