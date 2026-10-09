@@ -2,7 +2,7 @@ version: '3.8'
 
 # ==============================================================================
 # Going Merry — 100% Cloud-Native Docker Compose
-# Deploy on Azure for Students or Oracle Cloud with a single command:
+# Deploy on AWS Lightsail or EC2 with a single command:
 # docker compose up -d
 # ==============================================================================
 

@@ -3,7 +3,7 @@ Going Merry — Kaggle T4 GPU Autonomous Render Worker
 ===================================================
 Runs on Kaggle Cloud with 100% Free NVIDIA Tesla T4 GPU (30 hours/week).
 Automatically starts Remotion render server, exposes Cloudflare tunnel,
-and registers itself with Azure Master (https://app.sarkaricalc.me).
+and registers itself with AWS Master (https://app.sarkaricalc.me).
 """
 
 import os
@@ -103,8 +103,8 @@ def start_services():
     except Exception as e:
         log(f"⚠️ Broadcast notice: {e}")
 
-    # Auto-register with Azure Master (non-blocking / quick retry)
-    log(f"📡 Registering with Azure Master: {MASTER_URL}...")
+    # Auto-register with AWS Master (non-blocking / quick retry)
+    log(f"📡 Registering with AWS Master: {MASTER_URL}...")
     reg_url = f"{MASTER_URL.rstrip('/')}/api/cluster/register"
     payload = {
         "url": tunnel_url,

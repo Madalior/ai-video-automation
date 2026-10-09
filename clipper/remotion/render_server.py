@@ -55,35 +55,91 @@ def _run_render_job(job_id, temp_input_path, temp_props_path, output_path, max_f
     with JOBS_LOCK:
         JOBS[job_id]["status"] = "rendering"
     try:
-        cmd = [
-            "npx", "remotion", "render",
-            "src/index.ts", "ViralCaptionComponent", str(output_path),
-            "--props", os.path.basename(temp_props_path),
-            "--gl=angle"
-        ]
-        if max_frames:
-            cmd.extend(["--frames", f"0-{int(max_frames)}"])
-            
-        print(f"\n[GPU_WORKER] 🚀 Starting render job {job_id}...")
-        r = subprocess.run(
-            cmd,
-            cwd=str(REMOTION_DIR),
-            capture_output=True,
-            text=True,
-            shell=(os.name == "nt")
-        )
-        if r.returncode != 0 or not output_path.exists():
-            print(f"[GPU_WORKER] ❌ Render failed:\n{r.stderr[-2000:]}")
-            with JOBS_LOCK:
-                JOBS[job_id]["status"] = "failed"
-                JOBS[job_id]["error"] = r.stderr[-1000:]
+        is_transparent = False
+        try:
+            with open(temp_props_path, "r", encoding="utf-8") as pf:
+                props_dict = json.load(pf)
+                is_transparent = bool(props_dict.get("transparentOverlay", False))
+        except Exception:
+            pass
+
+        if is_transparent and temp_input_path.exists():
+            temp_overlay_path = REMOTION_DIR / f"temp_overlay_{job_id}.mov"
+            cmd = [
+                "npx", "remotion", "render",
+                "src/index.ts", "ViralCaptionComponent", str(temp_overlay_path),
+                "--props", os.path.basename(temp_props_path),
+                "--codec=prores",
+                "--prores-profile=4444",
+                "--pixel-format=yuva444p10le",
+                "--image-format=png",
+                "--gl=angle"
+            ]
+            if max_frames:
+                cmd.extend(["--frames", f"0-{int(max_frames)}"])
+            print(f"\n[GPU_WORKER] 🚀 Starting Option B transparent render job {job_id}...")
+            r = subprocess.run(cmd, cwd=str(REMOTION_DIR), capture_output=True, text=True, shell=(os.name == "nt"))
+            if r.returncode != 0 or not temp_overlay_path.exists():
+                print(f"[GPU_WORKER] ❌ Transparent overlay render failed:\n{r.stderr[-2000:]}")
+                with JOBS_LOCK:
+                    JOBS[job_id]["status"] = "failed"
+                    JOBS[job_id]["error"] = r.stderr[-1000:]
+                return
+
+            print(f"[GPU_WORKER] ⚡ Compositing transparent captions onto source video with FFmpeg...")
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", str(temp_input_path),
+                "-i", str(temp_overlay_path),
+                "-filter_complex", "[0:v][1:v]overlay=0:0:shortest=1",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "copy",
+                str(output_path)
+            ]
+            fr = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            if temp_overlay_path.exists():
+                try: os.remove(temp_overlay_path)
+                except Exception: pass
+            if fr.returncode != 0 or not output_path.exists():
+                print(f"[GPU_WORKER] ❌ FFmpeg composite failed:\n{fr.stderr[-2000:]}")
+                with JOBS_LOCK:
+                    JOBS[job_id]["status"] = "failed"
+                    JOBS[job_id]["error"] = fr.stderr[-1000:]
+                return
         else:
-            size_mb = os.path.getsize(output_path) / (1024 * 1024)
-            print(f"[GPU_WORKER] ✅ Render complete: {output_path.name} ({size_mb:.1f} MB)")
-            with JOBS_LOCK:
-                JOBS[job_id]["status"] = "completed"
-                JOBS[job_id]["size_mb"] = round(size_mb, 2)
-                JOBS[job_id]["output_path"] = str(output_path)
+            cmd = [
+                "npx", "remotion", "render",
+                "src/index.ts", "ViralCaptionComponent", str(output_path),
+                "--props", os.path.basename(temp_props_path),
+                "--gl=angle"
+            ]
+            if max_frames:
+                cmd.extend(["--frames", f"0-{int(max_frames)}"])
+                
+            print(f"\n[GPU_WORKER] 🚀 Starting render job {job_id}...")
+            r = subprocess.run(
+                cmd,
+                cwd=str(REMOTION_DIR),
+                capture_output=True,
+                text=True,
+                shell=(os.name == "nt")
+            )
+            if r.returncode != 0 or not output_path.exists():
+                print(f"[GPU_WORKER] ❌ Render failed:\n{r.stderr[-2000:]}")
+                with JOBS_LOCK:
+                    JOBS[job_id]["status"] = "failed"
+                    JOBS[job_id]["error"] = r.stderr[-1000:]
+                return
+
+        size_mb = os.path.getsize(output_path) / (1024 * 1024)
+        print(f"[GPU_WORKER] ✅ Render complete: {output_path.name} ({size_mb:.1f} MB)")
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "completed"
+            JOBS[job_id]["size_mb"] = round(size_mb, 2)
+            JOBS[job_id]["output_path"] = str(output_path)
     except Exception as e:
         print(f"[GPU_WORKER] ❌ Job exception: {e}")
         with JOBS_LOCK:
@@ -121,7 +177,8 @@ def render_async():
             props = json.loads(props_str)
         except Exception:
             props = {}
-        props["videoPath"] = temp_input_name
+        if not props.get("transparentOverlay"):
+            props["videoPath"] = temp_input_name
         with open(temp_props_path, "w", encoding="utf-8") as f:
             json.dump(props, f, ensure_ascii=False)
 
@@ -408,7 +465,7 @@ def index():
                 <span class="badge {'green' if gpu_active else 'yellow'}">{'🟢 NVIDIA GPU Active' if gpu_active else '⚠️ CPU Fallback'}</span>
                 <span class="badge {'green' if remotion_ready else 'yellow'}">{'🟢 Remotion Ready' if remotion_ready else '⏳ Setup Needed'}</span>
             </div>
-            <p style="margin-top: 20px; font-size: 12px; color: #64748b;">Ready to accept render requests from Azure Master.</p>
+            <p style="margin-top: 20px; font-size: 12px; color: #64748b;">Ready to accept render requests from AWS Master.</p>
         </div>
     </body>
     </html>
@@ -462,36 +519,80 @@ def render_clip():
             props = json.loads(props_str)
         except Exception:
             props = {}
-        props["videoPath"] = temp_input_name
+        is_transparent = bool(props.get("transparentOverlay", False))
+        if not is_transparent:
+            props["videoPath"] = temp_input_name
         
         with open(temp_props_path, "w", encoding="utf-8") as f:
             json.dump(props, f, ensure_ascii=False)
             
-        # 3. Assemble Remotion CLI command with hardware acceleration
-        cmd = [
-            "npx", "remotion", "render",
-            "src/index.ts", "ViralCaptionComponent", str(output_path),
-            "--props", temp_props_name,
-            "--gl=angle"
-        ]
-        if max_frames:
-            cmd.extend(["--frames", f"0-{int(max_frames)}"])
+        if is_transparent and temp_input_path.exists():
+            temp_overlay_path = REMOTION_DIR / f"temp_overlay_{job_id}.mov"
+            cmd = [
+                "npx", "remotion", "render",
+                "src/index.ts", "ViralCaptionComponent", str(temp_overlay_path),
+                "--props", temp_props_name,
+                "--codec=prores",
+                "--prores-profile=4444",
+                "--pixel-format=yuva444p10le",
+                "--image-format=png",
+                "--gl=angle"
+            ]
+            if max_frames:
+                cmd.extend(["--frames", f"0-{int(max_frames)}"])
+                
+            print(f"\n[GPU_WORKER] 🚀 Starting Option B sync render job {job_id}...")
+            r = subprocess.run(cmd, cwd=str(REMOTION_DIR), capture_output=True, text=True, shell=(os.name == "nt"))
+            if r.returncode != 0 or not temp_overlay_path.exists():
+                print(f"[GPU_WORKER] ❌ Remotion transparent render failed:\n{r.stderr[-2000:]}")
+                return jsonify({"error": "Remotion render failed", "details": r.stderr[-2000:]}), 500
+
+            print(f"[GPU_WORKER] ⚡ Compositing transparent captions onto source video with FFmpeg...")
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", str(temp_input_path),
+                "-i", str(temp_overlay_path),
+                "-filter_complex", "[0:v][1:v]overlay=0:0:shortest=1",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "copy",
+                str(output_path)
+            ]
+            fr = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            if temp_overlay_path.exists():
+                try: os.remove(temp_overlay_path)
+                except Exception: pass
+            if fr.returncode != 0 or not output_path.exists():
+                print(f"[GPU_WORKER] ❌ FFmpeg composite failed:\n{fr.stderr[-2000:]}")
+                return jsonify({"error": "FFmpeg composite failed", "details": fr.stderr[-2000:]}), 500
+        else:
+            # Legacy direct render
+            cmd = [
+                "npx", "remotion", "render",
+                "src/index.ts", "ViralCaptionComponent", str(output_path),
+                "--props", temp_props_name,
+                "--gl=angle"
+            ]
+            if max_frames:
+                cmd.extend(["--frames", f"0-{int(max_frames)}"])
+                
+            print(f"\n[GPU_WORKER] 🚀 Starting render job {job_id}...")
+            r = subprocess.run(
+                cmd,
+                cwd=str(REMOTION_DIR),
+                capture_output=True,
+                text=True,
+                shell=(os.name == "nt")
+            )
             
-        print(f"\n[GPU_WORKER] 🚀 Starting render job {job_id}...")
-        r = subprocess.run(
-            cmd,
-            cwd=str(REMOTION_DIR),
-            capture_output=True,
-            text=True,
-            shell=(os.name == "nt")
-        )
-        
-        if r.returncode != 0 or not output_path.exists():
-            print(f"[GPU_WORKER] ❌ Render failed:\n{r.stderr[-2000:]}")
-            return jsonify({
-                "error": "Remotion render failed",
-                "details": r.stderr[-2000:]
-            }), 500
+            if r.returncode != 0 or not output_path.exists():
+                print(f"[GPU_WORKER] ❌ Render failed:\n{r.stderr[-2000:]}")
+                return jsonify({
+                    "error": "Remotion render failed",
+                    "details": r.stderr[-2000:]
+                }), 500
             
         size_mb = os.path.getsize(output_path) / (1024 * 1024)
         print(f"[GPU_WORKER] ✅ Render complete: {output_filename} ({size_mb:.1f} MB)")
@@ -541,7 +642,7 @@ def discover_lightning_public_url(port: int = 8000) -> str:
 
 
 def auto_register_with_master(master_url: str, public_url: str, worker_name: str, token: str):
-    """Pings the Azure Master dashboard to register this worker in the live pool."""
+    """Pings the AWS Master dashboard to register this worker in the live pool."""
     import requests
     endpoint = f"{master_url.rstrip('/')}/api/cluster/register"
     payload = {
@@ -564,7 +665,7 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="0.0.0.0", help="Host interface (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
     parser.add_argument("--name", default="Worker Node", help="Human-readable worker name (e.g. Worker 1)")
-    parser.add_argument("--master-url", default="https://app.sarkaricalc.me", help="Azure master URL (default: https://app.sarkaricalc.me)")
+    parser.add_argument("--master-url", default="https://app.sarkaricalc.me", help="AWS master URL (default: https://app.sarkaricalc.me)")
     parser.add_argument("--public-url", default=None, help="This worker's public Lightning URL")
     parser.add_argument("--token", default=AUTH_TOKEN, help="Shared cluster security token")
     args = parser.parse_args()

@@ -120,11 +120,11 @@ class BrowserEngine:
                     print("\n" + "=" * 70)
                     print("[BROWSER] 🛑 BLOCKED: Strict Residential IP Protection Triggered!")
                     print("[BROWSER] The Home SOCKS5 Tunnel (port 1080) is offline.")
-                    print("[BROWSER] Connecting from Azure's datacenter IP will cause Instagram shadowbans.")
+                    print("[BROWSER] Connecting from AWS's datacenter IP will cause Instagram shadowbans.")
                     print("[BROWSER] 👉 Run this 1-line command on your PC to upload safely:")
-                    print("          ssh -R 0.0.0.0:1080 azure")
+                    print("          ssh -R 0.0.0.0:1080 aws")
                     print("=" * 70 + "\n")
-                    raise RuntimeError("Upload blocked by Residential IP Guard: Home tunnel on port 1080 is offline. Run 'ssh -R 0.0.0.0:1080 azure' on your PC to upload safely.")
+                    raise RuntimeError("Upload blocked by Residential IP Guard: Home tunnel on port 1080 is offline. Run 'ssh -R 0.0.0.0:1080 aws' on your PC to upload safely.")
                 else:
                     print("[BROWSER] ⚠️ Home tunnel offline. Proceeding with direct connection (Datacenter IP).")
 
