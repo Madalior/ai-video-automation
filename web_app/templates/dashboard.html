@@ -181,22 +181,17 @@
   </div>
 
   <form id="formConnectGmail" onsubmit="handleConnectGmailSubmit(event)">
-    <!-- STEP 1: GMAIL & GENERAL USERNAME -->
+    <!-- STEP 1: GMAIL & BRAND IDENTITY -->
     <div style="margin-bottom: 24px;">
       <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--color-brand-black); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <span style="background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 6px; border-radius: var(--radius-xs);">[STEP 01]</span>
-        <span>// GMAIL IDENTITY & USERNAME</span>
+        <span>// GMAIL IDENTITY</span>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label">Gmail Address</label>
           <input type="email" id="wizGmail" class="form-input" placeholder="creator30@gmail.com" required>
           <div class="form-hint">OPERATOR GOOGLE ACCOUNT USED FOR PROFILES & OAUTH.</div>
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label">General Username for this Gmail</label>
-          <input type="text" id="wizUsername" class="form-input" placeholder="@SpeedViralClips" required>
-          <div class="form-hint">PRIMARY CREATOR HANDLE ACROSS CHANNELS.</div>
         </div>
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label">Display / Brand Name</label>
@@ -206,68 +201,56 @@
       </div>
     </div>
 
-    <!-- STEP 2: CHANNEL CONTENT TYPE -->
+    <!-- STEP 2: CHANNEL CONTENT MODEL ALLOCATION (4-CHOICE MODEL) -->
     <div style="margin-bottom: 24px;">
       <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--color-brand-black); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         <span style="background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 6px; border-radius: var(--radius-xs);">[STEP 02]</span>
         <span>// CHANNEL CONTENT MODEL ALLOCATION</span>
       </div>
-      <div class="radio-choice-grid">
+      <div class="radio-choice-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+        <!-- Choice 1: Whop Content Rewards -->
         <label class="radio-choice-card selected" id="cardWhop" onclick="selectContentType('whop_content')">
           <input type="radio" name="contentTypeChoice" value="whop_content" checked>
           <div>
             <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-black); font-size: 0.85rem;">🏆 WHOP CONTENT REWARDS</div>
-            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); margin-top: 4px; line-height: 1.35;">
+            <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 5px; line-height: 1.4;">
               AUTOMATED BOUNTY CAMPAIGNS ($5.00 CPM). ENROLLED IN VIRAL TRACKER BEFORE SUBMISSION.
             </div>
           </div>
         </label>
+
+        <!-- Choice 2: Upload Video Based Content -->
         <label class="radio-choice-card" id="cardUpload" onclick="selectContentType('upload_based')">
           <input type="radio" name="contentTypeChoice" value="upload_based">
           <div>
-            <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-black); font-size: 0.85rem;">🎬 URL / UPLOAD-BASED CONTENT</div>
-            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); margin-top: 4px; line-height: 1.35;">
-              DIRECT VIDEO CLIPPING, LIVESTREAM CROPPING, AND MANUAL SOCIAL DISPATCHES.
+            <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-black); font-size: 0.85rem;">📤 UPLOAD VIDEO BASED CONTENT</div>
+            <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 5px; line-height: 1.4;">
+              OPERATES VIA TELEGRAM BOT: UPLOAD VIDEOS DIRECTLY VIA BOT, AWS CATCHES MEDIA AND SENDS TO THE GOING MERRY PIPELINE.
             </div>
           </div>
         </label>
-      </div>
-    </div>
 
-    <!-- STEP 3: PLATFORM CHANNELS REGISTRATION -->
-    <div style="margin-bottom: 24px;">
-      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--color-brand-black); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <span style="background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 6px; border-radius: var(--radius-xs);">[STEP 03]</span>
-        <span>// TARGET CHANNEL HANDLES (AUTO-DETECTED UPON BROWSER LOGIN)</span>
-      </div>
-      <p style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-muted); margin-bottom: 14px; line-height: 1.4;">
-        CHANNELS ARE AUTHENTICATED VIA <strong>GOOGLE OAUTH (YOUTUBE)</strong> AND <strong>ISOLATED CHROME SESSIONS (IG, TT, FB)</strong>. YOU CAN ENTER TARGET HANDLES BELOW OR LEAVE BLANK TO DETECT FROM LOGIN.
-      </p>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
-            <span class="channel-badge badge-yt">▶ YouTube</span> Shorts Handle
-          </label>
-          <input type="text" id="wizYt" class="form-input" placeholder="e.g. @MyShortsChannel">
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
-            <span class="channel-badge badge-ig">📸 Instagram</span> Reels Handle
-          </label>
-          <input type="text" id="wizIg" class="form-input" placeholder="e.g. @MyInstagramReels">
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
-            <span class="channel-badge badge-fb">🌐 Facebook</span> Page Handle
-          </label>
-          <input type="text" id="wizFb" class="form-input" placeholder="e.g. @MyFacebookPage">
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" style="display: flex; align-items: center; gap: 6px;">
-            <span class="channel-badge badge-tt">🎵 TikTok</span> Profile Handle
-          </label>
-          <input type="text" id="wizTt" class="form-input" placeholder="e.g. @MyTikTokProfile">
-        </div>
+        <!-- Choice 3: Follow Influencers -->
+        <label class="radio-choice-card" id="cardInfluencer" onclick="selectContentType('follow_influencer')">
+          <input type="radio" name="contentTypeChoice" value="follow_influencer">
+          <div>
+            <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-black); font-size: 0.85rem;">🎙️ FOLLOW INFLUENCERS</div>
+            <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 5px; line-height: 1.4;">
+              MONITOR YOUTUBE CHANNELS: BOT DETECTS NEW LIVESTREAMS/VIDEOS, ACCESSES ARCHIVED STREAMS, OR ACCEPTS DIRECT STREAM URLS POST-REGISTRATION.
+            </div>
+          </div>
+        </label>
+
+        <!-- Choice 4: Follow Telegram Channel -->
+        <label class="radio-choice-card" id="cardTelegram" onclick="selectContentType('follow_telegram')">
+          <input type="radio" name="contentTypeChoice" value="follow_telegram">
+          <div>
+            <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-black); font-size: 0.85rem;">🏴‍☠️ FOLLOW TELEGRAM CHANNEL</div>
+            <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 5px; line-height: 1.4;">
+              SERIALIZED ANIME / EPISODE MONITOR: PROVIDE A TELEGRAM CHANNEL WITH EPISODES, AUTONOMOUSLY HARVESTS & DISPATCHES TO CLIPPING PIPELINE.
+            </div>
+          </div>
+        </label>
       </div>
     </div>
 
@@ -275,7 +258,7 @@
     <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--color-border); padding-top: 18px;">
       <button type="button" class="btn-secondary" onclick="toggleConnectGmailWizard()">CANCEL</button>
       <button type="submit" class="btn-primary" style="width: auto; padding: 12px 28px;">
-        ⚡ REGISTER NODE TO 30+ FLEET
+        REGISTER NODE
       </button>
     </div>
   </form>
@@ -310,8 +293,14 @@
                 {% endif %}
                 {% if persona.content_type == 'whop_content' %}
                   <span class="badge-whop-type">🏆 Whop Content</span>
+                {% elif persona.content_type == 'upload_based' %}
+                  <span class="badge-upload-type">📤 Upload Video</span>
+                {% elif persona.content_type == 'follow_influencer' %}
+                  <span class="badge-upload-type" style="background: rgba(0, 136, 204, 0.12); color: #0088cc; border: 1px solid rgba(0, 136, 204, 0.4);">🎙️ Influencer Monitor</span>
+                {% elif persona.content_type == 'follow_telegram' %}
+                  <span class="badge-upload-type" style="background: rgba(255, 170, 0, 0.12); color: #d97706; border: 1px solid rgba(255, 170, 0, 0.4);">🏴‍☠️ Telegram Anime</span>
                 {% else %}
-                  <span class="badge-upload-type">🎬 Upload-Based</span>
+                  <span class="badge-upload-type">🎬 {{ persona.content_type }}</span>
                 {% endif %}
               </div>
             </div>
@@ -1229,14 +1218,27 @@ function toggleConnectGmailWizard() {
 
 function selectContentType(type) {
   selectedContentType = type;
-  document.getElementById("cardWhop").classList.toggle("selected", type === "whop_content");
-  document.getElementById("cardUpload").classList.toggle("selected", type === "upload_based");
+  const cardIds = {
+    whop_content: "cardWhop",
+    upload_based: "cardUpload",
+    follow_influencer: "cardInfluencer",
+    follow_telegram: "cardTelegram"
+  };
+
+  Object.entries(cardIds).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.toggle("selected", key === type);
+      const radio = el.querySelector("input[type=radio]");
+      if (radio) radio.checked = (key === type);
+    }
+  });
 }
 
 function filterFleet(filter) {
-  document.getElementById("filterTabAll").classList.toggle("active", filter === "all");
-  document.getElementById("filterTabWhop").classList.toggle("active", filter === "whop_content");
-  document.getElementById("filterTabUpload").classList.toggle("active", filter === "upload_based");
+  document.getElementById("filterTabAll")?.classList.toggle("active", filter === "all");
+  document.getElementById("filterTabWhop")?.classList.toggle("active", filter === "whop_content");
+  document.getElementById("filterTabUpload")?.classList.toggle("active", filter === "upload_based");
 
   const cards = document.querySelectorAll(".fleet-card");
   cards.forEach(card => {
@@ -1251,15 +1253,15 @@ function filterFleet(filter) {
 
 async function handleConnectGmailSubmit(e) {
   e.preventDefault();
+  const gmailVal = (document.getElementById("wizGmail")?.value || "").trim();
+  const nameVal = (document.getElementById("wizName")?.value || "").trim();
+  const usernameVal = nameVal ? `@${nameVal.replace(/\s+/g, '')}` : `@${gmailVal.split('@')[0]}`;
+
   const payload = {
-    gmail: document.getElementById("wizGmail").value,
-    username: document.getElementById("wizUsername").value,
-    name: document.getElementById("wizName").value,
-    content_type: selectedContentType,
-    youtube_handle: document.getElementById("wizYt").value,
-    instagram_handle: document.getElementById("wizIg").value,
-    facebook_handle: document.getElementById("wizFb").value,
-    tiktok_handle: document.getElementById("wizTt").value
+    gmail: gmailVal,
+    username: usernameVal,
+    name: nameVal || (gmailVal ? gmailVal.split('@')[0] : "Creator Node"),
+    content_type: selectedContentType
   };
 
   try {

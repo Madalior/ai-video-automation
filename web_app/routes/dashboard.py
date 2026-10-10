@@ -222,8 +222,8 @@ def create_account_persona():
     
     name = data.get("name", "").strip() or (username.lstrip("@") if username else "Creator Account")
     niche = data.get("niche", "general").strip()
-    content_type = data.get("content_type", "whop_content").strip() # whop_content | upload_based
-    fleet = data.get("fleet", "whop" if content_type == "whop_content" else "general").strip()
+    content_type = data.get("content_type", "whop_content").strip() # whop_content | upload_based | follow_influencer | follow_telegram
+    fleet = data.get("fleet", "whop" if content_type == "whop_content" else ("influencer" if content_type == "follow_influencer" else ("anime" if content_type == "follow_telegram" else "general"))).strip()
 
     if not username and not gmail:
         return jsonify({"success": False, "message": "Either Gmail address or Username is required"}), 400
