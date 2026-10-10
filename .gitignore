@@ -114,6 +114,7 @@ antigravity_optimizer*.py
 secrets.json
 credentials.json
 client_secrets.json
+*.pem
 
 # Exception: keep important production configs
 !.env.example

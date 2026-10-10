@@ -48,18 +48,50 @@ class CaptionBurner:
                     words.append({"text": text, "start": start, "end": end})
         return words
 
+    def _probe_video_info(self, video_path: str):
+        """Extract duration and native FPS from video using ffprobe."""
+        dur = 0.0
+        fps = 30.0
+        try:
+            cmd = [
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=r_frame_rate,duration:format=duration",
+                "-of", "json", str(video_path)
+            ]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode == 0:
+                data = json.loads(r.stdout)
+                streams = data.get("streams", [])
+                if streams:
+                    s = streams[0]
+                    if s.get("duration"):
+                        dur = float(s["duration"])
+                    r_fr = s.get("r_frame_rate", "30/1")
+                    if "/" in r_fr:
+                        n, d = r_fr.split("/")
+                        fps = float(n) / max(1.0, float(d))
+                    else:
+                        fps = float(r_fr)
+                if dur <= 0 and data.get("format", {}).get("duration"):
+                    dur = float(data["format"]["duration"])
+        except Exception as e:
+            print(f"[CAPTIONS] ffprobe info notice: {e}")
+        return dur, fps
+
     def burn_word_srt(
         self,
         video_path: str,
         word_srt_path: str,
         output_path: str = None,
-        style: str = "viral_ishowspeed",
+        style: str = "editor_masala",
         max_frames: Optional[int] = None,
         tracking_data: list = None,
         tracking_json: str = None,
+        style_overrides: dict = None,
     ) -> Optional[str]:
         """
-        Burn SRT captions into a video using Remotion.
+        Burn SRT captions into a video using Option B (transparent Remotion overlay + FFmpeg composite).
+        Supported styles/templates: "delhi", "editor_masala", "gum_gum"
         """
         if not os.path.exists(video_path):
             print(f"[CAPTIONS] Video not found: {video_path}")
@@ -69,116 +101,22 @@ class CaptionBurner:
             print(f"[CAPTIONS] SRT not found: {word_srt_path}")
             return None
 
-        if output_path is None:
-            base = os.path.splitext(video_path)[0]
-            output_path = f"{base}_captioned.mp4"
-
-        out_abs = str(Path(output_path).absolute())
-        if os.path.exists(out_abs) and os.path.getsize(out_abs) > 1024 and not os.getenv("FORCE_RE_RENDER"):
-            size_mb = os.path.getsize(out_abs) / (1024 * 1024)
-            print(f"[CAPTIONS] ⚡ Fast-forward: Pre-rendered video already exists: {os.path.basename(out_abs)} ({size_mb:.1f} MB)")
-            return out_abs
-
-        print("\n[CAPTIONS] Parsing SRT to JSON for Remotion...")
         transcript = self._parse_srt(word_srt_path)
+        overrides = {"template": style}
+        if style_overrides:
+            overrides.update(style_overrides)
 
-        import shutil
-        import uuid
-        render_id = uuid.uuid4().hex[:8]
-        public_dir = self.remotion_dir / "public"
-        public_dir.mkdir(exist_ok=True)
-        safe_video_name = f"temp_render_vid_{render_id}.mp4"
-        safe_video_path = public_dir / safe_video_name
+        return self.burn_from_words(
+            video_path=video_path,
+            words=transcript,
+            output_path=output_path,
+            style_overrides=overrides,
+            max_frames=max_frames,
+            tracking_data=tracking_data,
+            tracking_json=tracking_json
+        )
 
-        out_abs = Path(output_path).absolute().as_posix()
-
-        print("[CAPTIONS] Copying video to Remotion public directory for rendering...")
-        shutil.copy2(video_path, safe_video_path)
-
-        if tracking_data is not None:
-            print(f"[CAPTIONS] Using provided tracking data ({len(tracking_data)} points)...")
-        elif tracking_json and os.path.exists(tracking_json):
-            print(f"[CAPTIONS] Loading existing tracking data from {tracking_json}...")
-            try:
-                with open(tracking_json, "r", encoding="utf-8") as f:
-                    t_content = json.load(f)
-                tracking_data = t_content.get("data", t_content) if isinstance(t_content, dict) else t_content
-            except Exception as e:
-                print(f"[CAPTIONS] Failed to read {tracking_json}: {e}")
-                tracking_data = []
-        else:
-            print("[CAPTIONS] Running Face Tracking analysis...")
-            try:
-                from clipper.core.face_tracker import FaceTracker
-                tracker = FaceTracker(sample_rate=3)
-                tracking_json_path = str(self.remotion_dir / f"temp_tracking_{render_id}.json")
-                tracking_data = tracker.track(str(safe_video_path), tracking_json_path)
-            except ImportError:
-                print("[CAPTIONS] Face tracking dependencies not installed. Skipping.")
-                tracking_data = []
-            except Exception as e:
-                print(f"[CAPTIONS] Face tracking error: {e}")
-                tracking_data = []
-
-        props = {
-            "videoPath": safe_video_name,
-            "transcript": transcript,
-            "trackingData": tracking_data
-        }
-
-        # Write props to a temp file to avoid huge command line arguments
-        props_file = self.remotion_dir / f"temp_props_{render_id}.json"
-        with open(props_file, "w", encoding="utf-8") as f:
-            json.dump(props, f)
-
-        print(f"[CAPTIONS] Invoking Remotion CLI...")
-        cmd = [
-            "npx", "remotion", "render",
-            "src/index.ts", "ViralCaptionComponent", out_abs,
-            "--props", f"temp_props_{render_id}.json"
-        ]
-        if max_frames:
-            cmd.extend(["--frames", f"0-{max_frames}"])
-            print(f"[CAPTIONS] Quick Render mode enabled: rendering frames 0-{max_frames}")
-
-        try:
-            r = subprocess.run(cmd, cwd=str(self.remotion_dir), capture_output=True, text=True, shell=os.name == 'nt')
-            if r.returncode == 0 and os.path.exists(out_abs):
-                size = os.path.getsize(out_abs) / (1024*1024)
-                print(f"[CAPTIONS] Done: {os.path.basename(out_abs)} ({size:.1f} MB)")
-                
-                # Cleanup temp files
-                if props_file.exists():
-                    try:
-                        os.remove(props_file)
-                    except Exception:
-                        pass
-                if safe_video_path.exists():
-                    try:
-                        os.remove(safe_video_path)
-                    except Exception:
-                        pass
-                    
-                return out_abs
-            else:
-                print(f"[CAPTIONS] Remotion Error:\n{r.stderr}")
-                return None
-        except Exception as e:
-            print(f"[CAPTIONS] Error running Remotion: {e}")
-            return None
-        finally:
-            if props_file.exists():
-                try:
-                    os.remove(props_file)
-                except Exception:
-                    pass
-            if safe_video_path.exists():
-                try:
-                    os.remove(safe_video_path)
-                except Exception:
-                    pass
-
-    def burn_srt(self, video_path: str, srt_path: str, output_path: str = None, style: str = "modern") -> Optional[str]:
+    def burn_srt(self, video_path: str, srt_path: str, output_path: str = None, style: str = "editor_masala") -> Optional[str]:
         return self.burn_word_srt(video_path, srt_path, output_path, style)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -264,18 +202,15 @@ class CaptionBurner:
             w["text"] = w["text"].upper().strip().strip(".,!?'\"")
         clip_words = [w for w in clip_words if w["text"]]
 
-        # ── 4. Copy video to Remotion /public ────────────────────────────────
-        import shutil
+        # ── 4. Probe video stream parameters ──────────────────────────────
         import uuid
         render_id = uuid.uuid4().hex[:8]
-        public_dir = self.remotion_dir / "public"
-        public_dir.mkdir(exist_ok=True)
-        safe_video_name = f"temp_render_vid_{render_id}.mp4"
-        safe_video_path = public_dir / safe_video_name
-        print(f"[CAPTIONS] Copying video to Remotion public directory ({safe_video_name})...")
-        shutil.copy2(video_path, safe_video_path)
+        v_dur, v_fps = self._probe_video_info(video_path)
+        calc_duration = duration_sec if duration_sec else v_dur
+        fps_int = int(round(v_fps)) if v_fps > 0 else 30
+        dur_frames = int(round(calc_duration * fps_int)) if calc_duration > 0 else 300
 
-        # ── 5. Face tracking ─────────────────────────────────────────────────
+        # ── 5. Face tracking (if provided or skip) ───────────────────────────
         if tracking_data is not None:
             print(f"[CAPTIONS] Using provided tracking data ({len(tracking_data)} points)...")
         elif tracking_json == "skip":
@@ -291,35 +226,38 @@ class CaptionBurner:
                 print(f"[CAPTIONS] Failed to read {tracking_json}: {e}")
                 tracking_data = []
         else:
-            print("[CAPTIONS] Running face tracking...")
-            try:
-                from clipper.core.face_tracker import FaceTracker
-                tracker = FaceTracker(sample_rate=3)
-                tracking_json_path = str(self.remotion_dir / f"temp_tracking_{render_id}.json")
-                tracking_data = tracker.track(str(safe_video_path), tracking_json_path)
-            except Exception as e:
-                print(f"[CAPTIONS] Face tracking skipped: {e}")
-                tracking_data = []
+            tracking_data = []
 
-        # ── 6. Build Remotion props ───────────────────────────────────────────
+        # ── 6. Build Remotion props (Option B: transparent overlay, zero video copy)
+        template_name = "gum_gum"
+        if style_overrides and "template" in style_overrides:
+            template_name = style_overrides["template"]
+
         props = {
-            "videoPath": safe_video_name,
+            "template": template_name,
+            "personaMode": "auto",
+            "videoPath": "",
+            "transparentOverlay": True,
+            "durationInFrames": dur_frames,
+            "fps": fps_int,
             "transcript": clip_words,
             "trackingData": tracking_data,
-            # Style defaults matching our Composition.tsx
-            "line1Color": "#CCCCCC",
-            "line2Color": "#FFFFFF",
+            # 2-Sword style styling defaults
+            "textColor": "#FFFFFF",
+            "line1Color": "#FFFFFF",
+            "line2Color": "#FF2A4D",
             "keywordColor": "#00FF66",
+            "heroColor": "#FFD700",
             "glowIntensity": 1.0,
             "shadowIntensity": 1.0,
-            "line1FontSize": 34,
-            "line2FontSize": 40,
-            "keywordFontSize": 42,
-            "letterSpacing": 3,
-            "popScaleAmount": 1.08,
+            "fontSize": 44,
+            "line1FontSize": 38,
+            "line2FontSize": 50,
+            "keywordFontSize": 52,
+            "letterSpacing": 2,
+            "popScaleAmount": 1.10,
             "lineGap": 2,
-            "captionYPercent": 68,
-            # Pass keyword list so Composition.tsx knows which words to highlight
+            "captionYPercent": 54,
             "keywords": list(keywords),
         }
 
@@ -327,9 +265,9 @@ class CaptionBurner:
         if style_overrides:
             props.update(style_overrides)
 
-        # ── 7. Check for Distributed GPU Cluster (Lightning AI / Dedicated GPUs) ────
+        # ── 7. Check for Distributed GPU Cluster ──────────────────────────────
         from clipper.core.gpu_cluster import cluster
-        if cluster.get_configured_workers():
+        if not os.getenv("FORCE_LOCAL") and cluster.get_configured_workers():
             remote_out = cluster.render_single(
                 video_path=video_path,
                 props=props,
@@ -337,23 +275,24 @@ class CaptionBurner:
                 max_frames=max_frames
             )
             if remote_result := remote_out:
-                if safe_video_path.exists():
-                    try: os.remove(safe_video_path)
-                    except Exception: pass
                 return remote_result
-            print("[CAPTIONS] ⚠️ GPU Cluster nodes offline — falling back to local render...")
+            print("[CAPTIONS] ⚠️ GPU Cluster nodes offline — falling back to local Option B render...")
 
-        # ── 8. Write props JSON for local render ──────────────────────────────
+        # ── 8. Local Option B: Render transparent ProRes 4444 MOV with Remotion
         props_file = self.remotion_dir / f"temp_props_{render_id}.json"
         with open(props_file, "w", encoding="utf-8") as f:
             json.dump(props, f, ensure_ascii=False)
 
-        # ── 9. Run Local Remotion render ──────────────────────────────────────
-        print(f"[CAPTIONS] Invoking Remotion render...")
+        overlay_mov = self.remotion_dir / f"temp_overlay_{render_id}.mov"
+        print(f"[CAPTIONS] 🎨 Rendering transparent caption layer via Remotion (ProRes 4444)...")
         cmd = [
             "npx", "remotion", "render",
-            "src/index.ts", "ViralCaptionComponent", out_abs,
+            "src/index.ts", "ViralCaptionComponent", str(overlay_mov),
             "--props", f"temp_props_{render_id}.json",
+            "--codec=prores",
+            "--prores-profile=4444",
+            "--pixel-format=yuva444p10le",
+            "--image-format=png",
             "--gl=angle"
         ]
         if max_frames:
@@ -367,15 +306,50 @@ class CaptionBurner:
                 capture_output=True, text=True,
                 shell=(os.name == "nt")
             )
-            if r.returncode == 0 and os.path.exists(out_abs):
+            if r.returncode != 0 or not overlay_mov.exists():
+                print(f"[CAPTIONS] ❌ Remotion Overlay Error:\n{r.stderr[-2000:]}")
+                return None
+
+            # ── 9. Composite transparent captions onto pristine reframed video via FFmpeg
+            print(f"[CAPTIONS] ⚡ Compositing transparent captions onto pristine video with FFmpeg...")
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", str(video_path),
+                "-i", str(overlay_mov),
+                "-filter_complex", "[0:v][1:v]overlay=0:0:shortest=1",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "copy",
+                out_abs
+            ]
+            if max_frames:
+                preview_sec = max_frames / max(1.0, float(fps_int))
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-t", str(preview_sec),
+                    "-i", str(video_path),
+                    "-i", str(overlay_mov),
+                    "-filter_complex", "[0:v][1:v]overlay=0:0:shortest=1",
+                    "-c:v", "libx264",
+                    "-preset", "fast",
+                    "-crf", "18",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "copy",
+                    out_abs
+                ]
+
+            fr = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            if fr.returncode == 0 and os.path.exists(out_abs):
                 size = os.path.getsize(out_abs) / (1024 * 1024)
-                print(f"[CAPTIONS] ✅ Done: {os.path.basename(out_abs)} ({size:.1f} MB)")
+                print(f"[CAPTIONS] ✅ Option B Complete: {os.path.basename(out_abs)} ({size:.1f} MB, native {v_fps:.2f} fps)")
                 return out_abs
             else:
-                print(f"[CAPTIONS] ❌ Remotion Error:\n{r.stderr[-2000:]}")
+                print(f"[CAPTIONS] ❌ FFmpeg composite error:\n{fr.stderr[-2000:]}")
                 return None
         except Exception as e:
-            print(f"[CAPTIONS] Error running Remotion: {e}")
+            print(f"[CAPTIONS] Error running Option B: {e}")
             return None
         finally:
             if props_file.exists():
@@ -383,9 +357,9 @@ class CaptionBurner:
                     os.remove(props_file)
                 except Exception:
                     pass
-            if safe_video_path.exists():
+            if overlay_mov.exists():
                 try:
-                    os.remove(safe_video_path)
+                    os.remove(overlay_mov)
                 except Exception:
                     pass
 

@@ -65,7 +65,7 @@ def authenticate_account(account_id: str, client_secrets_path: Path, tokens_dir:
         </head>
         <body>
         <div class="box">
-            <h2>TECHTRONICS / GOING MERRY</h2>
+            <h2>GOING MERRY™ // AUTONOMOUS FLEET COMMAND</h2>
             <h1 style="color:#fff;">YOUTUBE AUTHENTICATED!</h1>
             <p style="color:#aaa;">You can close this tab and return to the console.</p>
         </div>

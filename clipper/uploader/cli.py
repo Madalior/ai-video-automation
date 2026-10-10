@@ -64,6 +64,7 @@ def main():
     upload_p.add_argument("--tags", default="shorts,viral", help="Comma-separated tags")
     upload_p.add_argument("--platforms", default="youtube", help="Comma-separated platforms: youtube,tiktok,instagram")
     upload_p.add_argument("--privacy", default="public", choices=["public", "unlisted", "private"], help="YouTube visibility")
+    upload_p.add_argument("--visible", action="store_true", help="Run browser visibly on screen instead of headless")
 
     args = parser.parse_args()
     pm = ProfileManager()
@@ -127,7 +128,8 @@ def main():
             hashtags=tags_list,
             platforms=plat_list,
             account_id=args.id,
-            privacy=args.privacy
+            privacy=args.privacy,
+            headless=not args.visible
         )
         print("Upload Result:", res)
 

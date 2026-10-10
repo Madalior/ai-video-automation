@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Michroma&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- TECHTRONICS / GOING MERRY Design System -->
+  <!-- GOING MERRY™ Design System -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -69,6 +69,7 @@
     </div>
     {% else %}
     <div class="nav-links">
+      <a href="https://github.com/Madalior/ai-video-automation" target="_blank" rel="noopener noreferrer" class="nav-link" style="color: var(--color-muted);">SOURCE CODE ↗</a>
       <a href="{{ url_for('auth.login') }}" class="nav-btn-primary">AUTHENTICATE [🔒]</a>
     </div>
     {% endif %}

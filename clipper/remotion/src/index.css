@@ -3,11 +3,23 @@
    Font: Komika Axis (comic-style bold condensed)
    ───────────────────────────────────────────────────────────────── */
 
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=Montserrat:ital,wght@0,400..900;1,400..900&display=swap');
 
 @font-face {
   font-family: 'Komika Axis';
   src: url('./KOMIKAX_.ttf') format('truetype');
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Shelley';
+  src: url('./Shelley.ttf') format('truetype');
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Brunson';
+  src: url('./Brunson.ttf') format('truetype');
   font-display: block;
 }
 

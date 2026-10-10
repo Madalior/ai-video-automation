@@ -229,11 +229,12 @@ class BulkDispatcher:
         title: str,
         caption: str = "",
         hashtags: Optional[List[str]] = None,
-        privacy: str = "public"
+        privacy: str = "public",
+        headless: bool = True
     ) -> Dict[str, Any]:
         """Uploads a Short to YouTube Studio using persistent Chrome session."""
         print(f"[YOUTUBE] Uploading Short for [{account_id}]...")
-        with self.browser_engine.open_session(account_id=account_id, headless=True) as (context, page):
+        with self.browser_engine.open_session(account_id=account_id, headless=headless, platform="youtube") as (context, page):
             yt = YouTubeStudioUploader(page)
             return yt.upload_short(
                 video_path=video_path,
@@ -254,7 +255,8 @@ class BulkDispatcher:
         hashtags: Optional[List[str]] = None,
         platforms: Optional[List[str]] = None,
         account_id: str = "acc_01",
-        privacy: str = "public"
+        privacy: str = "public",
+        headless: bool = True
     ) -> Dict[str, Any]:
         """
         Dispatches a clip to the target platforms for the given account.
@@ -281,7 +283,8 @@ class BulkDispatcher:
                     title=title,
                     caption=caption,
                     hashtags=hashtags,
-                    privacy=privacy
+                    privacy=privacy,
+                    headless=headless
                 )
             except Exception as e:
                 print(f"[YOUTUBE] ⚠️ Upload exception: {e}")

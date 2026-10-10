@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block title %}GOING MERRY™ — Automate Your Video Production Workflow{% endblock %}
+
+{% block content %}
+<div class="landing-container" style="max-width: 1140px; margin: 0 auto; padding: 20px 0 60px;">
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       A. HERO SECTION
+       ═══════════════════════════════════════════════════════════════ -->
+  <section class="landing-hero" style="text-align: center; padding: 60px 20px 50px; border-bottom: 2px solid var(--color-brand-black);">
+    <div style="display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+      <span class="led-pulse"></span>
+      <span style="font-family: var(--font-mono); font-size: 0.76rem; letter-spacing: 0.22em; color: var(--color-muted); text-transform: uppercase;">
+        // AUTONOMOUS VIDEO ORCHESTRATION ENGINE
+      </span>
+    </div>
+
+    <h1 style="font-family: var(--font-wordmark); font-size: 2.8rem; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-brand-black); line-height: 1.15; margin: 0 0 16px;">
+      GOING MERRY<span style="color: var(--color-brand-accent);">™</span>
+    </h1>
+
+    <h2 style="font-family: var(--font-sans); font-size: 1.55rem; font-weight: 600; color: var(--color-brand-black); margin: 0 auto 16px; max-width: 780px; letter-spacing: -0.01em;">
+      Automate Your Video Production Workflow.
+    </h2>
+
+    <p style="font-family: var(--font-mono); font-size: 0.92rem; color: var(--color-muted); margin: 0 auto 32px; max-width: 720px; line-height: 1.6; letter-spacing: 0.02em;">
+      An autonomous control center engineered for orchestrating AI-assisted content planning, multi-stream ingestion, intelligent speech transcription, dynamic 9:16 vertical re-framing, automated Remotion rendering, and distributed social publishing.
+    </p>
+
+    <!-- CTAs -->
+    <div style="display: flex; justify-content: center; align-items: center; gap: 18px; flex-wrap: wrap;">
+      <a href="{{ url_for('auth.login') }}" class="btn-primary" style="padding: 16px 36px; font-size: 0.95rem; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; border: 2px solid var(--color-brand-black); box-shadow: 4px 4px 0px rgba(17, 17, 17, 0.9);">
+        <span>EXPLORE THE PLATFORM</span>
+        <span>⚡</span>
+      </a>
+      <a href="https://github.com/Madalior/ai-video-automation" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="padding: 16px 32px; font-size: 0.95rem; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; border: 2px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-brand-black);">
+        <span>VIEW SOURCE CODE</span>
+        <span>↗</span>
+      </a>
+    </div>
+
+    <!-- Telemetry Badges Strip -->
+    <div style="display: flex; justify-content: center; gap: 24px; margin-top: 40px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted);">
+      <div style="display: inline-flex; align-items: center; gap: 8px;">
+        <span style="color: var(--color-brand-accent);">●</span>
+        <span>STATUS: OPERATIONAL BETA MVP</span>
+      </div>
+      <div style="display: inline-flex; align-items: center; gap: 8px;">
+        <span style="color: var(--color-brand-black);">■</span>
+        <span>ISOLATION: 30+ DISK PROFILES</span>
+      </div>
+      <div style="display: inline-flex; align-items: center; gap: 8px;">
+        <span style="color: var(--color-brand-accent);">▲</span>
+        <span>STACK: PYTHON 3.11 • DOCKER • REMOTION</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       B. HOW IT WORKS (VERIFIED 7-STAGE PIPELINE)
+       ═══════════════════════════════════════════════════════════════ -->
+  <section style="padding: 50px 0 40px; border-bottom: 2px solid var(--color-brand-black);">
+    <div style="margin-bottom: 30px;">
+      <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.2em; color: var(--color-muted); text-transform: uppercase;">
+        // PIPELINE EXECUTION ARCHITECTURE
+      </div>
+      <h3 style="font-family: var(--font-wordmark); font-size: 1.4rem; text-transform: uppercase; margin: 6px 0 0; color: var(--color-brand-black);">
+        How The Autonomous Production Engine Works
+      </h3>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px;">
+      
+      <!-- Stage 1 -->
+      <div class="tech-card" style="padding: 22px; border: 1px solid var(--color-border-strong);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--color-brand-accent); background: #111; padding: 2px 8px; border-radius: var(--radius-xs);">STAGE 01</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);">YT-DLP / INGESTION</span>
+        </div>
+        <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; color: var(--color-brand-black);">
+          Content Ingestion & Stream Monitoring
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.55;">
+          Monitors creator livestreams, Whop bounty targets, and source channels via <code>yt-dlp</code>. Supports direct URL uploads and Telegram bot automated intake.
+        </p>
+      </div>
+
+      <!-- Stage 2 -->
+      <div class="tech-card" style="padding: 22px; border: 1px solid var(--color-border-strong);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--color-brand-accent); background: #111; padding: 2px 8px; border-radius: var(--radius-xs);">STAGE 02</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);">WHISPER AI</span>
+        </div>
+        <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; color: var(--color-brand-black);">
+          Millisecond Speech-to-Text Transcription
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.55;">
+          Executes local OpenAI Whisper / faster-whisper inference to extract verbatim transcripts with precise word-level start and end timestamps.
+        </p>
+      </div>
+
+      <!-- Stage 3 -->
+      <div class="tech-card" style="padding: 22px; border: 1px solid var(--color-border-strong);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--color-brand-accent); background: #111; padding: 2px 8px; border-radius: var(--radius-xs);">STAGE 03</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);">GEMINI FLASH / LLM</span>
+        </div>
+        <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; color: var(--color-brand-black);">
+          AI Viral Hook Scoring & Truncation
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.55;">
+          Analyzes candidate segments using Google Gemini Flash, evaluating narrative arc, emotional spikes, and pacing to produce viral probability scores.
+        </p>
+      </div>
+
+      <!-- Stage 4 -->
+      <div class="tech-card" style="padding: 22px; border: 1px solid var(--color-border-strong);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--color-brand-accent); background: #111; padding: 2px 8px; border-radius: var(--radius-xs);">STAGE 04</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);">YOLOV8-FACE</span>
+        </div>
+        <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; color: var(--color-brand-black);">
+          Computer Vision 9:16 Smart Face Tracking
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.55;">
+          Deploys YOLOv8 face detection neural weights (<code>yolov8n-face.pt</code>) to track active speakers and dynamically frame wide horizontal footage into 9:16 vertical shorts.
+        </p>
+      </div>
+
+      <!-- Stage 5 -->
+      <div class="tech-card" style="padding: 22px; border: 1px solid var(--color-border-strong);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--color-brand-accent); background: #111; padding: 2px 8px; border-radius: var(--radius-xs);">STAGE 05</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);">REMOTION & FFMPEG</span>
+        </div>
+        <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; color: var(--color-brand-black);">
+          Dynamic Typography & Layout Assembly
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.55;">
+          Renders frame-accurate kinetic animated subtitles via Remotion React compositions and performs split-screen compositing and audio ducking with FFmpeg.
+        </p>
+      </div>
+
+      <!-- Stage 6 -->
+      <div class="tech-card" style="padding: 22px; border: 1px solid var(--color-border-strong);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--color-brand-accent); background: #111; padding: 2px 8px; border-radius: var(--radius-xs);">STAGE 06</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);">YOUTUBE API / PLAYWRIGHT</span>
+        </div>
+        <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; color: var(--color-brand-black);">
+          Multi-Channel Isolated Dispatching
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.55;">
+          Dispatches videos to YouTube Data API v3 and social accounts using isolated Chrome profile sandboxes, sequential anti-flag delays, and residential proxy guards.
+        </p>
+      </div>
+
+      <!-- Stage 7 -->
+      <div class="tech-card" style="padding: 22px; border: 1px solid var(--color-border-strong);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; color: var(--color-brand-accent); background: #111; padding: 2px 8px; border-radius: var(--radius-xs);">STAGE 07</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-muted);">SSE TELEMETRY</span>
+        </div>
+        <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; color: var(--color-brand-black);">
+          Telemetry Streaming & View Auditing
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.55;">
+          Streams real-time terminal output to the dashboard via Server-Sent Events (SSE) and performs on-demand yt-dlp telemetry sweeps of the last 3 published videos per node.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       C. REAL PLATFORM CAPABILITIES
+       ═══════════════════════════════════════════════════════════════ -->
+  <section style="padding: 50px 0 40px; border-bottom: 2px solid var(--color-brand-black);">
+    <div style="margin-bottom: 30px;">
+      <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.2em; color: var(--color-muted); text-transform: uppercase;">
+        // OPERATIONAL CAPABILITIES
+      </div>
+      <h3 style="font-family: var(--font-wordmark); font-size: 1.4rem; text-transform: uppercase; margin: 6px 0 0; color: var(--color-brand-black);">
+        Engineered For Fleet Reliability
+      </h3>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+      
+      <div style="border-left: 3px solid var(--color-brand-accent); padding: 10px 0 10px 18px;">
+        <h4 style="font-family: var(--font-sans); font-size: 1rem; font-weight: 700; margin: 0 0 6px; color: var(--color-brand-black);">
+          Physical Disk Profile Isolation
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.5;">
+          Each of the 30 creator fleet nodes operates inside its own dedicated browser profile directory (<code>uploader_profiles/profile_N</code>), guaranteeing zero cookie collisions and zero cross-account session contamination.
+        </p>
+      </div>
+
+      <div style="border-left: 3px solid var(--color-brand-black); padding: 10px 0 10px 18px;">
+        <h4 style="font-family: var(--font-sans); font-size: 1rem; font-weight: 700; margin: 0 0 6px; color: var(--color-brand-black);">
+          Residential SOCKS5 Proxy Gateway
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.5;">
+          Avoids social platform bot blacklists through an integrated home WiFi / residential SOCKS5 proxy tunnel, masking automated uploads behind genuine residential IP infrastructure.
+        </p>
+      </div>
+
+      <div style="border-left: 3px solid var(--color-brand-accent); padding: 10px 0 10px 18px;">
+        <h4 style="font-family: var(--font-sans); font-size: 1rem; font-weight: 700; margin: 0 0 6px; color: var(--color-brand-black);">
+          Remote Mobile noVNC Cloud Auth
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.5;">
+          Enables operators to approve Google 2FA challenges and solve platform security prompts on the cloud server directly from a smartphone screen via browser-streamed noVNC display.
+        </p>
+      </div>
+
+      <div style="border-left: 3px solid var(--color-brand-black); padding: 10px 0 10px 18px;">
+        <h4 style="font-family: var(--font-sans); font-size: 1rem; font-weight: 700; margin: 0 0 6px; color: var(--color-brand-black);">
+          Sequential Human Jitter Scheduler
+        </h4>
+        <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-muted); margin: 0; line-height: 1.5;">
+          Dispatches videos using algorithmic randomized intervals (20–30 minute human jitter) preventing velocity-based anti-spam triggers across target platforms.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       D. TECHNICAL OVERVIEW & SYSTEM STACK
+       ═══════════════════════════════════════════════════════════════ -->
+  <section style="padding: 50px 0 40px; border-bottom: 2px solid var(--color-brand-black);">
+    <div style="margin-bottom: 24px;">
+      <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.2em; color: var(--color-muted); text-transform: uppercase;">
+        // ARCHITECTURAL SPECIFICATIONS
+      </div>
+      <h3 style="font-family: var(--font-wordmark); font-size: 1.4rem; text-transform: uppercase; margin: 6px 0 0; color: var(--color-brand-black);">
+        Technology Stack & Core Infrastructure
+      </h3>
+    </div>
+
+    <div style="background: var(--color-obsidian-surface); border: 1px solid var(--color-border-dark); border-radius: var(--radius-sm); padding: 24px; color: #FFFFFF; font-family: var(--font-mono); font-size: 0.8rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
+        <div>
+          <div style="color: var(--color-brand-accent); font-weight: 700; margin-bottom: 6px;">[CORE BACKEND]</div>
+          <div style="color: #AAA; line-height: 1.6;">
+            • Python 3.11 Runtime<br>
+            • Flask Application Server<br>
+            • SQLAlchemy ORM (SQLite Engine)<br>
+            • Flask-Login & Bcrypt Security
+          </div>
+        </div>
+
+        <div>
+          <div style="color: var(--color-brand-accent); font-weight: 700; margin-bottom: 6px;">[AI & COMPUTER VISION]</div>
+          <div style="color: #AAA; line-height: 1.6;">
+            • OpenAI Whisper / faster-whisper<br>
+            • YOLOv8 Face Tracking (ultralytics)<br>
+            • Google Gemini Flash 1.5 / Groq<br>
+            • yt-dlp Stream Engine
+          </div>
+        </div>
+
+        <div>
+          <div style="color: var(--color-brand-accent); font-weight: 700; margin-bottom: 6px;">[COMPOSITION & RENDER]</div>
+          <div style="color: #AAA; line-height: 1.6;">
+            • Remotion React Motion Graphics<br>
+            • FFmpeg 6.x Hardware Acceleration<br>
+            • Node.js 18.x Subprocess Runner<br>
+            • Dynamic Kinetic Subtitle Sync
+          </div>
+        </div>
+
+        <div>
+          <div style="color: var(--color-brand-accent); font-weight: 700; margin-bottom: 6px;">[DEPLOYMENT & CLOUD]</div>
+          <div style="color: #AAA; line-height: 1.6;">
+            • Ubuntu 22.04 Jammy Container<br>
+            • Xvfb Virtual Framebuffer<br>
+            • noVNC & Websockify (Port 8080)<br>
+            • AWS Lightsail Production Host
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       E & F. PROJECT STATUS, LINKS & CONTACT
+       ═══════════════════════════════════════════════════════════════ -->
+  <section style="padding: 50px 0 20px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; align-items: center;">
+      <div>
+        <div style="font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.2em; color: var(--color-muted); text-transform: uppercase;">
+          // PROJECT MATURITY
+        </div>
+        <h3 style="font-family: var(--font-wordmark); font-size: 1.3rem; text-transform: uppercase; margin: 6px 0 10px; color: var(--color-brand-black);">
+          Operational Beta MVP
+        </h3>
+        <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-muted); line-height: 1.6; margin: 0;">
+          GOING MERRY™ is an active single-operator prototype designed for high-density autonomous short-form video operations. The platform connects directly to production cloud instances and executes live ingestion, AI transcription, face-tracking crops, Remotion renders, and multi-channel uploads.
+        </p>
+      </div>
+
+      <div class="tech-card" style="padding: 24px; border: 2px solid var(--color-brand-black); background: #FAF9F6;">
+        <div style="font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; margin-bottom: 12px; color: var(--color-brand-black);">
+          // FLEET CONTACT & REPOSITORIES
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.8; color: var(--color-brand-black);">
+          <div>
+            <strong>Repository:</strong> 
+            <a href="https://github.com/Madalior/ai-video-automation" target="_blank" rel="noopener noreferrer" style="color: #111; text-decoration: underline;">
+              github.com/Madalior/ai-video-automation
+            </a>
+          </div>
+          <div>
+            <strong>Command Center:</strong> 
+            <a href="https://app.sarkaricalc.me/dashboard" style="color: #111; text-decoration: underline;">
+              app.sarkaricalc.me/dashboard
+            </a>
+          </div>
+          <div>
+            <strong>Contact:</strong> 
+            <a href="mailto:founder@sarkaricalc.me" style="color: #111; text-decoration: underline;">
+              founder@sarkaricalc.me
+            </a>
+          </div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <a href="{{ url_for('auth.login') }}" class="btn-primary" style="display: block; text-align: center; text-decoration: none; padding: 12px; font-size: 0.85rem;">
+            AUTHENTICATE COMMAND CENTER ⚡
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

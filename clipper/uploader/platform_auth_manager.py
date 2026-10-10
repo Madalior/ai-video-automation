@@ -63,6 +63,21 @@ class PlatformAuthManager:
         }
 
     def _check_youtube_disk(self, account_id: str) -> Dict[str, Any]:
+        # 1. Check Option B: Persistent Chrome Profile first
+        local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
+        safe_profile = Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "youtube_profile"
+        browser_st = self._check_browser_profile(account_id, "youtube", safe_profile)
+        if browser_st.get("connected"):
+            return browser_st
+
+        # Also check workspace session dir for youtube_profile
+        workspace_profile = SESSIONS_DIR / account_id / "youtube_profile"
+        if workspace_profile.exists():
+            ws_st = self._check_browser_profile(account_id, "youtube", workspace_profile)
+            if ws_st.get("connected"):
+                return ws_st
+
+        # 2. Fall back to Option A: OAuth token
         token_file = YOUTUBE_TOKENS_DIR / f"token_{account_id}.json"
         channel_file = YOUTUBE_TOKENS_DIR / f"channel_{account_id}.json"
 
@@ -76,7 +91,7 @@ class PlatformAuthManager:
                 "status_label": "Not Connected",
                 "handle": None,
                 "badge": "badge-offline",
-                "error": "No OAuth token on disk"
+                "error": "No OAuth token or persistent Chrome profile on disk"
             }
 
         try:
@@ -164,7 +179,8 @@ class PlatformAuthManager:
         auth_keys = {
             "instagram": ["sessionid"],
             "tiktok": ["sessionid", "sid_guard"],
-            "facebook": ["c_user"]
+            "facebook": ["c_user"],
+            "youtube": ["LOGIN_INFO", "SAPISID", "SID", "SSID"]
         }
         required_keys = auth_keys.get(platform, ["sessionid"])
 
@@ -190,23 +206,26 @@ class PlatformAuthManager:
                 except Exception:
                     pass
 
-        # 2. Check for Chromium Cookies SQLite DB with substantial size (> 60KB)
+        # 2. Check for Chromium Cookies SQLite DB with substantial size (> 10KB)
         has_cookies_db = False
         for cdir in candidate_dirs:
             for p in [cdir / "Default" / "Network" / "Cookies", cdir / "Default" / "Cookies"]:
-                if p.exists() and p.stat().st_size > 60_000:
+                if p.exists() and p.stat().st_size > 10_000:
                     has_cookies_db = True
                     break
             if has_cookies_db:
                 break
 
         # 3. Read status.json for handle and timestamp
+        st_connected = False
         for cdir in candidate_dirs:
             st_file = cdir / "status.json"
             if st_file.exists():
                 try:
                     with open(st_file, "r", encoding="utf-8") as f:
                         st_data = json.load(f)
+                    if st_data.get("connected"):
+                        st_connected = True
                     if st_data.get("handle") and not detected_handle:
                         detected_handle = st_data.get("handle")
                     if st_data.get("timestamp"):
@@ -214,7 +233,7 @@ class PlatformAuthManager:
                 except Exception:
                     pass
 
-        is_connected = has_auth_cookies or (has_cookies_db and bool(detected_handle))
+        is_connected = has_auth_cookies or (has_cookies_db and (bool(detected_handle) or st_connected)) or st_connected
 
         if not is_connected:
             return {
@@ -254,9 +273,12 @@ class PlatformAuthManager:
         key = (account_id, platform)
 
         if platform == "youtube":
-            return self._start_youtube_oauth(account_id)
+            mode = os.environ.get("YOUTUBE_AUTH_MODE", "browser").lower()
+            if mode == "oauth":
+                return self._start_youtube_oauth(account_id)
+            # Default: Browser-based YouTube Studio login (Option B - Zero API quota)
 
-        if platform not in ("instagram", "tiktok", "facebook"):
+        if platform not in ("instagram", "tiktok", "facebook", "youtube"):
             return {"success": False, "error": f"Unknown platform: {platform}"}
 
         # auth_url is ONLY for YouTube Google OAuth redirects.
@@ -366,7 +388,7 @@ class PlatformAuthManager:
             success_html = """
             <!DOCTYPE html>
             <html>
-            <head><title>YouTube Connected — TECHTRONICS</title>
+            <head><title>YouTube Connected — GOING MERRY™</title>
             <style>
                 body { background: #111111; color: #4CE616; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
                 .box { border: 2px solid #4CE616; padding: 40px; text-align: center; border-radius: 8px; box-shadow: 0 0 30px rgba(76,230,22,0.25); background: #1a1a1a; max-width: 480px; }
@@ -376,7 +398,7 @@ class PlatformAuthManager:
             </head>
             <body>
             <div class="box">
-                <h2>TECHTRONICS // GOING MERRY</h2>
+                <h2>GOING MERRY™ // AUTONOMOUS FLEET COMMAND</h2>
                 <h1 style="color: #4CE616; margin: 15px 0;">YOUTUBE AUTHENTICATED!</h1>
                 <p>Google OAuth token has been saved successfully.<br>You may now close this tab and return to the dashboard.</p>
             </div>
@@ -518,8 +540,8 @@ class PlatformAuthManager:
 
         # 1. Check running state first
         is_running = False
-        if platform == "youtube":
-            is_running = account_id in ACTIVE_OAUTH_SERVERS
+        if platform == "youtube" and account_id in ACTIVE_OAUTH_SERVERS:
+            is_running = True
         else:
             item = ACTIVE_LOGIN_PROCESSES.get(key)
             proc = item[0] if isinstance(item, tuple) else item
@@ -527,30 +549,24 @@ class PlatformAuthManager:
 
         # 2. Read status file from LocalAppData safe dir or workspace
         status_data = {}
+        local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
+        candidate_status_files = [
+            Path(local_app_data) / "GoingMerry" / "profiles" / account_id / f"{platform}_profile" / "status.json",
+            SESSIONS_DIR / account_id / f"{platform}_profile" / "status.json",
+        ]
         if platform == "youtube":
-            status_file = YOUTUBE_TOKENS_DIR / f"status_{account_id}.json"
-            if status_file.exists():
+            candidate_status_files.append(YOUTUBE_TOKENS_DIR / f"status_{account_id}.json")
+
+        for sf in candidate_status_files:
+            if sf.exists():
                 try:
-                    with open(status_file, "r", encoding="utf-8") as f:
-                        status_data = json.load(f)
+                    with open(sf, "r", encoding="utf-8") as f:
+                        d = json.load(f)
+                    if d.get("connected") or d.get("status") in ("connected", "in_progress"):
+                        status_data = d
+                        break
                 except Exception:
                     pass
-        else:
-            local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
-            candidate_status_files = [
-                Path(local_app_data) / "GoingMerry" / "profiles" / account_id / f"{platform}_profile" / "status.json",
-                SESSIONS_DIR / account_id / f"{platform}_profile" / "status.json",
-            ]
-            for sf in candidate_status_files:
-                if sf.exists():
-                    try:
-                        with open(sf, "r", encoding="utf-8") as f:
-                            d = json.load(f)
-                        if d.get("connected") or d.get("status") in ("connected", "in_progress"):
-                            status_data = d
-                            break
-                    except Exception:
-                        pass
 
         # 3. If worker signaled success or connected
         if status_data.get("connected") is True or status_data.get("status") == "connected":

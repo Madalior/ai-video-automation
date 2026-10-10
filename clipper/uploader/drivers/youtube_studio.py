@@ -17,7 +17,7 @@ class YouTubeStudioUploader:
     Automates uploading to YouTube Creator Studio via Playwright.
     """
 
-    STUDIO_URL = "https://studio.youtube.com"
+    STUDIO_URL = "https://studio.youtube.com/?approve_browser_access=true"
 
     def __init__(self, page: Page):
         self.page = page
@@ -85,7 +85,14 @@ class YouTubeStudioUploader:
 
         # 2. Navigate to Studio
         self.page.goto(self.STUDIO_URL, wait_until="domcontentloaded", timeout=45000)
-        self.page.wait_for_timeout(3000)
+        self.page.wait_for_timeout(4000)
+
+        # Check for "Skip to YouTube Studio" browser warning page
+        skip_btn = self.page.locator("a:has-text('Skip to YouTube Studio')").first
+        if skip_btn.is_visible():
+            print("[YOUTUBE_BOT] Bypassing browser version check -> Clicking 'Skip to YouTube Studio'...")
+            skip_btn.click()
+            self.page.wait_for_timeout(4000)
 
         if "accounts.google.com" in self.page.url:
             return {
@@ -93,49 +100,67 @@ class YouTubeStudioUploader:
                 "message": "Session expired or not logged in. Please run the 1-time login command."
             }
 
-        # 3. Click CREATE button
+        # 3. Dismiss any initial modals & overlays
+        for dismiss_sel in ["#dismiss-button", "ytcp-button:has-text('Dismiss')", "ytcp-button:has-text('Got it')", "button:has-text('Close')"]:
+            try:
+                elem = self.page.locator(dismiss_sel).first
+                if elem.is_visible():
+                    elem.click()
+                    self.page.wait_for_timeout(500)
+            except Exception:
+                pass
+
+        try:
+            self.page.evaluate("() => { document.querySelectorAll('tp-yt-iron-overlay-backdrop.opened').forEach(e => e.remove()); }")
+        except Exception:
+            pass
+
         print("[YOUTUBE_BOT] Opening Upload Dialog...")
         create_btn = self.page.locator("#create-icon, ytcp-button#create-icon, button#create-icon, [aria-label*='Create']").first
         try:
-            create_btn.wait_for(state="visible", timeout=15000)
-            create_btn.click()
+            create_btn.wait_for(state="visible", timeout=20000)
+            create_btn.click(force=True)
         except PlaywrightTimeoutError:
-            # Fallback: direct click on upload button if visible
             upload_direct = self.page.locator("#upload-button, [aria-label*='Upload videos']").first
             if upload_direct.is_visible():
-                upload_direct.click()
+                upload_direct.click(force=True)
             else:
                 return {"status": "error", "message": "Could not find Create button in YouTube Studio."}
 
         self.page.wait_for_timeout(1000)
 
         # 4. Click 'Upload videos' in popup menu
-        upload_menu_item = self.page.locator("tp-yt-paper-item, paper-item").filter(has_text="Upload videos").first
-        if upload_menu_item.is_visible():
-            upload_menu_item.click()
+        upload_menu_item = self.page.locator("tp-yt-paper-item, paper-item, ytcp-text-menu tp-yt-paper-item, [test-id='upload-video-menu-item']").filter(has_text="Upload videos").first
+        try:
+            if upload_menu_item.is_visible():
+                upload_menu_item.click(force=True)
+        except Exception:
+            pass
 
         self.page.wait_for_timeout(1500)
 
         # 5. Set Input Files (drag & drop upload)
         print(f"[YOUTUBE_BOT] Uploading video binary: {video_file.name} ({video_file.stat().st_size / (1024*1024):.1f} MB)...")
         file_input = self.page.locator("input[type='file']").first
-        file_input.wait_for(state="attached", timeout=20000)
+        file_input.wait_for(state="attached", timeout=25000)
         file_input.set_input_files(str(video_file))
 
         # Wait for dialog details screen to appear
         print("[YOUTUBE_BOT] Waiting for Details dialog...")
-        title_box = self.page.locator("#textbox[aria-label*='title'], ytcp-mention-textbox#title-textarea #textbox, #title-textarea #textbox").first
-        title_box.wait_for(state="visible", timeout=35000)
+        title_box = self.page.locator("#textbox[aria-label*='title'], ytcp-mention-textbox#title-textarea #textbox, #title-textarea #textbox, div#textbox[contenteditable='true']").first
+        title_box.wait_for(state="visible", timeout=40000)
         self.page.wait_for_timeout(2000)
 
         # 6. Fill Title
         print("[YOUTUBE_BOT] Setting Title...")
-        title_box.click()
-        # Clear existing text
-        self.page.keyboard.press("Control+A")
-        self.page.keyboard.press("Backspace")
-        self.page.wait_for_timeout(300)
-        title_box.fill(final_title)
+        try:
+            title_box.click()
+            self.page.keyboard.press("Control+A")
+            self.page.keyboard.press("Backspace")
+            self.page.wait_for_timeout(300)
+            title_box.fill(final_title)
+        except Exception:
+            self.page.keyboard.type(final_title)
         self.page.wait_for_timeout(1000)
 
         # 7. Fill Description
@@ -143,61 +168,111 @@ class YouTubeStudioUploader:
             print("[YOUTUBE_BOT] Setting Description...")
             desc_box = self.page.locator("#textbox[aria-label*='description'], ytcp-mention-textbox#description-textarea #textbox, #description-textarea #textbox").first
             if desc_box.is_visible():
-                desc_box.click()
-                desc_box.fill(full_description[:4900])
+                try:
+                    desc_box.click()
+                    desc_box.fill(full_description[:4900])
+                except Exception:
+                    pass
                 self.page.wait_for_timeout(1000)
 
         # 8. Set 'Not made for kids'
         print("[YOUTUBE_BOT] Selecting 'Not made for kids'...")
         not_for_kids = self.page.locator("tp-yt-paper-radio-button[name='VIDEO_MADE_FOR_KIDS_NOT_MFK'], [name='VIDEO_MADE_FOR_KIDS_NOT_MFK']").first
+        if not not_for_kids.is_visible():
+            not_for_kids = self.page.locator("tp-yt-paper-radio-button").filter(has_text="not made for kids").first
         if not_for_kids.is_visible():
+            not_for_kids.scroll_into_view_if_needed()
             not_for_kids.click()
             self.page.wait_for_timeout(800)
 
         # 9. Grab the Video URL while in details screen
         video_url = ""
-        url_elem = self.page.locator("a.ytcp-video-info, .video-url-fadeable a, [href*='youtu.be']").first
-        if url_elem.is_visible():
-            video_url = url_elem.get_attribute("href") or url_elem.inner_text().strip()
-            print(f"[YOUTUBE_BOT] 🔗 Video Link Captured: {video_url}")
+        try:
+            url_elem = self.page.locator("a.ytcp-video-info, .video-url-fadeable a, a[href*='youtu.be']").first
+            if url_elem.is_visible():
+                video_url = url_elem.get_attribute("href") or url_elem.inner_text().strip()
+                print(f"[YOUTUBE_BOT] 🔗 Video Link Captured: {video_url}")
+        except Exception:
+            pass
 
-        # 10. Click 'Next' 3 times to get to Visibility screen
-        next_button = self.page.locator("#next-button").first
-        for step in range(1, 4):
-            print(f"[YOUTUBE_BOT] Clicking Next (Step {step}/3)...")
-            self.page.wait_for_timeout(1000)
-            if next_button.is_visible():
+        # 10. Advance dynamically to the Visibility screen
+        priv_upper = privacy.strip().upper()
+        if priv_upper not in ("PUBLIC", "UNLISTED", "PRIVATE"):
+            priv_upper = "PUBLIC"
+
+        vis_selector = "tp-yt-paper-radio-button[name='PUBLIC'], tp-yt-paper-radio-button[name='UNLISTED'], tp-yt-paper-radio-button[name='PRIVATE'], [name='PUBLIC'], [name='UNLISTED'], [name='PRIVATE']"
+        
+        max_steps = 6
+        step = 0
+        while step < max_steps:
+            if self.page.locator(vis_selector).count() > 0 and self.page.locator(vis_selector).first.is_visible():
+                print(f"[YOUTUBE_BOT] Reached Visibility screen!")
+                break
+
+            # Handle possible monetization screen
+            monetization_off = self.page.locator("tp-yt-paper-radio-button[name='OFF'], [name='OFF']").first
+            if monetization_off.is_visible():
+                try:
+                    monetization_off.click()
+                    self.page.wait_for_timeout(500)
+                    save_mon = self.page.locator("ytcp-button:has-text('Save'), #save-button").first
+                    if save_mon.is_visible(): save_mon.click()
+                except Exception:
+                    pass
+
+            next_button = self.page.locator("#next-button").first
+            if next_button.is_visible() and next_button.is_enabled():
+                step += 1
+                print(f"[YOUTUBE_BOT] Advancing step {step}/{max_steps}...")
                 next_button.click()
+                self.page.wait_for_timeout(2000)
+            else:
+                self.page.wait_for_timeout(1000)
+                step += 1
 
-        self.page.wait_for_timeout(2000)
+        self.page.wait_for_timeout(1500)
 
         # 11. Select Visibility
-        print(f"[YOUTUBE_BOT] Setting visibility to: {privacy.upper()}...")
-        priv_upper = privacy.strip().upper()
-        if priv_upper == "UNLISTED":
-            vis_radio = self.page.locator("tp-yt-paper-radio-button[name='UNLISTED'], [name='UNLISTED']").first
-        elif priv_upper == "PRIVATE":
-            vis_radio = self.page.locator("tp-yt-paper-radio-button[name='PRIVATE'], [name='PRIVATE']").first
-        else:
-            vis_radio = self.page.locator("tp-yt-paper-radio-button[name='PUBLIC'], [name='PUBLIC']").first
-
+        print(f"[YOUTUBE_BOT] Setting visibility to: {priv_upper}...")
+        vis_radio = self.page.locator(f"tp-yt-paper-radio-button[name='{priv_upper}'], [name='{priv_upper}']").first
+        if not vis_radio.is_visible():
+            vis_radio = self.page.locator("tp-yt-paper-radio-button").filter(has_text=priv_upper.capitalize()).first
         if vis_radio.is_visible():
+            vis_radio.scroll_into_view_if_needed()
             vis_radio.click()
             self.page.wait_for_timeout(1000)
+        else:
+            pub = self.page.locator("tp-yt-paper-radio-button[name='PUBLIC'], [name='PUBLIC']").first
+            if pub.is_visible():
+                pub.scroll_into_view_if_needed()
+                pub.click()
+                self.page.wait_for_timeout(1000)
 
         # 12. Click Save / Publish
         print("[YOUTUBE_BOT] Clicking Publish / Save...")
         done_button = self.page.locator("#done-button").first
-        done_button.wait_for(state="visible", timeout=15000)
+        done_button.wait_for(state="visible", timeout=20000)
         done_button.click()
 
         # Wait for confirmation modal or dialog close
-        self.page.wait_for_timeout(5000)
-        close_btn = self.page.locator("#close-button, ytcp-button#close-button").first
+        self.page.wait_for_timeout(6000)
+
+        # Try to capture link from share dialog if not yet captured
+        if not video_url:
+            for url_sel in ["a.ytcp-video-info", "a#share-url", ".video-url-fadeable a", "a[href*='youtu.be']", "a[href*='youtube.com/watch']"]:
+                try:
+                    share_url_elem = self.page.locator(url_sel).first
+                    if share_url_elem.is_visible():
+                        video_url = share_url_elem.get_attribute("href") or share_url_elem.inner_text().strip()
+                        if video_url: break
+                except Exception:
+                    pass
+
+        close_btn = self.page.locator("#close-button, ytcp-button#close-button, button:has-text('Close')").first
         if close_btn.is_visible():
             close_btn.click()
 
-        print(f"[YOUTUBE_BOT] ✅ SUCCESS! Short published successfully: {video_url or 'Published'}")
+        print(f"[YOUTUBE_BOT] ✅ SUCCESS! Video published successfully: {video_url or 'Published to YouTube Studio'}")
         return {
             "status": "success",
             "platform": "youtube",

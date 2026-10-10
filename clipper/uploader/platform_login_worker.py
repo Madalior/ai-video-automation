@@ -48,8 +48,14 @@ PLATFORM_CONFIG = {
         "login_url": "https://www.facebook.com/login",
         "auth_cookies": ["c_user", "xs"],
         "name": "Facebook"
+    },
+    "youtube": {
+        "login_url": "https://studio.youtube.com",
+        "auth_cookies": ["LOGIN_INFO", "SAPISID", "SID", "SSID", "__Secure-3PAPISID", "__Secure-3PSID"],
+        "name": "YouTube Studio"
     }
 }
+
 
 
 def get_safe_profile_dir(account_id: str, platform: str) -> Path:
@@ -163,19 +169,21 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
     try:
         from playwright.sync_api import sync_playwright
 
+        chrome_exe = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+        chrome_exe_x86 = r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
         edge_exe_candidates = [
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
         ]
+        has_chrome = os.path.exists(chrome_exe) or os.path.exists(chrome_exe_x86)
         has_edge = any(os.path.exists(p) for p in edge_exe_candidates)
-        chrome_exe = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
-        if has_edge:
-            use_channel = "msedge"
-            browser_name = "Microsoft Edge"
-        elif os.path.exists(chrome_exe):
+        if has_chrome:
             use_channel = "chrome"
             browser_name = "Google Chrome"
+        elif has_edge:
+            use_channel = "msedge"
+            browser_name = "Microsoft Edge"
         else:
             use_channel = None
             browser_name = "Chromium"
@@ -315,6 +323,23 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                             time.sleep(3)
                             break
 
+                    elif platform == "youtube":
+                        yt_keys = {"LOGIN_INFO", "SAPISID", "SID", "SSID", "__Secure-3PAPISID", "__Secure-3PSID"}
+                        is_studio = "studio.youtube.com" in current_url and "accounts.google.com" not in current_url and "signin" not in current_url
+                        if any(k in cookie_names for k in yt_keys) or is_studio:
+                            logged_in = True
+                            try:
+                                ch_elem = page.locator("#channel-title, #entity-name, ytcp-entity-page #entity-name, [aria-label*='Channel']").first
+                                if ch_elem.count() > 0:
+                                    detected_handle = ch_elem.inner_text().strip()
+                            except Exception:
+                                pass
+                            if not detected_handle:
+                                detected_handle = f"@{account_id} (YouTube Studio)"
+                            print(f"[{platform.upper()}_WORKER] ✅ YouTube Studio session verified! ({detected_handle})")
+                            time.sleep(3)
+                            break
+
                 except Exception:
                     pass
 
@@ -368,6 +393,10 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                     for c in final_cookies:
                         if c.get("name") == "c_user":
                             detected_handle = f"fb_{c['value']}"
+                elif platform == "youtube" and any(k in c_names for k in ["LOGIN_INFO", "SAPISID", "SID", "SSID", "__Secure-3PAPISID", "__Secure-3PSID"]):
+                    logged_in = True
+                    if not detected_handle:
+                        detected_handle = f"@{account_id} (YouTube Studio)"
 
             if logged_in:
                 # Save cookies to disk across all targets
@@ -443,6 +472,9 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                             elif platform == "facebook":
                                 persona.facebook_status = "connected"
                                 if detected_handle: persona.facebook_handle = detected_handle
+                            elif platform == "youtube":
+                                persona.youtube_status = "connected"
+                                if detected_handle: persona.youtube_handle = detected_handle
 
                             soc = SocialAccount.query.filter_by(user_id=persona.user_id, platform=platform).first()
                             if not soc:
@@ -510,7 +542,7 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interactive Platform Login Worker")
     parser.add_argument("--account-id", type=str, required=True, help="Unique account persona ID")
-    parser.add_argument("--platform", type=str, required=True, choices=["instagram", "tiktok", "facebook"])
+    parser.add_argument("--platform", type=str, required=True, choices=["instagram", "tiktok", "facebook", "youtube"])
     parser.add_argument("--profile-dir", type=str, default="", help="Custom persistent profile directory")
     parser.add_argument("--timeout", type=int, default=300, help="Login timeout in seconds (default: 300)")
     args = parser.parse_args()

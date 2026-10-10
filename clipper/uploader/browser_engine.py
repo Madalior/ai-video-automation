@@ -45,7 +45,8 @@ class BrowserEngine:
         self,
         account_id: str,
         headless: bool = True,
-        slow_mo: int = 50
+        slow_mo: int = 50,
+        platform: Optional[str] = None
     ):
         """
         Context manager yielding (context, page) for an isolated account profile.
@@ -61,18 +62,51 @@ class BrowserEngine:
         session_dir = self.profile_mgr.base_dir / "sessions" / account_id
         session_dir.mkdir(parents=True, exist_ok=True)
 
+        platform_str = (platform or "").lower()
+
         if sys.platform != "win32":
-            safe_session_dir = session_dir / "uploader_session"
+            if platform_str:
+                safe_session_dir = session_dir / f"{platform_str}_profile"
+            else:
+                safe_session_dir = session_dir / "uploader_session"
             use_channel = None
         else:
             local_app_data = os.environ.get("LOCALAPPDATA", r"C:\Users\vijay\AppData\Local")
-            safe_session_dir = Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "uploader_session"
+            
+            # Locate the correct persistent profile directory
+            if platform_str:
+                candidate_dirs = [
+                    Path(local_app_data) / "GoingMerry" / "profiles" / account_id / f"{platform_str}_profile",
+                    session_dir / f"{platform_str}_profile",
+                    Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "uploader_session",
+                    session_dir / "uploader_session"
+                ]
+            else:
+                candidate_dirs = [
+                    Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "youtube_profile",
+                    Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "uploader_session",
+                    session_dir / "uploader_session"
+                ]
+
+            safe_session_dir = next((d for d in candidate_dirs if d.exists()), candidate_dirs[0])
+
+            # Select browser channel (Chrome is mandatory for Google/YouTube App-Bound encryption)
+            chrome_exe_candidates = [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            ]
+            has_chrome = any(os.path.exists(p) for p in chrome_exe_candidates)
+
             edge_exe_candidates = [
                 r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
                 r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
             ]
             has_edge = any(os.path.exists(p) for p in edge_exe_candidates)
-            use_channel = "msedge" if has_edge else "chrome"
+
+            if platform_str == "youtube" or safe_session_dir.name == "youtube_profile":
+                use_channel = "chrome" if has_chrome else None
+            else:
+                use_channel = "chrome" if has_chrome else ("msedge" if has_edge else None)
 
         safe_session_dir.mkdir(parents=True, exist_ok=True)
 
@@ -86,7 +120,12 @@ class BrowserEngine:
 
         # Resolve Proxy: Account Proxy > Environment Proxy > Auto-Detect Home SOCKS5 Tunnel
         proxy_config = None
-        custom_proxy = account.get("proxy") or os.environ.get("UPLOAD_PROXY") or os.environ.get("INSTAGRAM_PROXY")
+        custom_proxy = (
+            account.get("proxy")
+            or os.environ.get("UPLOAD_PROXY")
+            or os.environ.get("YOUTUBE_PROXY")
+            or os.environ.get("INSTAGRAM_PROXY")
+        )
         use_home_tunnel = os.environ.get("USE_HOME_TUNNEL", "true").lower() in ["true", "1", "yes"]
 
         if custom_proxy:
@@ -115,8 +154,9 @@ class BrowserEngine:
                 proxy_config = {"server": f"socks5://{tunnel_host}:{tunnel_port}"}
                 print(f"[BROWSER] 🛡️ Stealth Home Gateway ACTIVE! Routing browser via Home SOCKS5 ({tunnel_host}:{tunnel_port})")
             else:
+                is_cloud_env = sys.platform != "win32" or bool(os.environ.get("AWS_REGION") or os.environ.get("EC2_INSTANCE_ID") or os.environ.get("CLOUD_ENV"))
                 strict_residential = os.environ.get("STRICT_RESIDENTIAL_IP", "true").lower() in ["true", "1", "yes"]
-                if strict_residential and not os.environ.get("ALLOW_DATACENTER_IP"):
+                if is_cloud_env and strict_residential and not os.environ.get("ALLOW_DATACENTER_IP"):
                     print("\n" + "=" * 70)
                     print("[BROWSER] 🛑 BLOCKED: Strict Residential IP Protection Triggered!")
                     print("[BROWSER] The Home SOCKS5 Tunnel (port 1080) is offline.")
@@ -126,7 +166,7 @@ class BrowserEngine:
                     print("=" * 70 + "\n")
                     raise RuntimeError("Upload blocked by Residential IP Guard: Home tunnel on port 1080 is offline. Run 'ssh -R 0.0.0.0:1080 aws' on your PC to upload safely.")
                 else:
-                    print("[BROWSER] ⚠️ Home tunnel offline. Proceeding with direct connection (Datacenter IP).")
+                    print("[BROWSER] 🏠 Local residential IP active (Direct PC connection).")
 
         chrome_args = [
             "--disable-blink-features=AutomationControlled",
@@ -151,11 +191,12 @@ class BrowserEngine:
                 "args": chrome_args,
                 "slow_mo": slow_mo,
                 "viewport": None,
-                "user_agent": DEFAULT_USER_AGENT,
                 "locale": "en-US",
                 "timezone_id": "America/New_York",
                 "permissions": ["clipboard-read", "clipboard-write"]
             }
+            if not use_channel:
+                launch_kwargs["user_agent"] = DEFAULT_USER_AGENT
             if proxy_config:
                 launch_kwargs["proxy"] = proxy_config
             if use_channel:
@@ -174,13 +215,16 @@ class BrowserEngine:
             # Load any saved cookies from workspace or localappdata into context
             local_app_data = os.environ.get("LOCALAPPDATA", "")
             cookie_candidates = [
+                self.profile_mgr.base_dir / "accounts" / f"{account_id}_youtube_cookies.json",
                 self.profile_mgr.base_dir / "accounts" / f"{account_id}_instagram_cookies.json",
                 self.profile_mgr.base_dir / "accounts" / f"{account_id}_cookies.json",
+                session_dir / "youtube_profile" / "cookies.json",
                 session_dir / "instagram_profile" / "cookies.json",
                 session_dir / "cookies.json",
                 safe_session_dir / "cookies.json",
             ]
             if local_app_data:
+                cookie_candidates.append(Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "youtube_profile" / "cookies.json")
                 cookie_candidates.append(Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "instagram_profile" / "cookies.json")
 
             for ck_file in cookie_candidates:
@@ -195,9 +239,10 @@ class BrowserEngine:
                                     cookie_entry = {
                                         "name": c["name"],
                                         "value": c["value"],
-                                        "domain": c.get("domain", ".instagram.com"),
                                         "path": c.get("path", "/")
                                     }
+                                    if "domain" in c and c["domain"]:
+                                        cookie_entry["domain"] = c["domain"]
                                     if "secure" in c: cookie_entry["secure"] = c["secure"]
                                     if "httpOnly" in c: cookie_entry["httpOnly"] = c["httpOnly"]
                                     s_site = c.get("sameSite")
@@ -297,6 +342,9 @@ class BrowserEngine:
                 elif platform == "tiktok":
                     if "sessionid" in cookie_map:
                         detected_handle = "@tiktok_creator"
+                elif platform == "youtube":
+                    if any(k in cookie_map for k in ["LOGIN_INFO", "SAPISID", "SID", "SSID", "__Secure-3PAPISID"]):
+                        detected_handle = f"@{account_id} (YouTube Studio)"
 
                 # Write status.json
                 st_data = {
