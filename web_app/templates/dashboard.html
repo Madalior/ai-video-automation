@@ -254,6 +254,83 @@
       </div>
     </div>
 
+    <!-- STEP 3: PLATFORM AUTHENTICATION & CHANNEL LOGINS -->
+    <div style="margin-bottom: 24px;">
+      <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--color-brand-black); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+        <span style="background: var(--color-brand-black); color: var(--color-brand-accent); padding: 2px 6px; border-radius: var(--radius-xs);">[STEP 03]</span>
+        <span>// PLATFORM AUTHENTICATION & CHANNEL LOGINS</span>
+      </div>
+      <p style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-bottom: 14px; line-height: 1.4;">
+        CONNECT SOCIAL PLATFORMS FOR THIS NODE. LOGINS USE OFFICIAL GOOGLE OAUTH (YOUTUBE) AND ISOLATED CHROMIUM INSTANCES (INSTAGRAM, TIKTOK, FACEBOOK) SAVED ON DISK.
+      </p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+        <!-- YouTube -->
+        <div style="background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 4px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span class="channel-badge badge-yt">▶ YouTube</span>
+              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">Google OAuth</span>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-bottom: 12px;">
+              Direct Shorts publishing via official channel token.
+            </div>
+          </div>
+          <button type="button" class="btn-action-connect" onclick="triggerConnectFromWizard('youtube')" style="width: 100%; padding: 7px 10px; font-size: 0.75rem; text-align: center;">
+            🔗 Connect YouTube
+          </button>
+        </div>
+
+        <!-- Instagram -->
+        <div style="background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 4px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span class="channel-badge badge-ig">📸 Instagram</span>
+              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">Chrome Profile</span>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-bottom: 12px;">
+              Reels upload with persistent anti-ban session.
+            </div>
+          </div>
+          <button type="button" class="btn-action-connect" onclick="triggerConnectFromWizard('instagram')" style="width: 100%; padding: 7px 10px; font-size: 0.75rem; text-align: center;">
+            🔗 Connect Instagram
+          </button>
+        </div>
+
+        <!-- TikTok -->
+        <div style="background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 4px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span class="channel-badge badge-tt">🎵 TikTok</span>
+              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">Session Cookies</span>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-bottom: 12px;">
+              Automated high-virality sound tagging & upload.
+            </div>
+          </div>
+          <button type="button" class="btn-action-connect" onclick="triggerConnectFromWizard('tiktok')" style="width: 100%; padding: 7px 10px; font-size: 0.75rem; text-align: center;">
+            🔗 Connect TikTok
+          </button>
+        </div>
+
+        <!-- Facebook -->
+        <div style="background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 4px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span class="channel-badge badge-fb">🌐 Facebook</span>
+              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">Page Session</span>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-bottom: 12px;">
+              Facebook Reels page distribution.
+            </div>
+          </div>
+          <button type="button" class="btn-action-connect" onclick="triggerConnectFromWizard('facebook')" style="width: 100%; padding: 7px 10px; font-size: 0.75rem; text-align: center;">
+            🔗 Connect Facebook
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- SUBMIT -->
     <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--color-border); padding-top: 18px;">
       <button type="button" class="btn-secondary" onclick="toggleConnectGmailWizard()">CANCEL</button>
@@ -278,145 +355,102 @@
   </div>
 
   {% if personas %}
-    <div class="persona-grid">
+    <div class="persona-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px;">
       {% for persona in personas %}
       {% set p_status = fleet_platform_status.get(persona.id, {}) %}
-      <div class="persona-card fleet-card" data-content-type="{{ persona.content_type or 'whop_content' }}" id="persona-card-{{ persona.id }}">
-        <div class="persona-header">
-          <div class="persona-title-group">
-            <div class="persona-avatar">🚀</div>
-            <div>
-              <div class="persona-username">{{ persona.username }}</div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
-                {% if persona.gmail %}
-                  <span class="badge-gmail" title="Linked Gmail Address">📧 {{ persona.gmail }}</span>
-                {% endif %}
-                {% if persona.content_type == 'whop_content' %}
-                  <span class="badge-whop-type">🏆 Whop Content</span>
-                {% elif persona.content_type == 'upload_based' %}
-                  <span class="badge-upload-type">📤 Upload Video</span>
-                {% elif persona.content_type == 'follow_influencer' %}
-                  <span class="badge-upload-type" style="background: rgba(0, 136, 204, 0.12); color: #0088cc; border: 1px solid rgba(0, 136, 204, 0.4);">🎙️ Influencer Monitor</span>
-                {% elif persona.content_type == 'follow_telegram' %}
-                  <span class="badge-upload-type" style="background: rgba(255, 170, 0, 0.12); color: #d97706; border: 1px solid rgba(255, 170, 0, 0.4);">🏴‍☠️ Telegram Anime</span>
+      <div class="persona-card fleet-card" data-content-type="{{ persona.content_type or 'whop_content' }}" id="persona-card-{{ persona.id }}" style="border: 2px solid var(--color-brand-black); background: #FFFFFF; padding: 18px; border-radius: 4px; box-shadow: 3px 3px 0px rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <!-- Persona Header -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; border-bottom: 1px solid var(--color-border); padding-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="persona-avatar" style="width: 38px; height: 38px; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; background: #111; color: #4CE616; border-radius: 4px;">🚀</div>
+              <div>
+                <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.95rem; color: var(--color-brand-black);">{{ persona.username }}</div>
+                <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-top: 2px;">
+                  {{ persona.name or "Creator Node" }}
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button onclick="syncExistingSessions('{{ persona.id }}')" style="background: rgba(17,17,17,0.06); border: 1px solid var(--color-border-strong); color: var(--color-brand-black); cursor: pointer; font-size: 0.68rem; font-family: var(--font-mono); padding: 4px 8px; border-radius: var(--radius-xs); font-weight: 700;" title="Auto-detect and sync saved sessions from disk">
+                🔄 SYNC
+              </button>
+              <button onclick="deleteAccountPersona('{{ persona.id }}')" style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1rem; padding: 2px 4px;" title="Remove node from fleet">
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          <!-- Node Metadata Pills -->
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;">
+            {% if persona.gmail %}
+              <span class="badge-gmail" title="Linked Gmail Address">📧 {{ persona.gmail }}</span>
+            {% endif %}
+            {% if persona.content_type == 'whop_content' %}
+              <span class="badge-whop-type">🏆 Whop Content</span>
+            {% elif persona.content_type == 'upload_based' %}
+              <span class="badge-upload-type">📤 Upload Video</span>
+            {% elif persona.content_type == 'follow_influencer' %}
+              <span class="badge-upload-type" style="background: rgba(0, 136, 204, 0.12); color: #0088cc; border: 1px solid rgba(0, 136, 204, 0.4);">🎙️ Influencer Monitor</span>
+            {% elif persona.content_type == 'follow_telegram' %}
+              <span class="badge-upload-type" style="background: rgba(255, 170, 0, 0.12); color: #d97706; border: 1px solid rgba(255, 170, 0, 0.4);">🏴‍☠️ Telegram Anime</span>
+            {% else %}
+              <span class="badge-upload-type">🎬 {{ persona.content_type }}</span>
+            {% endif %}
+          </div>
+
+          <!-- Platform Status Strip (Compact Indicator Pills) -->
+          <div style="background: #FAF9F6; border: 1px solid var(--color-border); border-radius: 4px; padding: 10px 12px; margin-bottom: 14px;">
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted); font-weight: 700; margin-bottom: 8px; display: flex; justify-content: space-between;">
+              <span>PLATFORM STATUS:</span>
+              <span>DIR: {{ persona.id }}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; background: #fff; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 3px;">
+                <span>▶ YT:</span>
+                {% if p_status.get('youtube', {}).get('connected') %}
+                  <span style="color: #2e7d32; font-weight: 700;">🟢 LIVE</span>
                 {% else %}
-                  <span class="badge-upload-type">🎬 {{ persona.content_type }}</span>
+                  <span style="color: var(--color-muted);">⚪ OFFLINE</span>
+                {% endif %}
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; background: #fff; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 3px;">
+                <span>📸 IG:</span>
+                {% if p_status.get('instagram', {}).get('connected') %}
+                  <span style="color: #2e7d32; font-weight: 700;">🟢 LIVE</span>
+                {% else %}
+                  <span style="color: var(--color-muted);">⚪ OFFLINE</span>
+                {% endif %}
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; background: #fff; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 3px;">
+                <span>🎵 TT:</span>
+                {% if p_status.get('tiktok', {}).get('connected') %}
+                  <span style="color: #2e7d32; font-weight: 700;">🟢 LIVE</span>
+                {% else %}
+                  <span style="color: var(--color-muted);">⚪ OFFLINE</span>
+                {% endif %}
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; background: #fff; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 3px;">
+                <span>🌐 FB:</span>
+                {% if p_status.get('facebook', {}).get('connected') %}
+                  <span style="color: #2e7d32; font-weight: 700;">🟢 LIVE</span>
+                {% else %}
+                  <span style="color: var(--color-muted);">⚪ OFFLINE</span>
                 {% endif %}
               </div>
             </div>
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <button onclick="syncExistingSessions('{{ persona.id }}')" style="background: rgba(17,17,17,0.06); border: 1px solid var(--color-border-strong); color: var(--color-brand-black); cursor: pointer; font-size: 0.68rem; font-family: var(--font-mono); padding: 3px 8px; border-radius: var(--radius-xs); font-weight: 700;" title="Auto-detect and sync saved sessions from disk">
-              🔄 SYNC SESSIONS
-            </button>
-            <button onclick="deleteAccountPersona('{{ persona.id }}')" style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.9rem;" title="Remove account from fleet">
-              🗑️
-            </button>
           </div>
         </div>
 
-        <!-- Channel List (YT, IG, FB, TikTok) with Real Actions -->
-        <div class="channel-list">
-          <!-- YouTube -->
-          <div class="channel-row" id="row-{{ persona.id }}-youtube">
-            <div class="channel-info">
-              <span class="channel-badge badge-yt">▶ YouTube</span>
-              <span class="channel-handle" id="handle-{{ persona.id }}-youtube">
-                {% if p_status.get('youtube', {}).get('connected') %}
-                  {{ p_status.get('youtube', {}).get('channel_title') or persona.youtube_handle or "Connected Channel" }}
-                {% else %}
-                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
-                {% endif %}
-              </span>
-            </div>
-            <div class="channel-actions" id="actions-{{ persona.id }}-youtube" style="display: flex; align-items: center; gap: 6px;">
-              {% if p_status.get('youtube', {}).get('connected') %}
-                <span class="badge-connected" title="OAuth Verified on Disk">✅ Connected</span>
-                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'youtube')" title="Verify live API">⚡ Test</button>
-                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'youtube')" title="Disconnect token">✕</button>
-              {% else %}
-                <span class="badge-disconnected">⚠️ Not Connected</span>
-                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'youtube', '{{ persona.username }}')" title="Sign in with Google OAuth">🔗 Connect</button>
-              {% endif %}
-            </div>
+        <!-- Node Actions & Footer -->
+        <div>
+          <button type="button" class="btn-primary" onclick="openNodeManageModal('{{ persona.id }}', '{{ persona.username }}')" style="width: 100%; padding: 9px 14px; font-size: 0.75rem; text-align: center; margin-bottom: 8px;">
+            🔗 CONNECT / MANAGE PLATFORMS
+          </button>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted); border-top: 1px solid var(--color-border); padding-top: 6px;">
+            <span>Brand: {{ persona.name or persona.username }}</span>
+            <span>Clips: {{ persona.clips|length }}</span>
           </div>
-
-          <!-- Instagram -->
-          <div class="channel-row" id="row-{{ persona.id }}-instagram">
-            <div class="channel-info">
-              <span class="channel-badge badge-ig">📸 Instagram</span>
-              <span class="channel-handle" id="handle-{{ persona.id }}-instagram">
-                {% if p_status.get('instagram', {}).get('connected') %}
-                  {{ p_status.get('instagram', {}).get('handle') or persona.instagram_handle or "Connected Profile" }}
-                {% else %}
-                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
-                {% endif %}
-              </span>
-            </div>
-            <div class="channel-actions" id="actions-{{ persona.id }}-instagram" style="display: flex; align-items: center; gap: 6px;">
-              {% if p_status.get('instagram', {}).get('connected') %}
-                <span class="badge-connected" title="Cookies Saved in Profile">✅ Connected</span>
-                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'instagram')" title="Verify session">⚡ Test</button>
-                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'instagram')" title="Disconnect session">✕</button>
-              {% else %}
-                <span class="badge-disconnected">⚠️ Not Connected</span>
-                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'instagram', '{{ persona.username }}')" title="Launch Chrome to login">🔗 Connect</button>
-              {% endif %}
-            </div>
-          </div>
-
-          <!-- Facebook -->
-          <div class="channel-row" id="row-{{ persona.id }}-facebook">
-            <div class="channel-info">
-              <span class="channel-badge badge-fb">🌐 Facebook</span>
-              <span class="channel-handle" id="handle-{{ persona.id }}-facebook">
-                {% if p_status.get('facebook', {}).get('connected') %}
-                  {{ p_status.get('facebook', {}).get('handle') or persona.facebook_handle or "Connected Profile" }}
-                {% else %}
-                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
-                {% endif %}
-              </span>
-            </div>
-            <div class="channel-actions" id="actions-{{ persona.id }}-facebook" style="display: flex; align-items: center; gap: 6px;">
-              {% if p_status.get('facebook', {}).get('connected') %}
-                <span class="badge-connected" title="Cookies Saved in Profile">✅ Connected</span>
-                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'facebook')" title="Verify session">⚡ Test</button>
-                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'facebook')" title="Disconnect session">✕</button>
-              {% else %}
-                <span class="badge-disconnected">⚠️ Not Connected</span>
-                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'facebook', '{{ persona.username }}')" title="Launch Chrome to login">🔗 Connect</button>
-              {% endif %}
-            </div>
-          </div>
-
-          <!-- TikTok -->
-          <div class="channel-row" id="row-{{ persona.id }}-tiktok">
-            <div class="channel-info">
-              <span class="channel-badge badge-tt">🎵 TikTok</span>
-              <span class="channel-handle" id="handle-{{ persona.id }}-tiktok">
-                {% if p_status.get('tiktok', {}).get('connected') %}
-                  {{ p_status.get('tiktok', {}).get('handle') or persona.tiktok_handle or "Connected Profile" }}
-                {% else %}
-                  <span style="color: var(--text-dim); font-style: italic;">Not Connected</span>
-                {% endif %}
-              </span>
-            </div>
-            <div class="channel-actions" id="actions-{{ persona.id }}-tiktok" style="display: flex; align-items: center; gap: 6px;">
-              {% if p_status.get('tiktok', {}).get('connected') %}
-                <span class="badge-connected" title="Cookies Saved in Profile">✅ Connected</span>
-                <button class="btn-action-test" onclick="testPlatform('{{ persona.id }}', 'tiktok')" title="Verify session">⚡ Test</button>
-                <button class="btn-action-disconnect" onclick="disconnectPlatform('{{ persona.id }}', 'tiktok')" title="Disconnect session">✕</button>
-              {% else %}
-                <span class="badge-disconnected">⚠️ Not Connected</span>
-                <button class="btn-action-connect" onclick="openConnectModal('{{ persona.id }}', 'tiktok', '{{ persona.username }}')" title="Launch Chrome to login">🔗 Connect</button>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
-        <!-- Card Footer -->
-        <div class="persona-footer">
-          <span>Brand: <strong>{{ persona.name or persona.username }}</strong></span>
-          <span>Clips: <strong>{{ persona.clips|length }}</strong></span>
         </div>
       </div>
       {% endfor %}
@@ -2047,6 +2081,78 @@ async function triggerAllEnginesNow() {
 
   alert(`🚀 All 4 Going Merry engines triggered! Fleet execution is running across all isolated browser nodes.`);
 }
+
+// ─── NODE PLATFORMS MODAL & WIZARD CONTROLLER ──────────────────────────
+let currentManagingAccId = null;
+let currentManagingUsername = null;
+
+function openNodeManageModal(accId, username) {
+  currentManagingAccId = accId;
+  currentManagingUsername = username;
+  const titleEl = document.getElementById("manageNodeTitle");
+  if (titleEl) titleEl.innerText = `Manage Platforms: ${username}`;
+  const modal = document.getElementById("manageNodeModal");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeNodeManageModal() {
+  const modal = document.getElementById("manageNodeModal");
+  if (modal) modal.style.display = "none";
+  currentManagingAccId = null;
+  currentManagingUsername = null;
+}
+
+function connectPlatformFromNodeModal(platform) {
+  if (!currentManagingAccId) return;
+  const accId = currentManagingAccId;
+  const username = currentManagingUsername;
+  closeNodeManageModal();
+  openConnectModal(accId, platform, username);
+}
+
+function testPlatformFromNodeModal(platform) {
+  if (!currentManagingAccId) return;
+  testPlatform(currentManagingAccId, platform);
+}
+
+function disconnectPlatformFromNodeModal(platform) {
+  if (!currentManagingAccId) return;
+  disconnectPlatform(currentManagingAccId, platform);
+}
+
+async function triggerConnectFromWizard(platform) {
+  const gmailVal = (document.getElementById("wizGmail")?.value || "").trim();
+  if (!gmailVal) {
+    alert("Please enter your Gmail Address in [STEP 01] first!");
+    document.getElementById("wizGmail")?.focus();
+    return;
+  }
+  const nameVal = (document.getElementById("wizName")?.value || "").trim();
+  const usernameVal = nameVal ? `@${nameVal.replace(/\s+/g, '')}` : `@${gmailVal.split('@')[0]}`;
+
+  const payload = {
+    gmail: gmailVal,
+    username: usernameVal,
+    name: nameVal || gmailVal.split('@')[0],
+    content_type: selectedContentType
+  };
+
+  try {
+    const res = await fetch("/api/accounts/new", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success && data.persona && data.persona.id) {
+      openConnectModal(data.persona.id, platform, data.persona.username);
+    } else {
+      alert("Notice: " + (data.message || "Failed to initialize node"));
+    }
+  } catch (err) {
+    alert("Error initializing node: " + err);
+  }
+}
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════
@@ -2102,6 +2208,96 @@ async function triggerAllEnginesNow() {
       <button type="button" class="btn-secondary" onclick="cancelCurrentLogin()" style="flex: 1; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 2px;">CANCEL</button>
       <button type="button" id="btnConfirmLogin" class="btn-primary" onclick="confirmCurrentLogin()" style="flex: 2; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 2px;">
         ✅ I HAVE FINISHED LOGGING IN
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     NODE PLATFORMS MANAGEMENT MODAL
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="manageNodeModal" class="modal-backdrop" style="display: none;">
+  <div class="modal-box" style="background: var(--color-brand-black); border: 2px solid var(--color-brand-accent); box-shadow: 0 10px 40px rgba(0,0,0,0.9); border-radius: 4px; padding: 24px; max-width: 520px; width: 90%;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.5rem;">🔗</span>
+        <div>
+          <h3 id="manageNodeTitle" style="font-family: var(--font-wordmark); font-size: 1.05rem; font-weight: 400; color: #FFFFFF; margin: 0; letter-spacing: 0.05em; text-transform: uppercase;">Manage Node Platforms</h3>
+          <p style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-top: 2px;">Real Browser & OAuth Sessions</p>
+        </div>
+      </div>
+      <button onclick="closeNodeManageModal()" style="background: none; border: none; color: var(--color-muted); font-size: 1.4rem; cursor: pointer; line-height: 1;">✕</button>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+      <!-- YouTube -->
+      <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="channel-badge badge-yt">▶ YouTube</span>
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #fff; font-weight: 700;">Google OAuth 2.0</div>
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">Shorts Upload API Token</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-action-connect" onclick="connectPlatformFromNodeModal('youtube')">🔗 Connect</button>
+          <button type="button" class="btn-action-test" onclick="testPlatformFromNodeModal('youtube')">⚡ Test</button>
+          <button type="button" class="btn-action-disconnect" onclick="disconnectPlatformFromNodeModal('youtube')">✕</button>
+        </div>
+      </div>
+
+      <!-- Instagram -->
+      <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="channel-badge badge-ig">📸 Instagram</span>
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #fff; font-weight: 700;">Dedicated Chrome</div>
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">Reels Cookie Storage</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-action-connect" onclick="connectPlatformFromNodeModal('instagram')">🔗 Connect</button>
+          <button type="button" class="btn-action-test" onclick="testPlatformFromNodeModal('instagram')">⚡ Test</button>
+          <button type="button" class="btn-action-disconnect" onclick="disconnectPlatformFromNodeModal('instagram')">✕</button>
+        </div>
+      </div>
+
+      <!-- TikTok -->
+      <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="channel-badge badge-tt">🎵 TikTok</span>
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #fff; font-weight: 700;">Isolated Session</div>
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">TikTok Sound & Video</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-action-connect" onclick="connectPlatformFromNodeModal('tiktok')">🔗 Connect</button>
+          <button type="button" class="btn-action-test" onclick="testPlatformFromNodeModal('tiktok')">⚡ Test</button>
+          <button type="button" class="btn-action-disconnect" onclick="disconnectPlatformFromNodeModal('tiktok')">✕</button>
+        </div>
+      </div>
+
+      <!-- Facebook -->
+      <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="channel-badge badge-fb">🌐 Facebook</span>
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #fff; font-weight: 700;">Page Reels Session</div>
+            <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">Browser Page Auth</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-action-connect" onclick="connectPlatformFromNodeModal('facebook')">🔗 Connect</button>
+          <button type="button" class="btn-action-test" onclick="testPlatformFromNodeModal('facebook')">⚡ Test</button>
+          <button type="button" class="btn-action-disconnect" onclick="disconnectPlatformFromNodeModal('facebook')">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="button" class="btn-secondary" onclick="closeNodeManageModal()" style="padding: 8px 18px; font-family: var(--font-mono); font-size: 0.78rem;">
+        CLOSE
       </button>
     </div>
   </div>
