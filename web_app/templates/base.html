@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}TECHTRONICS™ — THE NEW TECH VIBES | 30+ Fleet Command{% endblock %}</title>
+  <title>{% block title %}GOING MERRY™ — AUTONOMOUS FLEET COMMAND{% endblock %}</title>
   
   <!-- Typography Stack: Michroma, Space Grotesk, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Michroma&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- TECHTRONICS Design System -->
+  <!-- TECHTRONICS / GOING MERRY Design System -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -18,11 +18,11 @@
   <!-- Top Telemetry Header Strip -->
   <div class="system-ticker-bar">
     <div class="system-ticker-left">
-      <span>// OBJECT REF: TECHTRONICS-CORE-01</span>
+      <span>// VESSEL REF: GOING-MERRY-FLAGSHIP-01</span>
       <span>•</span>
-      <span>EST. 2024 | INDIA</span>
+      <span>EST. 2024 | PIRATE FLEET</span>
       <span>•</span>
-      <span>TECHNOLOGY MEETS EVERYDAY LIFE</span>
+      <span>AUTONOMOUS AI PIRATE REEL ENGINE</span>
     </div>
     <div class="system-ticker-right">
       <span class="led-pulse"></span>
@@ -33,26 +33,28 @@
   <!-- Industrial Tech Navigation Bar -->
   <nav class="navbar">
     <a href="{{ url_for('dash.dashboard') }}" class="nav-brand-lockup">
-      <!-- Slanted Dual-T Precision Monogram SVG Glyph -->
-      <svg width="40" height="32" viewBox="0 0 48 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block;">
-        <g transform="skewX(-18) translate(10, 0)">
-          <!-- Top Crossbar with acute aerodynamic wing tip -->
-          <path d="M0 6 L9 2 L32 2 L32 8 L4 8 Z" fill="#111111" />
-          <!-- Left Stem (Primary Stem, cuts off midway) -->
-          <path d="M8 8 L14 8 L14 20 L8 20 Z" fill="#111111" />
-          <!-- Signature Electric Lime Accent: Sheared parallelogram flush on baseline -->
-          <path d="M8 25 L14 25 L14 36 L8 36 Z" fill="#4CE616" />
-          <!-- Right Stem: Floating blade extending full height to baseline -->
-          <path d="M19 8 L25 8 L25 36 L19 36 Z" fill="#111111" />
-        </g>
+      <!-- Going Merry Pirate Flagship Monogram SVG Glyph -->
+      <svg width="42" height="34" viewBox="0 0 48 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block;">
+        <!-- Ship Hull with curved prow -->
+        <path d="M4 28 C12 36, 32 36, 44 26 L40 32 C30 38, 12 38, 2 31 Z" fill="#111111" />
+        <!-- Main Mast -->
+        <path d="M22 6 L25 6 L24 28 L21 28 Z" fill="#111111" />
+        <!-- Main Sail -->
+        <path d="M25 8 C35 10, 36 20, 24 22 C30 18, 30 12, 25 8 Z" fill="#111111" />
+        <!-- Fore Sail with Electric Lime Accent -->
+        <path d="M14 10 C21 12, 21 22, 12 24 C17 20, 17 14, 14 10 Z" fill="#4CE616" />
+        <!-- Top Pirate Pennant Flag -->
+        <path d="M25 6 L33 9 L25 12 Z" fill="#4CE616" />
+        <!-- Ram Figurehead accent dot -->
+        <circle cx="6" cy="27" r="2.5" fill="#4CE616" />
       </svg>
 
       <div class="nav-brand-text">
         <div class="brand-wordmark">
-          TECHTRONICS<span class="brand-tm">TM</span>
+          GOING MERRY<span class="brand-tm" style="color: #4CE616;">⚓</span>
         </div>
         <div class="brand-tagline">
-          THE NEW TECH VIBES <span class="brand-tagline-dash"></span> [ 0 ]
+          THE PIRATE AI FLEET <span class="brand-tagline-dash"></span> [ 0 ]
         </div>
       </div>
     </a>
@@ -94,9 +96,9 @@
   <!-- Industrial Metadata Footer -->
   <footer class="brand-footer">
     <div>
-      <strong>TECHTRONICS™</strong> • THE NEW TECH VIBES • EST. 2024 | INDIA
+      <strong>GOING MERRY™</strong> • THE PIRATE AI FLEET • EST. 2024
       <div style="font-size: 0.68rem; margin-top: 3px; color: var(--color-muted);">
-        TECHNOLOGY MEETS EVERYDAY LIFE // HIGH-PRECISION AUTONOMOUS TELEMETRY
+        AUTONOMOUS VIRAL PIRATE REEL ENGINE // HIGH-PRECISION MEDIA TELEMETRY
       </div>
     </div>
     <div class="brand-footer-specs">
