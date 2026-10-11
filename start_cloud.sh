@@ -52,10 +52,26 @@ fi
 websockify --web="$NOVNC_DIR" 6080 127.0.0.1:5900 &
 sleep 1
 
+# 5b. Start Nginx reverse proxy (Routes /vnc/, /websockify, and proxies web app to 5001)
+echo "🔀 Configuring and starting Nginx reverse proxy on port 5000..."
+if ! command -v nginx >/dev/null 2>&1; then
+    apt-get update -qq && apt-get install -y -qq --no-install-recommends nginx
+fi
+
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+if [ -f "/app/deploy/nginx_cloud.conf" ]; then
+    cp /app/deploy/nginx_cloud.conf /etc/nginx/sites-available/default
+    rm -f /etc/nginx/sites-enabled/default
+    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+fi
+
+nginx -t || true
+service nginx restart 2>/dev/null || nginx 2>/dev/null || true
+
 echo "========================================================"
-echo "  ✅ VIRTUAL DISPLAY READY FOR MOBILE BROWSER SESSIONS"
-echo "  noVNC Stream available at: http://localhost:6080/vnc.html"
-echo "  Flask Dashboard starting on: http://0.0.0.0:5000"
+echo "  ✅ VIRTUAL DISPLAY & REVERSE PROXY READY"
+echo "  noVNC Stream available at: /vnc/vnc.html"
+echo "  Flask Dashboard proxied on: http://0.0.0.0:5000 -> 127.0.0.1:5001"
 echo "========================================================"
 
 # 6. Initialize database tables if needed
@@ -72,10 +88,10 @@ echo "👷 Starting Background Queue Worker Daemon (worker.py)..."
 mkdir -p /app/instance
 python -u /app/worker.py > /app/instance/worker.log 2>&1 &
 
-# 7. Start the Web Dashboard
+# 7. Start the Web Dashboard on 127.0.0.1:5001 (proxied by Nginx on port 5000)
 if command -v gunicorn >/dev/null 2>&1; then
-    exec gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 8 --timeout 120 "web_app.app:create_app()"
+    exec gunicorn --bind 127.0.0.1:5001 --workers 1 --threads 8 --timeout 120 "web_app.app:create_app()"
 else
-    exec python -c "from web_app.app import app; app.run(host='0.0.0.0', port=5000, threaded=True)"
+    exec python -c "from web_app.app import app; app.run(host='127.0.0.1', port=5001, threaded=True)"
 fi
 

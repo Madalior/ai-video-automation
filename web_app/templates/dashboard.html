@@ -1558,8 +1558,14 @@ async function openConnectModal(accId, platform, username) {
         if (extBtn) extBtn.href = data.vnc_url;
       }
       document.getElementById("modalStatusMessage").innerText = `Cloud browser live! Log into ${meta.name} inside the window below:`;
-      document.getElementById("modalStatusHint").innerText = "Touch/click the browser screen below to enter your credentials or tap 'Sign in with Google'.";
+      document.getElementById("modalStatusHint").innerText = "Touch/click the browser screen below to enter your credentials or tap 'OPEN CLOUD BROWSER IN NEW WINDOW ↗'.";
       document.getElementById("modalSpinner").innerText = "📱";
+
+      try {
+        window.open(data.vnc_url, '_blank');
+      } catch (popupErr) {
+        console.warn("Auto-popup blocked, button is visible:", popupErr);
+      }
     } else {
       document.getElementById("modalVncContainer").style.display = "none";
       document.getElementById("modalAuthActionContainer").style.display = "none";
@@ -1671,6 +1677,34 @@ function openVncFullscreen() {
   const iframe = document.getElementById("modalVncIframe");
   if (iframe && iframe.src) {
     window.open(iframe.src, '_blank');
+  }
+}
+
+function switchVncPort() {
+  const iframe = document.getElementById("modalVncIframe");
+  if (!iframe || !iframe.src) return;
+  let curr = iframe.src;
+  if (curr.includes("/vnc/")) {
+    iframe.src = `http://${window.location.hostname}:8080/vnc.html?autoconnect=true&resize=scale`;
+  } else if (curr.includes(":8080")) {
+    iframe.src = `http://${window.location.hostname}:6080/vnc.html?autoconnect=true&resize=scale`;
+  } else {
+    iframe.src = `${window.location.origin}/vnc/vnc.html?autoconnect=true&resize=scale&path=websockify`;
+  }
+  const extBtn = document.getElementById("btnVncExternalTab");
+  if (extBtn) extBtn.href = iframe.src;
+  const fsBtn = document.getElementById("btnVncFullscreen");
+  if (fsBtn) fsBtn.href = iframe.src;
+}
+
+async function launchLocalDesktopBrowser() {
+  if (!activeAccId || !activePlatform) return;
+  try {
+    const res = await fetch(`/api/accounts/${activeAccId}/connect/${activePlatform}?method=browser`, { method: "POST" });
+    const data = await res.json();
+    alert(data.message || "Browser session dispatched.");
+  } catch (e) {
+    alert("Error launching browser: " + e);
   }
 }
 
@@ -2197,9 +2231,15 @@ async function triggerConnectFromWizard(platform) {
 <!-- ═══════════════════════════════════════════════════════════════
      REAL-TIME PLATFORM CONNECTION MODAL DIALOG
      ═══════════════════════════════════════════════════════════════ -->
-<div id="connectPlatformModal" class="modal-backdrop" style="display: none;">
-  <div class="modal-box" style="background: var(--color-brand-black); border: 2px solid var(--color-brand-accent); box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 30px rgba(76,230,22,0.2); border-radius: 4px; padding: 24px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+<div id="connectPlatformModal" class="modal-backdrop" onclick="if(event.target === this) cancelCurrentLogin();" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; z-index: 99999; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); padding: 16px; overflow-y: auto;">
+  <div class="modal-box" style="background: var(--color-brand-black); border: 2px solid var(--color-brand-accent); box-shadow: 0 10px 50px rgba(0,0,0,0.95), 0 0 35px rgba(76,230,22,0.25); border-radius: 6px; padding: 22px; max-width: 680px; width: 100%; max-height: 92vh; overflow-y: auto; position: relative; margin: auto;">
+    
+    <!-- FIXED HIGH-VISIBILITY CLOSE BUTTON (ALWAYS VISIBLE) -->
+    <button type="button" onclick="cancelCurrentLogin()" style="position: absolute; top: 12px; right: 12px; z-index: 999; background: #e50914; color: #ffffff; border: 1px solid #ff4444; border-radius: 4px; padding: 6px 16px; font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 15px rgba(229,9,20,0.6); transition: all 0.2s;" onmouseover="this.style.background='#ff1f1f'" onmouseout="this.style.background='#e50914'">
+      ✕ CLOSE
+    </button>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; padding-right: 90px;">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span id="modalPlatformIcon" style="font-size: 1.6rem;">🌐</span>
         <div>
@@ -2207,11 +2247,10 @@ async function triggerConnectFromWizard(platform) {
           <p id="modalSubtitle" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-top: 2px;">Account: @User</p>
         </div>
       </div>
-      <button onclick="cancelCurrentLogin()" style="background: none; border: none; color: var(--color-muted); font-size: 1.4rem; cursor: pointer; line-height: 1;">✕</button>
     </div>
 
     <!-- Status Box -->
-    <div id="modalStatusBox" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 20px; text-align: center; margin-bottom: 16px;">
+    <div id="modalStatusBox" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 18px; text-align: center; margin-bottom: 16px;">
       <div id="modalSpinner" style="font-size: 2.2rem; margin-bottom: 10px;">🌐</div>
       <div id="modalStatusMessage" style="font-family: var(--font-mono); font-size: 0.88rem; font-weight: 700; color: #FFFFFF; line-height: 1.4;">
         Initializing connection...
@@ -2221,21 +2260,34 @@ async function triggerConnectFromWizard(platform) {
       </div>
     </div>
 
-    <!-- Cloud noVNC In-Dashboard Live Browser Stream (For Mobile Phone Access) -->
+    <!-- Cloud noVNC In-Dashboard Live Browser Stream -->
     <div id="modalVncContainer" style="display: none; margin-bottom: 16px; border-radius: 4px; overflow: hidden; border: 1px solid var(--color-brand-accent);">
-      <div style="background: rgba(0,0,0,0.7); padding: 8px 12px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-brand-accent); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+      <div style="background: rgba(0,0,0,0.7); padding: 8px 12px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-brand-accent); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap; gap: 8px;">
         <span>📱 CLOUD BROWSER (TOUCH INTERACTIVE)</span>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <a id="btnVncFullscreen" href="#" onclick="openVncFullscreen(); return false;" style="background: rgba(76,230,22,0.15); border: 1px solid var(--color-brand-accent); color: var(--color-brand-accent); border-radius: 2px; padding: 2px 8px; cursor: pointer; font-size: 0.68rem; text-decoration: none;">⛶ FULLSCREEN TAB</a>
-          <button type="button" onclick="refreshVncFrame()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 2px; padding: 2px 8px; cursor: pointer; font-size: 0.68rem;">🔄 RELOAD</button>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <a id="btnVncFullscreen" href="#" onclick="openVncFullscreen(); return false;" style="background: rgba(76,230,22,0.15); border: 1px solid var(--color-brand-accent); color: var(--color-brand-accent); border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem; text-decoration: none;">⛶ FULLSCREEN</a>
+          <button type="button" onclick="refreshVncFrame()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem;">🔄 RELOAD</button>
+          <button type="button" onclick="switchVncPort()" id="btnSwitchPort" style="background: rgba(245,158,11,0.15); border: 1px solid #f59e0b; color: #f59e0b; border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem;">⚡ PORT 6080/8080</button>
+          <button type="button" onclick="cancelCurrentLogin()" style="background: #e50914; border: 1px solid #ff4444; color: #fff; border-radius: 2px; padding: 3px 10px; cursor: pointer; font-size: 0.68rem; font-weight: bold;">✕ CLOSE</button>
         </div>
       </div>
-      <div style="background: #111; padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
-        <a id="btnVncExternalTab" href="#" target="_blank" class="nav-btn-primary" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; text-decoration: none; padding: 8px 16px;">
+      
+      <div style="background: #111; padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+        <a id="btnVncExternalTab" href="#" target="_blank" class="nav-btn-primary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; text-decoration: none; padding: 6px 14px;">
           <span>🌐</span> <span>OPEN CLOUD BROWSER IN NEW WINDOW ↗</span>
         </a>
+        <button type="button" onclick="launchLocalDesktopBrowser()" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 6px 14px; border-radius: 2px; background: rgba(59,130,246,0.15); border: 1px solid #3b82f6; color: #93c5fd; cursor: pointer; font-family: var(--font-mono);">
+          <span>💻</span> <span>OPEN DIRECT CHROME ON PC</span>
+        </button>
       </div>
-      <iframe id="modalVncIframe" src="" style="width: 100%; height: 480px; border: none; background: #000; display: block;" allow="fullscreen *; clipboard-read; clipboard-write" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>
+
+      <div style="position: relative; width: 100%; height: 420px; background: #000;">
+        <iframe id="modalVncIframe" src="" style="width: 100%; height: 100%; border: none; background: #000; display: block;" allow="fullscreen *; clipboard-read; clipboard-write" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>
+      </div>
+      
+      <div style="background: rgba(0,0,0,0.8); padding: 8px 12px; font-family: var(--font-mono); font-size: 0.70rem; color: #9ca3af; text-align: center;">
+        💡 <em>If the screen above is black, click <strong>"OPEN CLOUD BROWSER IN NEW WINDOW ↗"</strong> or <strong>"PORT 6080/8080"</strong>, or log in via <strong>"OPEN DIRECT CHROME ON PC"</strong>.</em>
+      </div>
     </div>
 
     <!-- Direct Action Button Container (For Google OAuth or Direct Launch) -->
@@ -2248,9 +2300,11 @@ async function triggerConnectFromWizard(platform) {
       </div>
     </div>
 
-    <div style="display: flex; justify-content: space-between; gap: 12px;">
-      <button type="button" class="btn-secondary" onclick="cancelCurrentLogin()" style="flex: 1; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 2px;">CANCEL</button>
-      <button type="button" id="btnConfirmLogin" class="btn-primary" onclick="confirmCurrentLogin()" style="flex: 2; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 2px;">
+    <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px;">
+      <button type="button" class="btn-secondary" onclick="cancelCurrentLogin()" style="flex: 1; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 4px; background: rgba(229,9,20,0.15); border: 1px solid #e50914; color: #ff6b6b; font-weight: bold;">
+        ✕ CLOSE / CANCEL
+      </button>
+      <button type="button" id="btnConfirmLogin" class="btn-primary" onclick="confirmCurrentLogin()" style="flex: 2; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 4px;">
         ✅ I HAVE FINISHED LOGGING IN
       </button>
     </div>

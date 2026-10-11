@@ -33,6 +33,10 @@ app.config.update(
     MAX_CONTENT_LENGTH=500 * 1024 * 1024,  # 500MB upload limit
 )
 
+# ── Reverse Proxy Header Support (Nginx / Cloudflare) ───────────────────────
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 # ── Extensions ───────────────────────────────────────────────────────────────
 db      = SQLAlchemy(app)
 bcrypt  = Bcrypt(app)

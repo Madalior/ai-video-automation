@@ -13,13 +13,14 @@ ENV SCREEN_WIDTH=1280
 ENV SCREEN_HEIGHT=800
 ENV SCREEN_DEPTH=24
 
-# 1. Install Virtual Display (Xvfb), VNC, noVNC, window manager, and media tools
+# 1. Install Virtual Display (Xvfb), VNC, noVNC, window manager, nginx, and media tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     x11vnc \
     novnc \
     websockify \
     fluxbox \
+    nginx \
     ffmpeg \
     curl \
     wget \

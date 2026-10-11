@@ -42,24 +42,37 @@ def connect_platform(acc_id, platform):
 
     persona = AccountPersona.query.filter_by(id=acc_id).first()
     if not persona:
-        return jsonify({"success": False, "message": "Account persona not found"}), 404
+        persona = AccountPersona.query.filter_by(username=acc_id).first()
+    if not persona:
+        uid = current_user.id if hasattr(current_user, 'id') and current_user.is_authenticated else 1
+        persona = AccountPersona(
+            id=acc_id,
+            user_id=uid,
+            username=f"@{acc_id}",
+            name=acc_id
+        )
+        db.session.add(persona)
+        db.session.commit()
 
     platform = platform.lower().strip()
     if platform not in ("youtube", "instagram", "tiktok", "facebook"):
         return jsonify({"success": False, "message": f"Unsupported platform: {platform}"}), 400
 
-    # For YouTube, try OAuth first unless browser method requested
+    # For YouTube, try Google OAuth if configured and not explicitly set to browser mode
     auth_method = request.args.get("method", "oauth").lower()
     if platform == "youtube" and auth_method != "browser":
         result = auth_mgr.start_login(account_id=acc_id, platform=platform)
-        if result.get("success"):
+        if result.get("success") and result.get("auth_url"):
             return jsonify(result)
         # If OAuth failed or client_secrets unavailable, fall through to interactive browser login for YouTube Studio
 
-    # For browser-based platforms (IG/TT/FB/YT Studio fallback), use isolated Chromium instance
+    # For browser-based platforms (Instagram, TikTok, Facebook, or YouTube Studio fallback)
     from clipper.uploader.platform_auth_manager import PROJECT_ROOT, SESSIONS_DIR
     import json as _json
     import time as _time
+
+    # Cancel any previous stale login worker and clean locks
+    auth_mgr.cancel_login(acc_id, platform)
 
     # Prepare profile directories and initial status
     profile_dir = SESSIONS_DIR / acc_id / f"{platform}_profile"
@@ -68,13 +81,21 @@ def connect_platform(acc_id, platform):
     safe_profile = Path(local_app_data) / "GoingMerry" / "profiles" / acc_id / f"{platform}_profile"
     safe_profile.mkdir(parents=True, exist_ok=True)
 
+    for pdir in (profile_dir, safe_profile):
+        for lf in ["lockfile", "SingletonLock", "SingletonSocket", "SingletonCookie", "LOCK"]:
+            for f in pdir.rglob(lf):
+                try:
+                    if f.is_file(): f.unlink()
+                except Exception:
+                    pass
+
     init_status = {
         "status": "in_progress",
         "phase": "launching",
         "connected": False,
         "platform": platform,
         "account_id": acc_id,
-        "message": f"Opening Chrome window for {platform.title()} login..."
+        "message": f"Opening Chromium window for {platform.title()} login..."
     }
     for pdir in (profile_dir, safe_profile):
         try:
@@ -89,13 +110,14 @@ def connect_platform(acc_id, platform):
     import sys
     is_linux_or_cloud = sys.platform != "win32" or bool(os.environ.get("DISPLAY"))
     
-    # Calculate VNC URL for mobile streaming
-    host = request.host.split(":")[0]
-    vnc_url = f"http://{host}:8080/vnc.html?autoconnect=true&resize=scale"
-    vnc_url_alt = f"http://{host}:6080/vnc.html?autoconnect=true&resize=scale"
+    # Calculate VNC URL:
+    # 1. Primary: HTTPS reverse proxy on same host (Port 443/80 safe, zero mixed content)
+    proto = request.headers.get("X-Forwarded-Proto", request.scheme)
+    vnc_url = f"{proto}://{request.host}/vnc/vnc.html?autoconnect=true&resize=scale&path=websockify"
+    vnc_url_alt = f"http://52.62.16.81:8080/vnc.html?autoconnect=true&resize=scale"
     
     if is_linux_or_cloud:
-        # Launch worker in background with virtual display (Xvfb)
+        # Launch worker in background with virtual display (Xvfb :99)
         import subprocess
         python_bin = sys.executable
         cmd = [
@@ -124,7 +146,7 @@ def connect_platform(acc_id, platform):
             "vnc_url": vnc_url,
             "vnc_url_alt": vnc_url_alt,
             "auth_url": None,
-            "message": f"Cloud browser live for {platform.title()}! Showing interactive screen..."
+            "message": f"Cloud browser live for {platform.title()}! Showing interactive screen below..."
         })
     else:
         # Windows Desktop testing
