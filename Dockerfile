@@ -42,8 +42,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir playwright-stealth psutil websockets
 
-# 4. Install Playwright browser binaries
-RUN playwright install chromium
+# 4. Install Playwright browser binaries with OS dependencies
+RUN playwright install --with-deps chromium
 
 # 5. Copy Remotion dependencies if package.json exists
 COPY package*.json ./

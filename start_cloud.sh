@@ -83,6 +83,9 @@ if [ -d "/app/clipper/remotion" ] && [ ! -d "/app/clipper/remotion/node_modules/
     (cd /app/clipper/remotion && npm install --legacy-peer-deps && npx remotion browser ensure) || true
 fi
 
+# 6b2. Ensure Chromium browser & OS dependencies are present
+playwright install --with-deps chromium 2>/dev/null || true
+
 # 6c. Start Background Queue Worker Daemon (Flowchart: WORKERS layer)
 echo "👷 Starting Background Queue Worker Daemon (worker.py)..."
 mkdir -p /app/instance

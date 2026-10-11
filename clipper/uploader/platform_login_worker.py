@@ -35,7 +35,7 @@ DEFAULT_USER_AGENT = (
 
 PLATFORM_CONFIG = {
     "instagram": {
-        "login_url": "https://www.instagram.com/accounts/login/",
+        "login_url": "https://www.instagram.com/",
         "auth_cookies": ["sessionid"],
         "name": "Instagram"
     },
@@ -50,7 +50,7 @@ PLATFORM_CONFIG = {
         "name": "Facebook"
     },
     "youtube": {
-        "login_url": "https://studio.youtube.com",
+        "login_url": "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fstudio.youtube.com%2F",
         "auth_cookies": ["LOGIN_INFO", "SAPISID", "SID", "SSID", "__Secure-3PAPISID", "__Secure-3PSID"],
         "name": "YouTube Studio"
     }
@@ -76,6 +76,13 @@ def get_safe_profile_dir(account_id: str, platform: str) -> Path:
 
 def _clean_stale_locks(profile_dir: Path):
     """Remove stale Chromium/Edge lock files and kill any orphaned processes holding them."""
+    if sys.platform != "win32":
+        try:
+            import subprocess
+            subprocess.run(["pkill", "-9", "-f", "chrome"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True)
+        except Exception:
+            pass
     try:
         import psutil
         dir_str = str(profile_dir).lower()
@@ -234,6 +241,15 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                 page.goto(config["login_url"], wait_until="domcontentloaded", timeout=45000)
             except Exception as nav_err:
                 print(f"[{platform.upper()}_WORKER] Initial nav note: {nav_err}")
+
+            # Prevent Meta OIDC from hijacking Instagram to Facebook login
+            if platform == "instagram" and "facebook.com" in page.url:
+                print(f"[INSTAGRAM_WORKER] Detected Meta OIDC redirect to Facebook ({page.url}). Forcing return to pure Instagram...")
+                try:
+                    time.sleep(1)
+                    page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=20000)
+                except Exception as ig_err:
+                    print(f"[INSTAGRAM_WORKER] Re-nav note: {ig_err}")
 
             page.bring_to_front()
             time.sleep(1)

@@ -58,9 +58,9 @@ def connect_platform(acc_id, platform):
     if platform not in ("youtube", "instagram", "tiktok", "facebook"):
         return jsonify({"success": False, "message": f"Unsupported platform: {platform}"}), 400
 
-    # For YouTube, try Google OAuth if configured and not explicitly set to browser mode
+    # For YouTube, try Google OAuth if configured and not explicitly set to browser or desktop mode
     auth_method = request.args.get("method", "oauth").lower()
-    if platform == "youtube" and auth_method != "browser":
+    if platform == "youtube" and auth_method not in ("browser", "desktop"):
         result = auth_mgr.start_login(account_id=acc_id, platform=platform)
         if result.get("success") and result.get("auth_url"):
             return jsonify(result)
@@ -108,17 +108,29 @@ def connect_platform(acc_id, platform):
     
     # Check if running in Cloud / Linux / Docker or with VNC
     import sys
-    is_linux_or_cloud = sys.platform != "win32" or bool(os.environ.get("DISPLAY"))
+    is_linux_or_cloud = (sys.platform != "win32" or bool(os.environ.get("DISPLAY"))) and auth_method != "desktop"
+    if os.environ.get("FORCE_DESKTOP") or auth_method == "desktop":
+        is_linux_or_cloud = False
     
-    # Calculate VNC URL:
-    # 1. Primary: HTTPS reverse proxy on same host (Port 443/80 safe, zero mixed content)
+    # Calculate VNC URLs:
     proto = request.headers.get("X-Forwarded-Proto", request.scheme)
+    host_only = request.host.split(":")[0]
     vnc_url = f"{proto}://{request.host}/vnc/vnc.html?autoconnect=true&resize=scale&path=websockify"
-    vnc_url_alt = f"http://52.62.16.81:8080/vnc.html?autoconnect=true&resize=scale"
+    vnc_url_alt = f"http://{host_only}:8080/vnc.html?autoconnect=true&resize=scale"
+    vnc_url_6080 = f"http://{host_only}:6080/vnc.html?autoconnect=true&resize=scale"
     
     if is_linux_or_cloud:
-        # Launch worker in background with virtual display (Xvfb :99)
+        # 1. Cleanly terminate any previously stuck Chromium/Chrome processes on display :99
         import subprocess
+        try:
+            subprocess.run(["pkill", "-9", "-f", "platform_login_worker"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chrome"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True)
+            _time.sleep(0.5)
+        except Exception:
+            pass
+
+        # Launch worker in background with virtual display (Xvfb :99)
         python_bin = sys.executable
         cmd = [
             python_bin, "-u", str(worker_script),
@@ -134,9 +146,13 @@ def connect_platform(acc_id, platform):
             log_path = PROJECT_ROOT / "instance" / f"login_{acc_id}_{platform}.log"
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_file = open(log_path, "a", encoding="utf-8")
-            subprocess.Popen(cmd, env=env, cwd=str(PROJECT_ROOT), stdout=log_file, stderr=log_file)
+            proc = subprocess.Popen(cmd, env=env, cwd=str(PROJECT_ROOT), stdout=log_file, stderr=log_file)
         except Exception:
-            subprocess.Popen(cmd, env=env, cwd=str(PROJECT_ROOT))
+            proc = subprocess.Popen(cmd, env=env, cwd=str(PROJECT_ROOT))
+        
+        # Track in ACTIVE_LOGIN_PROCESSES so cancel_login can cleanly kill it
+        from clipper.uploader.platform_auth_manager import ACTIVE_LOGIN_PROCESSES
+        ACTIVE_LOGIN_PROCESSES[(acc_id, platform)] = proc
         
         return jsonify({
             "success": True,
@@ -145,6 +161,7 @@ def connect_platform(acc_id, platform):
             "account_id": acc_id,
             "vnc_url": vnc_url,
             "vnc_url_alt": vnc_url_alt,
+            "vnc_url_6080": vnc_url_6080,
             "auth_url": None,
             "message": f"Cloud browser live for {platform.title()}! Showing interactive screen below..."
         })
@@ -328,11 +345,37 @@ def sync_existing_sessions(acc_id):
 @platform_auth_bp.route("/api/accounts/<string:acc_id>/cancel-login/<string:platform>", methods=["POST"])
 @login_required
 def cancel_login(acc_id, platform):
+    import sys, subprocess
     platform = platform.lower().strip()
     auth_mgr.cancel_login(acc_id, platform)
+    if sys.platform != "win32":
+        try:
+            subprocess.run(["pkill", "-9", "-f", "platform_login_worker"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chrome"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True)
+        except Exception:
+            pass
     return jsonify({
         "success": True,
         "message": f"Cancelled login window for {platform.title()}."
+    })
+
+
+# ── 5b. POST Reset Virtual Screen (Kills all stuck windows) ───────────────────
+@platform_auth_bp.route("/api/platform/reset-display", methods=["POST"])
+@login_required
+def reset_virtual_display():
+    import sys, subprocess
+    if sys.platform != "win32":
+        try:
+            subprocess.run(["pkill", "-9", "-f", "platform_login_worker"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chrome"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True)
+        except Exception:
+            pass
+    return jsonify({
+        "success": True,
+        "message": "Virtual display cleared. Any stuck browser windows terminated."
     })
 
 

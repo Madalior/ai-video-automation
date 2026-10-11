@@ -1680,31 +1680,62 @@ function openVncFullscreen() {
   }
 }
 
+function toggleVncHeight() {
+  const wrapper = document.getElementById("vncIframeWrapper");
+  if (!wrapper) return;
+  if (wrapper.style.height === "480px") {
+    wrapper.style.height = "310px";
+  } else {
+    wrapper.style.height = "480px";
+  }
+}
+
+let currentVncCandidateIdx = 0;
 function switchVncPort() {
   const iframe = document.getElementById("modalVncIframe");
-  if (!iframe || !iframe.src) return;
-  let curr = iframe.src;
-  if (curr.includes("/vnc/")) {
-    iframe.src = `http://${window.location.hostname}:8080/vnc.html?autoconnect=true&resize=scale`;
-  } else if (curr.includes(":8080")) {
-    iframe.src = `http://${window.location.hostname}:6080/vnc.html?autoconnect=true&resize=scale`;
-  } else {
-    iframe.src = `${window.location.origin}/vnc/vnc.html?autoconnect=true&resize=scale&path=websockify`;
-  }
+  if (!iframe) return;
+  const host = window.location.hostname;
+  const candidates = [
+    { name: "Reverse Proxy (/vnc/)", url: `${window.location.origin}/vnc/vnc.html?autoconnect=true&resize=scale&path=websockify` },
+    { name: "Port 8080 (Cloudflare/Docker)", url: `http://${host}:8080/vnc.html?autoconnect=true&resize=scale` },
+    { name: "Port 6080 (Direct noVNC)", url: `http://${host}:6080/vnc.html?autoconnect=true&resize=scale` },
+    { name: "Cloud IP:8080", url: "http://52.62.16.81:8080/vnc.html?autoconnect=true&resize=scale" },
+    { name: "Cloud IP:6080", url: "http://52.62.16.81:6080/vnc.html?autoconnect=true&resize=scale" }
+  ];
+  currentVncCandidateIdx = (currentVncCandidateIdx + 1) % candidates.length;
+  const target = candidates[currentVncCandidateIdx];
+  iframe.src = target.url;
   const extBtn = document.getElementById("btnVncExternalTab");
-  if (extBtn) extBtn.href = iframe.src;
+  if (extBtn) extBtn.href = target.url;
   const fsBtn = document.getElementById("btnVncFullscreen");
-  if (fsBtn) fsBtn.href = iframe.src;
+  if (fsBtn) fsBtn.href = target.url;
+  const switchBtn = document.getElementById("btnSwitchPort");
+  if (switchBtn) switchBtn.innerText = `⚡ ${target.name}`;
+  const statusMsg = document.getElementById("modalStatusMessage");
+  if (statusMsg) statusMsg.innerText = `Switched stream to: ${target.name}`;
 }
 
 async function launchLocalDesktopBrowser() {
   if (!activeAccId || !activePlatform) return;
+  const statusMsg = document.getElementById("modalStatusMessage");
+  const statusHint = document.getElementById("modalStatusHint");
+  const spinner = document.getElementById("modalSpinner");
+  if (statusMsg) statusMsg.innerText = "⏳ Launching Chrome directly on your PC...";
+  if (spinner) spinner.innerText = "💻";
   try {
-    const res = await fetch(`/api/accounts/${activeAccId}/connect/${activePlatform}?method=browser`, { method: "POST" });
+    const res = await fetch(`/api/accounts/${activeAccId}/connect/${activePlatform}?method=desktop`, { method: "POST" });
     const data = await res.json();
-    alert(data.message || "Browser session dispatched.");
+    if (data.success || data.status === "started") {
+      const vncContainer = document.getElementById("modalVncContainer");
+      if (vncContainer) vncContainer.style.display = "none";
+      if (statusMsg) statusMsg.innerText = `💻 Chrome window opened on your PC for ${activePlatform.toUpperCase()}!`;
+      if (statusHint) statusHint.innerText = "Check your screen/taskbar, complete login, then click 'I HAVE FINISHED LOGGING IN' below.";
+      if (spinner) spinner.innerText = "🚀";
+    } else {
+      alert("Notice: " + (data.error || data.message || "Failed to launch desktop browser"));
+    }
   } catch (e) {
-    alert("Error launching browser: " + e);
+    alert("Error launching desktop browser: " + e);
   }
 }
 
@@ -1716,14 +1747,59 @@ async function cancelCurrentLogin() {
   const vncContainer = document.getElementById("modalVncContainer");
   if (vncContainer) vncContainer.style.display = "none";
 
-  if (activeAccId && activePlatform) {
-    try {
-      await fetch(`/api/accounts/${activeAccId}/cancel-login/${activePlatform}`, { method: "POST" });
-    } catch(e) {}
-  }
-  document.getElementById("connectPlatformModal").style.display = "none";
+  const modal = document.getElementById("connectPlatformModal");
+  if (modal) modal.style.display = "none";
+
+  const targetAcc = activeAccId;
+  const targetPlat = activePlatform;
   activeAccId = null;
   activePlatform = null;
+
+  if (targetAcc && targetPlat) {
+    try {
+      fetch(`/api/accounts/${targetAcc}/cancel-login/${targetPlat}`, { method: "POST" }).catch(() => {});
+    } catch(e) {}
+  }
+}
+
+// Global Escape key listener to close modal immediately
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape" || e.key === "Esc") {
+    const modal = document.getElementById("connectPlatformModal");
+    if (modal && modal.style.display !== "none") {
+      cancelCurrentLogin();
+    }
+    const nodeModal = document.getElementById("manageNodeModal");
+    if (nodeModal && nodeModal.style.display !== "none") {
+      closeNodeManageModal();
+    }
+  }
+});
+
+async function resetVirtualDisplay() {
+  const statusMsg = document.getElementById("modalStatusMessage");
+  if (statusMsg) statusMsg.innerText = "⏳ Killing any stuck browser windows on cloud display...";
+  try {
+    const res = await fetch("/api/platform/reset-display", { method: "POST" });
+    const data = await res.json();
+    refreshVncFrame();
+    if (activeAccId && activePlatform) {
+      setTimeout(() => {
+        openConnectModal(activeAccId, activePlatform);
+      }, 800);
+    }
+  } catch(e) {
+    alert("Reset display error: " + e);
+  }
+}
+
+function switchLoginPlatform(targetPlat) {
+  if (!activeAccId) return;
+  const targetAcc = activeAccId;
+  cancelCurrentLogin();
+  setTimeout(() => {
+    openConnectModal(targetAcc, targetPlat);
+  }, 400);
 }
 
 async function testPlatform(accId, platform) {
@@ -2231,15 +2307,15 @@ async function triggerConnectFromWizard(platform) {
 <!-- ═══════════════════════════════════════════════════════════════
      REAL-TIME PLATFORM CONNECTION MODAL DIALOG
      ═══════════════════════════════════════════════════════════════ -->
-<div id="connectPlatformModal" class="modal-backdrop" onclick="if(event.target === this) cancelCurrentLogin();" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; z-index: 99999; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); padding: 16px; overflow-y: auto;">
-  <div class="modal-box" style="background: var(--color-brand-black); border: 2px solid var(--color-brand-accent); box-shadow: 0 10px 50px rgba(0,0,0,0.95), 0 0 35px rgba(76,230,22,0.25); border-radius: 6px; padding: 22px; max-width: 680px; width: 100%; max-height: 92vh; overflow-y: auto; position: relative; margin: auto;">
+<div id="connectPlatformModal" class="modal-backdrop" onclick="if(event.target === this) cancelCurrentLogin();" style="display: none; align-items: flex-start; justify-content: center; position: fixed; inset: 0; z-index: 999999; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); padding: 20px 12px 60px 12px; overflow-y: auto;">
+  <div class="modal-box" style="background: var(--color-brand-black); border: 2px solid var(--color-brand-accent); box-shadow: 0 10px 50px rgba(0,0,0,0.95), 0 0 35px rgba(76,230,22,0.25); border-radius: 6px; padding: 18px; max-width: 680px; width: 100%; margin: 10px auto; position: relative;">
     
-    <!-- FIXED HIGH-VISIBILITY CLOSE BUTTON (ALWAYS VISIBLE) -->
-    <button type="button" onclick="cancelCurrentLogin()" style="position: absolute; top: 12px; right: 12px; z-index: 999; background: #e50914; color: #ffffff; border: 1px solid #ff4444; border-radius: 4px; padding: 6px 16px; font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 15px rgba(229,9,20,0.6); transition: all 0.2s;" onmouseover="this.style.background='#ff1f1f'" onmouseout="this.style.background='#e50914'">
+    <!-- FIXED HIGH-VISIBILITY CLOSE BUTTON (ALWAYS PINNED AND VISIBLE) -->
+    <button type="button" onclick="cancelCurrentLogin()" style="position: absolute; top: 12px; right: 12px; z-index: 999999; background: #e50914; color: #ffffff; border: 2px solid #ff4444; border-radius: 4px; padding: 6px 18px; font-weight: 800; font-family: var(--font-mono); font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 15px rgba(229,9,20,0.8); transition: all 0.2s;" onmouseover="this.style.background='#ff1f1f'" onmouseout="this.style.background='#e50914'">
       ✕ CLOSE
     </button>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; padding-right: 90px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; padding-right: 120px;">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span id="modalPlatformIcon" style="font-size: 1.6rem;">🌐</span>
         <div>
@@ -2250,48 +2326,57 @@ async function triggerConnectFromWizard(platform) {
     </div>
 
     <!-- Status Box -->
-    <div id="modalStatusBox" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 18px; text-align: center; margin-bottom: 16px;">
-      <div id="modalSpinner" style="font-size: 2.2rem; margin-bottom: 10px;">🌐</div>
-      <div id="modalStatusMessage" style="font-family: var(--font-mono); font-size: 0.88rem; font-weight: 700; color: #FFFFFF; line-height: 1.4;">
+    <div id="modalStatusBox" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 12px 16px; text-align: center; margin-bottom: 12px;">
+      <div id="modalSpinner" style="font-size: 1.8rem; margin-bottom: 6px;">🌐</div>
+      <div id="modalStatusMessage" style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: #FFFFFF; line-height: 1.4;">
         Initializing connection...
       </div>
-      <div id="modalStatusHint" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-top: 8px; line-height: 1.4;">
-        Please complete sign-in in the browser opened on your screen.
+      <div id="modalStatusHint" style="font-family: var(--font-mono); font-size: 0.70rem; color: var(--color-muted); margin-top: 4px; line-height: 1.4;">
+        Please complete sign-in in the browser window below.
       </div>
     </div>
 
     <!-- Cloud noVNC In-Dashboard Live Browser Stream -->
-    <div id="modalVncContainer" style="display: none; margin-bottom: 16px; border-radius: 4px; overflow: hidden; border: 1px solid var(--color-brand-accent);">
+    <div id="modalVncContainer" style="display: none; margin-bottom: 14px; border-radius: 4px; overflow: hidden; border: 1px solid var(--color-brand-accent);">
       <div style="background: rgba(0,0,0,0.7); padding: 8px 12px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-brand-accent); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap; gap: 8px;">
-        <span>📱 CLOUD BROWSER (TOUCH INTERACTIVE)</span>
-        <div style="display: flex; gap: 6px; align-items: center;">
+        <span>📱 CLOUD BROWSER STREAM</span>
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
           <a id="btnVncFullscreen" href="#" onclick="openVncFullscreen(); return false;" style="background: rgba(76,230,22,0.15); border: 1px solid var(--color-brand-accent); color: var(--color-brand-accent); border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem; text-decoration: none;">⛶ FULLSCREEN</a>
           <button type="button" onclick="refreshVncFrame()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem;">🔄 RELOAD</button>
           <button type="button" onclick="switchVncPort()" id="btnSwitchPort" style="background: rgba(245,158,11,0.15); border: 1px solid #f59e0b; color: #f59e0b; border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem;">⚡ PORT 6080/8080</button>
+          <button type="button" onclick="toggleVncHeight()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #ccc; border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem;">↕ RESIZE</button>
+          <button type="button" onclick="resetVirtualDisplay()" style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; color: #fca5a5; border-radius: 2px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem; font-weight: bold;" title="Kill any stuck Facebook/Chrome windows on the cloud screen">🧹 RESET SCREEN</button>
           <button type="button" onclick="cancelCurrentLogin()" style="background: #e50914; border: 1px solid #ff4444; color: #fff; border-radius: 2px; padding: 3px 10px; cursor: pointer; font-size: 0.68rem; font-weight: bold;">✕ CLOSE</button>
         </div>
       </div>
       
+      <div style="background: #181818; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted);">FORCE LOAD:</span>
+        <button type="button" onclick="switchLoginPlatform('youtube')" style="background: rgba(255,0,0,0.15); border: 1px solid #ff4444; color: #ff8888; border-radius: 2px; padding: 3px 10px; cursor: pointer; font-family: var(--font-mono); font-size: 0.70rem; font-weight: bold;">▶ YOUTUBE STUDIO</button>
+        <button type="button" onclick="switchLoginPlatform('instagram')" style="background: rgba(225,48,108,0.15); border: 1px solid #e1306c; color: #f472b6; border-radius: 2px; padding: 3px 10px; cursor: pointer; font-family: var(--font-mono); font-size: 0.70rem; font-weight: bold;">📸 INSTAGRAM</button>
+        <button type="button" onclick="switchLoginPlatform('tiktok')" style="background: rgba(37,244,238,0.15); border: 1px solid #25f4ee; color: #67e8f9; border-radius: 2px; padding: 3px 10px; cursor: pointer; font-family: var(--font-mono); font-size: 0.70rem; font-weight: bold;">🎵 TIKTOK</button>
+      </div>
+
       <div style="background: #111; padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
         <a id="btnVncExternalTab" href="#" target="_blank" class="nav-btn-primary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; text-decoration: none; padding: 6px 14px;">
-          <span>🌐</span> <span>OPEN CLOUD BROWSER IN NEW WINDOW ↗</span>
+          <span>🌐</span> <span>OPEN IN NEW WINDOW ↗</span>
         </a>
         <button type="button" onclick="launchLocalDesktopBrowser()" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 6px 14px; border-radius: 2px; background: rgba(59,130,246,0.15); border: 1px solid #3b82f6; color: #93c5fd; cursor: pointer; font-family: var(--font-mono);">
           <span>💻</span> <span>OPEN DIRECT CHROME ON PC</span>
         </button>
       </div>
 
-      <div style="position: relative; width: 100%; height: 420px; background: #000;">
+      <div id="vncIframeWrapper" style="position: relative; width: 100%; height: 310px; background: #000; transition: height 0.2s ease;">
         <iframe id="modalVncIframe" src="" style="width: 100%; height: 100%; border: none; background: #000; display: block;" allow="fullscreen *; clipboard-read; clipboard-write" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>
       </div>
       
       <div style="background: rgba(0,0,0,0.8); padding: 8px 12px; font-family: var(--font-mono); font-size: 0.70rem; color: #9ca3af; text-align: center;">
-        💡 <em>If the screen above is black, click <strong>"OPEN CLOUD BROWSER IN NEW WINDOW ↗"</strong> or <strong>"PORT 6080/8080"</strong>, or log in via <strong>"OPEN DIRECT CHROME ON PC"</strong>.</em>
+        💡 <em>If black screen: Click <strong>"OPEN IN NEW WINDOW ↗"</strong> or <strong>"PORT 6080/8080"</strong>, or switch to <strong>"OPEN DIRECT CHROME ON PC"</strong>.</em>
       </div>
     </div>
 
     <!-- Direct Action Button Container (For Google OAuth or Direct Launch) -->
-    <div id="modalAuthActionContainer" style="display: none; margin-bottom: 16px;">
+    <div id="modalAuthActionContainer" style="display: none; margin-bottom: 14px;">
       <a id="btnOpenAuthUrl" href="#" target="_blank" class="btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; text-decoration: none; padding: 12px 18px; font-family: var(--font-wordmark); font-size: 0.85rem; letter-spacing: 0.05em; background: var(--color-brand-accent); color: var(--color-brand-black); border-radius: 2px; box-shadow: 0 4px 20px rgba(76,230,22,0.4); text-transform: uppercase;">
         <span>🚀</span> <span id="btnOpenAuthUrlText">OPEN SIGN-IN PAGE</span>
       </a>
@@ -2301,10 +2386,10 @@ async function triggerConnectFromWizard(platform) {
     </div>
 
     <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px;">
-      <button type="button" class="btn-secondary" onclick="cancelCurrentLogin()" style="flex: 1; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 4px; background: rgba(229,9,20,0.15); border: 1px solid #e50914; color: #ff6b6b; font-weight: bold;">
+      <button type="button" class="btn-secondary" onclick="cancelCurrentLogin()" style="flex: 1; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.82rem; border-radius: 4px; background: rgba(229,9,20,0.18); border: 2px solid #e50914; color: #ff6b6b; font-weight: bold; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#e50914'; this.style.color='#fff';" onmouseout="this.style.background='rgba(229,9,20,0.18)'; this.style.color='#ff6b6b';">
         ✕ CLOSE / CANCEL
       </button>
-      <button type="button" id="btnConfirmLogin" class="btn-primary" onclick="confirmCurrentLogin()" style="flex: 2; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; border-radius: 4px;">
+      <button type="button" id="btnConfirmLogin" class="btn-primary" onclick="confirmCurrentLogin()" style="flex: 2; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.82rem; border-radius: 4px;">
         ✅ I HAVE FINISHED LOGGING IN
       </button>
     </div>
