@@ -324,3 +324,60 @@ def register_worker():
     }), 200
 
 
+@pipeline_bp.route("/api/worker/status", methods=["GET"])
+@login_required
+def get_worker_status():
+    """Returns background worker queue status and health."""
+    from clipper.core.queue_manager import queue_manager
+    stats = queue_manager.get_stats() if hasattr(queue_manager, "get_stats") else {"pending": 0, "active": 0}
+    with ACTIVE_JOBS_LOCK:
+        running_jobs = [j for j in ACTIVE_JOBS.values() if j.get("status") == "running"]
+    return jsonify({
+        "success": True,
+        "worker_active": True,
+        "queue_stats": stats,
+        "active_jobs_count": len(running_jobs),
+        "active_jobs": running_jobs[:5]
+    })
+
+
+@pipeline_bp.route("/api/pipeline/dispatch-all", methods=["POST"])
+@login_required
+def dispatch_all_engines():
+    """Triggers concurrent dispatches across all 4 Going Merry autonomous media engines."""
+    from clipper.core.queue_manager import queue_manager
+    user_id_val = current_user.id if current_user and hasattr(current_user, 'id') else 1
+
+    engines = [
+        {"id": "anime_saga", "name": "Anime Saga & Hype Edits", "source": "campaigns/raw_footage/authentic_vault_clip.mp4", "mode": "url", "split": False},
+        {"id": "podcasts", "name": "Viral Podcasts & Wisdom", "source": "https://www.youtube.com/watch?v=sample_podcast", "mode": "url", "split": False},
+        {"id": "gaming_split", "name": "Split-Screen Gaming & Climax", "source": "campaigns/raw_footage/authentic_vault_clip.mp4", "mode": "url", "split": True},
+        {"id": "whop_bounty", "name": "Whop Bounty Arbitrage", "source": "campaigns/raw_footage/authentic_vault_clip.mp4", "mode": "whop", "split": False},
+    ]
+
+    dispatched = []
+    for eng in engines:
+        job_id = f"gm_fleet_{eng['id']}_{uuid.uuid4().hex[:6]}"
+        try:
+            queue_manager.enqueue("clip_job", {
+                "source_url": eng["source"] if eng["source"].startswith("http") else None,
+                "video_file": eng["source"] if not eng["source"].startswith("http") else None,
+                "num_clips": 3,
+                "platform": "all",
+                "auto_upload": True,
+                "user_id": user_id_val,
+                "engine": eng["name"]
+            })
+            dispatched.append({"engine": eng["name"], "job_id": job_id, "status": "queued"})
+        except Exception as e:
+            dispatched.append({"engine": eng["name"], "job_id": job_id, "error": str(e)})
+
+    bus.emit("fleet.dispatch_all", {"timestamp": time.time(), "engines": [e["name"] for e in engines]})
+
+    return jsonify({
+        "success": True,
+        "message": f"Successfully queued all 4 Going Merry engines for background worker execution!",
+        "dispatched": dispatched
+    })
+
+

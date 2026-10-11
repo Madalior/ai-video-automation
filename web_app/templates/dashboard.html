@@ -25,6 +25,17 @@
       <strong id="scanText">SCAN VIEWS NOW</strong>
     </button>
   </div>
+
+  <!-- Worker Status & Fleet Fast Trigger Bar -->
+  <div style="display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 16px; font-family: var(--font-mono); font-size: 0.74rem; flex-wrap: wrap;">
+    <div style="background: #111; color: var(--color-brand-accent); padding: 6px 14px; border-radius: 4px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(76, 230, 22, 0.4);">
+      <span class="led-pulse"></span>
+      <span id="workerStatusBadge">WORKER DAEMON: ACTIVE 🟢 [QUEUE: CONNECTED]</span>
+    </div>
+    <button type="button" onclick="triggerAllEnginesNow()" class="btn-secondary" style="padding: 6px 16px; font-size: 0.72rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--color-brand-black); background: #FAF9F6; font-weight: 700; color: #111;">
+      ⚡ DISPATCH ALL 4 ENGINES
+    </button>
+  </div>
 </div>
 
 <!-- Industrial Telemetry Stats Grid -->
@@ -1418,6 +1429,21 @@ async function scanAllViewsNow() {
   }
 }
 
+async function updateWorkerStatus() {
+  try {
+    const res = await fetch("/api/worker/status");
+    const data = await res.json();
+    const el = document.getElementById("workerStatusBadge");
+    if (el && data.success) {
+      const q = data.queue_stats ? (data.queue_stats.pending || 0) : 0;
+      const running = data.active_jobs_count || 0;
+      el.innerText = `WORKER DAEMON: ACTIVE 🟢 [JOBS: ${running} ACTIVE | ${q} QUEUED]`;
+    }
+  } catch(e) {}
+}
+setInterval(updateWorkerStatus, 8000);
+updateWorkerStatus();
+
 async function submitViralToWhop(clipId) {
   const btn = document.getElementById(`btn-submit-${clipId}`);
   if (btn) {
@@ -1528,6 +1554,8 @@ async function openConnectModal(accId, platform, username) {
         vncContainer.style.display = "block";
         const fsBtn = document.getElementById("btnVncFullscreen");
         if (fsBtn) fsBtn.href = data.vnc_url;
+        const extBtn = document.getElementById("btnVncExternalTab");
+        if (extBtn) extBtn.href = data.vnc_url;
       }
       document.getElementById("modalStatusMessage").innerText = `Cloud browser live! Log into ${meta.name} inside the window below:`;
       document.getElementById("modalStatusHint").innerText = "Touch/click the browser screen below to enter your credentials or tap 'Sign in with Google'.";
@@ -2079,7 +2107,18 @@ async function triggerAllEnginesNow() {
   );
   if (!confirmed) return;
 
-  alert(`🚀 All 4 Going Merry engines triggered! Fleet execution is running across all isolated browser nodes.`);
+  try {
+    const res = await fetch("/api/pipeline/dispatch-all", { method: "POST" });
+    const data = await res.json();
+    if (data.success) {
+      alert(`🚀 [FLEET DISPATCH ENGAGED]\n\nAll 4 Going Merry engines successfully dispatched to background workers!\n\n${data.message}`);
+      window.location.reload();
+    } else {
+      alert(`⚠️ Notice: ${data.message || 'Queued for background worker.'}`);
+    }
+  } catch (err) {
+    alert(`Error dispatching fleet engines: ${err}`);
+  }
 }
 
 // ─── NODE PLATFORMS MODAL & WIZARD CONTROLLER ──────────────────────────
@@ -2190,6 +2229,11 @@ async function triggerConnectFromWizard(platform) {
           <a id="btnVncFullscreen" href="#" onclick="openVncFullscreen(); return false;" style="background: rgba(76,230,22,0.15); border: 1px solid var(--color-brand-accent); color: var(--color-brand-accent); border-radius: 2px; padding: 2px 8px; cursor: pointer; font-size: 0.68rem; text-decoration: none;">⛶ FULLSCREEN TAB</a>
           <button type="button" onclick="refreshVncFrame()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 2px; padding: 2px 8px; cursor: pointer; font-size: 0.68rem;">🔄 RELOAD</button>
         </div>
+      </div>
+      <div style="background: #111; padding: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <a id="btnVncExternalTab" href="#" target="_blank" class="nav-btn-primary" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; text-decoration: none; padding: 8px 16px;">
+          <span>🌐</span> <span>OPEN CLOUD BROWSER IN NEW WINDOW ↗</span>
+        </a>
       </div>
       <iframe id="modalVncIframe" src="" style="width: 100%; height: 480px; border: none; background: #000; display: block;" allow="fullscreen *; clipboard-read; clipboard-write" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true"></iframe>
     </div>

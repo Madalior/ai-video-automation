@@ -31,11 +31,14 @@ services:
       - ./web_app:/app/web_app
       - ./clipper:/app/clipper
       - ./going_merry.py:/app/going_merry.py
+      - ./worker.py:/app/worker.py
       - ./start_cloud.sh:/app/start_cloud.sh
       - ./output:/app/output
       - ./uploader_profiles:/app/uploader_profiles
       - ./campaigns:/app/campaigns
       - ./instance:/app/instance
+      - ./youtube_tokens:/app/youtube_tokens
+      - ./client_secrets.json:/app/client_secrets.json
       - ./.env:/app/.env
     restart: unless-stopped
     networks:

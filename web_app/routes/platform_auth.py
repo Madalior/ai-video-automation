@@ -48,14 +48,15 @@ def connect_platform(acc_id, platform):
     if platform not in ("youtube", "instagram", "tiktok", "facebook"):
         return jsonify({"success": False, "message": f"Unsupported platform: {platform}"}), 400
 
-    # For YouTube, use the in-process OAuth flow (opens user's default browser via webbrowser module)
-    if platform == "youtube":
+    # For YouTube, try OAuth first unless browser method requested
+    auth_method = request.args.get("method", "oauth").lower()
+    if platform == "youtube" and auth_method != "browser":
         result = auth_mgr.start_login(account_id=acc_id, platform=platform)
-        return jsonify(result)
+        if result.get("success"):
+            return jsonify(result)
+        # If OAuth failed or client_secrets unavailable, fall through to interactive browser login for YouTube Studio
 
-    # For browser-based platforms (IG/TT/FB), use os.startfile() on a generated batch file.
-    # os.startfile() uses Windows ShellExecuteW which renders in the user's desktop session,
-    # even when the Flask dashboard is running from a background/IDE process.
+    # For browser-based platforms (IG/TT/FB/YT Studio fallback), use isolated Chromium instance
     from clipper.uploader.platform_auth_manager import PROJECT_ROOT, SESSIONS_DIR
     import json as _json
     import time as _time
@@ -90,7 +91,8 @@ def connect_platform(acc_id, platform):
     
     # Calculate VNC URL for mobile streaming
     host = request.host.split(":")[0]
-    vnc_url = f"http://{host}:6080/vnc.html?autoconnect=true&resize=scale"
+    vnc_url = f"http://{host}:8080/vnc.html?autoconnect=true&resize=scale"
+    vnc_url_alt = f"http://{host}:6080/vnc.html?autoconnect=true&resize=scale"
     
     if is_linux_or_cloud:
         # Launch worker in background with virtual display (Xvfb)
@@ -120,6 +122,7 @@ def connect_platform(acc_id, platform):
             "platform": platform,
             "account_id": acc_id,
             "vnc_url": vnc_url,
+            "vnc_url_alt": vnc_url_alt,
             "auth_url": None,
             "message": f"Cloud browser live for {platform.title()}! Showing interactive screen..."
         })
