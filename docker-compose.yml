@@ -36,6 +36,7 @@ services:
       - ./output:/app/output
       - ./uploader_profiles:/app/uploader_profiles
       - ./campaigns:/app/campaigns
+      - ./deploy:/app/deploy
       - ./instance:/app/instance
       - ./youtube_tokens:/app/youtube_tokens
       - ./client_secrets.json:/app/client_secrets.json
