@@ -91,6 +91,30 @@ class StreamMonitor:
                         "handle": channel
                     }
 
+        # Telegram Channel handling
+        elif "t.me/" in url or "telegram.me/" in url:
+            clean_url = url.split("?")[0].rstrip("/")
+            tg_match = re.search(r"(?:t\.me|telegram\.me)/(?:s/)?([a-zA-Z0-9_]+)", clean_url)
+            channel_name = tg_match.group(1) if tg_match else "channel"
+            handle = f"@{channel_name}"
+            preview_url = f"https://t.me/s/{channel_name}"
+            return {
+                "platform": "telegram",
+                "channel_url": preview_url,
+                "handle": handle
+            }
+
+        # Kick handling
+        elif "kick.com/" in url:
+            clean_url = url.split("?")[0].rstrip("/")
+            kick_match = re.search(r"kick\.com/([a-zA-Z0-9_]+)", clean_url)
+            handle = f"@{kick_match.group(1)}" if kick_match else ""
+            return {
+                "platform": "kick",
+                "channel_url": url,
+                "handle": handle
+            }
+
         return {
             "platform": "unknown",
             "channel_url": url,
@@ -116,6 +140,8 @@ class StreamMonitor:
                 data = json.loads(first_line)
                 
                 channel_title = (
+                    data.get("playlist_title") or
+                    data.get("playlist") or
                     data.get("playlist_uploader") or 
                     data.get("playlist_channel") or 
                     data.get("uploader") or 
@@ -188,6 +214,8 @@ class StreamMonitor:
                     if data.get("was_live") is True or data.get("live_status") == "was_live":
                         is_ended_stream = True
                     elif "twitch" in channel_url and data.get("ie_key") == "TwitchVod":
+                        is_ended_stream = True
+                    elif "t.me" in channel_url or "telegram" in channel_url:
                         is_ended_stream = True
                     elif duration and duration > 300 and data.get("is_live") is not True:
                         # Stream archive with valid duration that is not currently live

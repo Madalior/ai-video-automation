@@ -10,7 +10,37 @@
       Going Merry scans these creators daily and automatically produces viral shorts from ended livestreams.
     </p>
   </div>
-  <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Follow New Creator</a>
+  <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Advanced Clip Studio</a>
+</div>
+
+<!-- Quick Follow Form -->
+<div class="glass-card" style="margin-bottom: 28px; padding: 22px;">
+  <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+    <span>📡</span> Follow Creator Stream or Telegram Channel
+  </div>
+  <form method="POST" action="{{ url_for('influencers.add_influencer') }}" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;">
+    <div style="flex: 2; min-width: 280px;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Creator Handle / Stream URL or Telegram Channel</label>
+      <input type="text" name="channel_url" class="form-input" placeholder="e.g. https://www.youtube.com/@KaiCenat or https://t.me/CryptoMedia" required style="width: 100%;">
+    </div>
+    <div style="flex: 0.6; min-width: 110px;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Clips to Cut</label>
+      <input type="number" name="num_clips" class="form-input" value="5" min="1" max="20" style="width: 100%;">
+    </div>
+    <div style="flex: 1; min-width: 160px;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Target Upload</label>
+      <select name="target_platform" class="form-input" style="width: 100%;">
+        <option value="all">All Connected (YT, IG, TT, FB)</option>
+        <option value="youtube">YouTube Shorts Only</option>
+        <option value="instagram">Instagram Reels Only</option>
+        <option value="tiktok">TikTok Only</option>
+        <option value="facebook">Facebook Only</option>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn-primary" style="padding: 10px 22px; white-space: nowrap;">+ Follow &amp; Monitor</button>
+    </div>
+  </form>
 </div>
 
 <!-- Influencers Grid -->

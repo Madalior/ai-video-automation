@@ -162,15 +162,21 @@ def run_reverse_tunnel(cloud_target: str, local_port: int = 1080, remote_port: i
     print(f"\n[TUNNEL] 🚀 Launching reverse SSH tunnel to Cloud VPS ({cloud_target})...")
     print(f"[TUNNEL] Forwarding Cloud port {remote_port} -> Your Home WiFi (port {local_port})")
 
+    key_path = Path(__file__).resolve().parent / "going-merry-key.pem"
     ssh_cmd = [
         "ssh",
         "-N",
         "-o", "ExitOnForwardFailure=yes",
         "-o", "ServerAliveInterval=30",
         "-o", "ServerAliveCountMax=3",
+        "-o", "StrictHostKeyChecking=no",
+    ]
+    if key_path.exists():
+        ssh_cmd.extend(["-i", str(key_path)])
+    ssh_cmd.extend([
         "-R", f"0.0.0.0:{remote_port}:127.0.0.1:{local_port}",
         cloud_target
-    ]
+    ])
     while True:
         try:
             print(f"[TUNNEL] Connecting: {' '.join(ssh_cmd)}")

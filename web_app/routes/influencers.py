@@ -81,3 +81,40 @@ def delete_influencer(influencer_id):
     db.session.commit()
     flash(f"Unfollowed and removed {channel_name}.", "warning")
     return redirect(url_for("influencers.list_influencers"))
+
+
+@influencers_bp.route("/influencers/add", methods=["POST"])
+@login_required
+def add_influencer():
+    channel_url = request.form.get("channel_url", "").strip()
+    if not channel_url:
+        flash("Please enter a valid creator or channel URL.", "error")
+        return redirect(url_for("influencers.list_influencers"))
+
+    monitor = StreamMonitor()
+    meta = monitor.resolve_channel_metadata(channel_url)
+
+    existing = MonitoredInfluencer.query.filter_by(
+        user_id=current_user.id,
+        channel_url=meta["channel_url"]
+    ).first()
+
+    if not existing:
+        influencer = MonitoredInfluencer(
+            user_id=current_user.id,
+            channel_name=meta["channel_name"],
+            channel_handle=meta["channel_handle"],
+            channel_url=meta["channel_url"],
+            platform=meta["platform"],
+            num_clips=int(request.form.get("num_clips", 5)),
+            target_platform=request.form.get("target_platform", "all"),
+            auto_upload=True,
+            is_active=True
+        )
+        db.session.add(influencer)
+        db.session.commit()
+        flash(f"Started monitoring {meta['channel_name']} ({meta['platform'].title()})!", "success")
+    else:
+        flash(f"Already monitoring {existing.channel_name}.", "info")
+
+    return redirect(url_for("influencers.list_influencers"))
