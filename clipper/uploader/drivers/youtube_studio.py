@@ -84,8 +84,14 @@ class YouTubeStudioUploader:
         full_description = f"{caption.strip()}\n\n{tag_str}".strip()
 
         # 2. Navigate to Studio
+        print("[YOUTUBE_BOT] Navigating to YouTube Studio...")
         self.page.goto(self.STUDIO_URL, wait_until="domcontentloaded", timeout=45000)
-        self.page.wait_for_timeout(4000)
+
+        # Allow up to 10 seconds for any Google CheckCookie SSO bounce to complete
+        for _ in range(5):
+            if "studio.youtube.com" in self.page.url and "accounts.google.com" not in self.page.url:
+                break
+            self.page.wait_for_timeout(2000)
 
         # Check for "Skip to YouTube Studio" browser warning page
         skip_btn = self.page.locator("a:has-text('Skip to YouTube Studio')").first
@@ -93,6 +99,17 @@ class YouTubeStudioUploader:
             print("[YOUTUBE_BOT] Bypassing browser version check -> Clicking 'Skip to YouTube Studio'...")
             skip_btn.click()
             self.page.wait_for_timeout(4000)
+
+        # If on account chooser, attempt to click the account card
+        if "accounts.google.com" in self.page.url:
+            acct_btn = self.page.locator("[data-identifier], [data-email], div[role='link']:has-text('@gmail.com')").first
+            if acct_btn.is_visible():
+                print("[YOUTUBE_BOT] Detected Account Chooser. Attempting to select account...")
+                try:
+                    acct_btn.click()
+                    self.page.wait_for_timeout(5000)
+                except Exception:
+                    pass
 
         if "accounts.google.com" in self.page.url:
             return {

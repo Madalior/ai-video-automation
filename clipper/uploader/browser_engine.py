@@ -195,10 +195,10 @@ class BrowserEngine:
                 "viewport": {"width": 1920, "height": 1080} if headless else None,
                 "locale": "en-US",
                 "timezone_id": "America/New_York",
-                "permissions": ["clipboard-read", "clipboard-write"]
+                "permissions": ["clipboard-read", "clipboard-write"],
+                "ignore_default_args": ["--enable-automation"],
+                "user_agent": DEFAULT_USER_AGENT
             }
-            if not use_channel:
-                launch_kwargs["user_agent"] = DEFAULT_USER_AGENT
             if proxy_config:
                 launch_kwargs["proxy"] = proxy_config
             if use_channel:
@@ -256,6 +256,8 @@ class BrowserEngine:
                                     s_site = c.get("sameSite")
                                     if s_site in ["Strict", "Lax", "None"]:
                                         cookie_entry["sameSite"] = s_site
+                                    if "expires" in c and c["expires"] is not None and c["expires"] > 0:
+                                        cookie_entry["expires"] = c["expires"]
                                     valid_cookies.append(cookie_entry)
                             if valid_cookies:
                                 context.add_cookies(valid_cookies)
