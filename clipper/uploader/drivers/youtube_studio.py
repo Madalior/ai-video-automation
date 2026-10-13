@@ -133,33 +133,48 @@ class YouTubeStudioUploader:
             pass
 
         print("[YOUTUBE_BOT] Opening Upload Dialog...")
-        create_btn = self.page.locator("#create-icon, ytcp-button#create-icon, button#create-icon, [aria-label*='Create']").first
-        try:
-            create_btn.wait_for(state="visible", timeout=20000)
-            create_btn.click(force=True)
-        except PlaywrightTimeoutError:
-            upload_direct = self.page.locator("#upload-button, [aria-label*='Upload videos']").first
-            if upload_direct.is_visible():
-                upload_direct.click(force=True)
-            else:
-                return {"status": "error", "message": "Could not find Create button in YouTube Studio."}
+        dialog_opened = False
 
-        self.page.wait_for_timeout(1000)
-
-        # 4. Click 'Upload videos' in popup menu
-        upload_menu_item = self.page.locator("tp-yt-paper-item, paper-item, ytcp-text-menu tp-yt-paper-item, [test-id='upload-video-menu-item']").filter(has_text="Upload videos").first
+        # Try center 'Upload videos' button first (present on clean dashboard)
+        center_btn = self.page.locator("#upload-button, ytcp-button:has-text('Upload videos'), button:has-text('Upload videos'), [aria-label*='Upload videos']").first
         try:
-            if upload_menu_item.is_visible():
-                upload_menu_item.click(force=True)
+            if center_btn.is_visible(timeout=5000):
+                print("[YOUTUBE_BOT] Clicking center 'Upload videos' button...")
+                center_btn.click(force=True)
+                dialog_opened = True
         except Exception:
             pass
 
-        self.page.wait_for_timeout(1500)
+        # Try 'Create' button in header if center button wasn't clicked
+        if not dialog_opened:
+            create_btn = self.page.locator("#create-icon, ytcp-button#create-icon, button#create-icon, ytcp-button:has-text('Create'), button:has-text('Create'), [aria-label*='Create']").first
+            try:
+                print("[YOUTUBE_BOT] Waiting for Create / Upload button...")
+                create_btn.wait_for(state="visible", timeout=25000)
+                create_btn.click(force=True)
+                dialog_opened = True
+                self.page.wait_for_timeout(1000)
+
+                # Click 'Upload videos' in popup menu if it opens
+                upload_menu_item = self.page.locator("tp-yt-paper-item, paper-item, ytcp-text-menu tp-yt-paper-item, [test-id='upload-video-menu-item']").filter(has_text="Upload videos").first
+                if upload_menu_item.is_visible(timeout=3000):
+                    upload_menu_item.click(force=True)
+            except Exception as e:
+                print(f"[YOUTUBE_BOT] Create button click note: {e}")
+
+        # Check if file input is available; if not, trigger via direct URL (?d=ud)
+        file_input = self.page.locator("input[type='file']").first
+        try:
+            file_input.wait_for(state="attached", timeout=8000)
+        except Exception:
+            print("[YOUTUBE_BOT] File input not yet attached. Navigating directly to https://studio.youtube.com/?d=ud...")
+            self.page.goto("https://studio.youtube.com/?d=ud", wait_until="domcontentloaded", timeout=45000)
+            self.page.wait_for_timeout(3000)
 
         # 5. Set Input Files (drag & drop upload)
         print(f"[YOUTUBE_BOT] Uploading video binary: {video_file.name} ({video_file.stat().st_size / (1024*1024):.1f} MB)...")
         file_input = self.page.locator("input[type='file']").first
-        file_input.wait_for(state="attached", timeout=25000)
+        file_input.wait_for(state="attached", timeout=35000)
         file_input.set_input_files(str(video_file))
 
         # Wait for dialog details screen to appear
