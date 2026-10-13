@@ -182,6 +182,8 @@ class BrowserEngine:
                 "--disable-dev-shm-usage",
                 "--disable-gpu"
             ])
+            if os.environ.get("DISPLAY"):
+                headless = False
 
         playwright = sync_playwright().start()
         try:
@@ -190,7 +192,7 @@ class BrowserEngine:
                 "headless": headless,
                 "args": chrome_args,
                 "slow_mo": slow_mo,
-                "viewport": None,
+                "viewport": {"width": 1920, "height": 1080} if headless else None,
                 "locale": "en-US",
                 "timezone_id": "America/New_York",
                 "permissions": ["clipboard-read", "clipboard-write"]
@@ -214,16 +216,22 @@ class BrowserEngine:
 
             # Load any saved cookies from workspace or localappdata into context
             local_app_data = os.environ.get("LOCALAPPDATA", "")
-            cookie_candidates = [
-                self.profile_mgr.base_dir / "accounts" / f"{account_id}_youtube_cookies.json",
-                self.profile_mgr.base_dir / "accounts" / f"{account_id}_instagram_cookies.json",
+            cookie_candidates = []
+            if platform_str:
+                cookie_candidates.append(self.profile_mgr.base_dir / "accounts" / f"{account_id}_{platform_str}_cookies.json")
+                cookie_candidates.append(session_dir / f"{platform_str}_profile" / "cookies.json")
+                if local_app_data:
+                    cookie_candidates.append(Path(local_app_data) / "GoingMerry" / "profiles" / account_id / f"{platform_str}_profile" / "cookies.json")
+
+            cookie_candidates.extend([
                 self.profile_mgr.base_dir / "accounts" / f"{account_id}_cookies.json",
-                session_dir / "youtube_profile" / "cookies.json",
-                session_dir / "instagram_profile" / "cookies.json",
                 session_dir / "cookies.json",
                 safe_session_dir / "cookies.json",
-            ]
-            if local_app_data:
+            ])
+            if not platform_str:
+                cookie_candidates.insert(0, self.profile_mgr.base_dir / "accounts" / f"{account_id}_youtube_cookies.json")
+                cookie_candidates.insert(1, self.profile_mgr.base_dir / "accounts" / f"{account_id}_instagram_cookies.json")
+            if local_app_data and not platform_str:
                 cookie_candidates.append(Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "youtube_profile" / "cookies.json")
                 cookie_candidates.append(Path(local_app_data) / "GoingMerry" / "profiles" / account_id / "instagram_profile" / "cookies.json")
 

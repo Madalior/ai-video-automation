@@ -225,6 +225,28 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
             else:
                 print(f"[{platform.upper()}_WORKER] Launching bundled Chromium...")
 
+            # Proxy routing: Auto-detect Home SOCKS5 Gateway (host.docker.internal:1080)
+            custom_proxy = os.environ.get("UPLOAD_PROXY") or os.environ.get("LOGIN_PROXY")
+            if custom_proxy:
+                launch_kwargs["proxy"] = {"server": custom_proxy}
+                print(f"[{platform.upper()}_WORKER] 🌐 Using configured proxy: {custom_proxy}")
+            else:
+                tunnel_port = int(os.environ.get("SOCKS_TUNNEL_PORT", 1080))
+                candidates = ["host.docker.internal", "172.17.0.1", "127.0.0.1"]
+                import socket
+                for h in candidates:
+                    try:
+                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        s.settimeout(0.3)
+                        res = s.connect_ex((h, tunnel_port))
+                        s.close()
+                        if res == 0:
+                            launch_kwargs["proxy"] = {"server": f"socks5://{h}:{tunnel_port}"}
+                            print(f"[{platform.upper()}_WORKER] 🛡️ Stealth Home Gateway ACTIVE! Routing login browser via Home SOCKS5 ({h}:{tunnel_port})")
+                            break
+                    except Exception:
+                        pass
+
             context = p.chromium.launch_persistent_context(**launch_kwargs)
             pages = context.pages
             page = pages[0] if pages else context.new_page()
@@ -342,7 +364,8 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                     elif platform == "youtube":
                         yt_keys = {"LOGIN_INFO", "SAPISID", "SID", "SSID", "__Secure-3PAPISID", "__Secure-3PSID"}
                         is_studio = "studio.youtube.com" in current_url and "accounts.google.com" not in current_url and "signin" not in current_url
-                        if any(k in cookie_names for k in yt_keys) or is_studio:
+                        is_logged_in_google = "accounts.google.com" not in current_url and any(k in cookie_names for k in yt_keys)
+                        if is_studio or is_logged_in_google:
                             logged_in = True
                             try:
                                 ch_elem = page.locator("#channel-title, #entity-name, ytcp-entity-page #entity-name, [aria-label*='Channel']").first
