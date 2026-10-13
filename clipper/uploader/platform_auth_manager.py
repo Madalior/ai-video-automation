@@ -570,15 +570,17 @@ class PlatformAuthManager:
 
         # 3. If worker signaled success or connected
         if status_data.get("connected") is True or status_data.get("status") == "connected":
-            self.cancel_login(account_id, platform)
-            return {
-                "status": "connected",
-                "connected": True,
-                "platform": platform,
-                "account_id": account_id,
-                "message": status_data.get("message", f"{platform.title()} is connected!"),
-                "details": status_data
-            }
+            should_finalize = (not is_running) or status_data.get("phase") in ("logged_in_finalizing", "completed") or (status_data.get("verified_by") == "user_confirmation")
+            if should_finalize:
+                self.cancel_login(account_id, platform)
+                return {
+                    "status": "connected",
+                    "connected": True,
+                    "platform": platform,
+                    "account_id": account_id,
+                    "message": status_data.get("message", f"{platform.title()} is connected!"),
+                    "details": status_data
+                }
 
         if status_data.get("status") == "error":
             self.cancel_login(account_id, platform)

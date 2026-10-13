@@ -89,6 +89,12 @@ def connect_platform(acc_id, platform):
                 except Exception:
                     pass
 
+    # Remove stale cookie file for this platform if present
+    old_cookie = PROJECT_ROOT / "uploader_profiles" / "accounts" / f"{acc_id}_{platform}_cookies.json"
+    if old_cookie.exists():
+        try: old_cookie.unlink()
+        except Exception: pass
+
     init_status = {
         "status": "in_progress",
         "phase": "launching",

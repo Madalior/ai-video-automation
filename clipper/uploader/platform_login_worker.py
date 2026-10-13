@@ -362,10 +362,13 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                             break
 
                     elif platform == "youtube":
-                        yt_keys = {"LOGIN_INFO", "SAPISID", "SID", "SSID", "__Secure-3PAPISID", "__Secure-3PSID"}
-                        is_studio = "studio.youtube.com" in current_url and "accounts.google.com" not in current_url and "signin" not in current_url
-                        is_logged_in_google = "accounts.google.com" not in current_url and any(k in cookie_names for k in yt_keys)
-                        if is_studio or is_logged_in_google:
+                        is_studio = (
+                            "studio.youtube.com" in current_url 
+                            and "accounts.google.com" not in current_url 
+                            and "signin" not in current_url
+                            and "servicelogin" not in current_url
+                        )
+                        if is_studio:
                             logged_in = True
                             try:
                                 ch_elem = page.locator("#channel-title, #entity-name, ytcp-entity-page #entity-name, [aria-label*='Channel']").first
