@@ -127,6 +127,20 @@ class YouTubeStudioUploader:
             except Exception:
                 pass
 
+        # Check and cancel any previous stuck upload draft
+        cancel_btn = self.page.locator("button:has-text('Cancel upload'), ytcp-button:has-text('Cancel upload'), [aria-label*='Cancel upload']").first
+        if cancel_btn.is_visible():
+            print("[YOUTUBE_BOT] Found previous stuck upload draft. Cancelling it cleanly...")
+            try:
+                cancel_btn.click(force=True)
+                self.page.wait_for_timeout(2000)
+                confirm_btn = self.page.locator("ytcp-button:has-text('Cancel upload'), button:has-text('Cancel upload')").first
+                if confirm_btn.is_visible():
+                    confirm_btn.click(force=True)
+                    self.page.wait_for_timeout(3000)
+            except Exception as e:
+                print(f"[YOUTUBE_BOT] Cancel draft note: {e}")
+
         print("[YOUTUBE_BOT] Verifying Upload Dialog and File Input...")
         file_input = self.page.locator("input[type='file']").first
         
@@ -270,7 +284,34 @@ class YouTubeStudioUploader:
                 pub.click(force=True)
                 self.page.wait_for_timeout(1000)
 
-        # 12. Click Save / Publish
+        # 12. Wait for binary upload transmission to complete (Upload complete / Processing / Checks)
+        print("[YOUTUBE_BOT] Waiting for file transmission to reach 100% (Upload complete)...")
+        for wait_idx in range(90):
+            progress_el = self.page.locator(".progress-label, ytcp-video-upload-progress, [class*='progress-label']").first
+            status_text = ""
+            if progress_el.count() > 0:
+                try:
+                    status_text = progress_el.inner_text().strip()
+                except Exception:
+                    pass
+            
+            dialog_text = ""
+            try:
+                dialog_text = self.page.locator("ytcp-uploads-dialog, [role='dialog']").first.inner_text()
+            except Exception:
+                pass
+            
+            combined = f"{status_text} {dialog_text}"
+            if any(term in combined for term in ["Upload complete", "Processing", "Checks complete", "Checks finished"]):
+                print(f"[YOUTUBE_BOT] ✅ Upload transmission complete: '{status_text or 'Upload complete'}'")
+                break
+                
+            if wait_idx % 5 == 0 and status_text:
+                print(f"[YOUTUBE_BOT] Upload progress: {status_text}")
+                
+            self.page.wait_for_timeout(2000)
+
+        # 13. Click Save / Publish
         print("[YOUTUBE_BOT] Clicking Publish / Save...")
         done_button = self.page.locator("#done-button:not([hidden]), ytcp-button#done-button:not([hidden]), #done-button, ytcp-button:has-text('Publish'), button:has-text('Publish'), ytcp-button:has-text('Save'), button:has-text('Save')").first
         done_button.wait_for(state="attached", timeout=25000)
@@ -289,7 +330,11 @@ class YouTubeStudioUploader:
         print("[YOUTUBE_BOT] Clicked Save/Publish button successfully!")
 
         # Wait for confirmation modal or dialog close
-        self.page.wait_for_timeout(6000)
+        self.page.wait_for_timeout(8000)
+        try:
+            self.page.screenshot(path="/app/output/yt_published_confirmation.png")
+        except Exception:
+            pass
 
         # Try to capture link from share dialog if not yet captured
         if not video_url:
