@@ -369,7 +369,13 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                             and "servicelogin" not in current_url
                         )
                         if is_studio:
-                            logged_in = True
+                            # Give YouTube Studio time to fully render and write persistent tokens
+                            try:
+                                create_icon = page.locator("#create-icon, [aria-label*='Create'], #avatar-btn, ytcp-entity-page").first
+                                create_icon.wait_for(state="visible", timeout=20000)
+                            except Exception:
+                                pass
+
                             try:
                                 ch_elem = page.locator("#channel-title, #entity-name, ytcp-entity-page #entity-name, [aria-label*='Channel']").first
                                 if ch_elem.count() > 0:
@@ -378,8 +384,19 @@ def run_interactive_login(account_id: str, platform: str, timeout_sec: int = 300
                                 pass
                             if not detected_handle:
                                 detected_handle = f"@{account_id} (YouTube Studio)"
-                            print(f"[{platform.upper()}_WORKER] ✅ YouTube Studio session verified! ({detected_handle})")
-                            time.sleep(3)
+
+                            print(f"[{platform.upper()}_WORKER] ✅ YouTube Studio loaded! ({detected_handle}) - Allowing 10s for auth tokens to settle...")
+                            write_status({
+                                "status": "in_progress",
+                                "phase": "logged_in_finalizing",
+                                "connected": True,
+                                "platform": platform,
+                                "account_id": account_id,
+                                "handle": detected_handle,
+                                "message": f"YouTube Studio loaded! Finalizing Google session tokens for {detected_handle}..."
+                            })
+                            time.sleep(10)
+                            logged_in = True
                             break
 
                 except Exception:
