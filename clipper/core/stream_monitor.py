@@ -292,6 +292,7 @@ class StreamMonitor:
                             "title": title,
                             "url": webpage_url,
                             "duration": float(duration),
+                            "view_count": int(data.get("view_count") or 0),
                             "thumbnails": data.get("thumbnails") or [],
                         })
                 except json.JSONDecodeError:
@@ -301,6 +302,149 @@ class StreamMonitor:
             print(f"[STREAM MONITOR] [ERROR] Failed to fetch streams for {channel_url}: {e}")
 
         return completed
+
+    def fetch_archive_or_viral_streams(
+        self,
+        channel_url: str,
+        mode: str = "viral",
+        limit: int = 3,
+        offset_or_post_id: Optional[int] = None
+    ) -> List[Dict]:
+        """
+        Fetches either:
+        - `mode="viral"`: Most-viewed past viral streams / episodes sorted by view count.
+        - `mode="old_archive"`: Older archived episodes / past streams (using Telegram `?before=` or playlist offset).
+        - `mode="latest"`: Standard most recent streams/episodes.
+        """
+        if mode == "latest" and not offset_or_post_id:
+            return self.fetch_completed_streams(channel_url, limit=limit)
+
+        # 1. Telegram Channel Archive / Viral Handling
+        if "t.me/" in channel_url or "telegram.me/" in channel_url:
+            try:
+                import urllib.request
+                import html as html_lib
+                norm = self.normalize_channel_url(channel_url)
+                preview_url = norm["channel_url"]
+
+                if mode == "old_archive":
+                    if offset_or_post_id and offset_or_post_id > 0:
+                        target_url = f"{preview_url}?before={offset_or_post_id + 15}"
+                    else:
+                        # Auto-hop backwards into older archive page
+                        req0 = urllib.request.Request(preview_url, headers={"User-Agent": "Mozilla/5.0"})
+                        html0 = urllib.request.urlopen(req0, timeout=8).read().decode("utf-8", errors="replace")
+                        before_m = re.search(r'data-before="(\d+)"', html0)
+                        before_id = int(before_m.group(1)) if before_m else 100
+                        target_url = f"{preview_url}?before={before_id}"
+                else:
+                    target_url = preview_url
+
+                req = urllib.request.Request(target_url, headers={"User-Agent": "Mozilla/5.0"})
+                page_html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="replace")
+                blocks = page_html.split('data-post="')[1:]
+                candidates = []
+
+                for b in reversed(blocks):
+                    post_id = b.split('"')[0]
+                    has_video = ("<video" in b or "tgme_widget_message_video" in b or "tgme_widget_message_document" in b)
+                    if not has_video and len(blocks) > 3:
+                        continue
+
+                    dur_m = re.search(r'tgme_widget_message_video_duration[^>]*>([^<]+)<', b)
+                    dur_sec = 180.0
+                    if dur_m:
+                        parts = [int(x) for x in dur_m.group(1).strip().split(":") if x.isdigit()]
+                        if len(parts) == 2:
+                            dur_sec = float(parts[0] * 60 + parts[1])
+                        elif len(parts) == 3:
+                            dur_sec = float(parts[0] * 3600 + parts[1] * 60 + parts[2])
+
+                    # Parse Telegram views (e.g., "1.4M", "320K", "15200")
+                    views_m = re.search(r'tgme_widget_message_views[^>]*>([^<]+)<', b)
+                    views_val = 0
+                    if views_m:
+                        v_str = views_m.group(1).strip().upper()
+                        try:
+                            if "M" in v_str:
+                                views_val = int(float(v_str.replace("M", "")) * 1_000_000)
+                            elif "K" in v_str:
+                                views_val = int(float(v_str.replace("K", "")) * 1_000)
+                            else:
+                                views_val = int(re.sub(r"[^\d]", "", v_str) or 0)
+                        except Exception:
+                            views_val = 0
+
+                    text_m = re.search(r'tgme_widget_message_text[^>]*>(.*?)</div>', b, re.DOTALL)
+                    raw_text = re.sub(r'<[^>]+>', ' ', text_m.group(1)).strip() if text_m else ""
+                    clean_title = html_lib.unescape(re.sub(r'\s+', ' ', raw_text))[:80] or f"Episode #{post_id.split('/')[-1]}"
+                    tag_prefix = "🔥 [VIRAL TG]" if mode == "viral" else "📜 [OLD EPISODE]"
+                    vid_m = re.search(r'<video[^>]+src="([^"]+)"', b)
+                    media_url = vid_m.group(1) if vid_m else f"https://t.me/{post_id}"
+
+                    candidates.append({
+                        "stream_id": f"{post_id.replace('/', '_')}_{mode}",
+                        "title": f"{tag_prefix} {clean_title}",
+                        "url": media_url,
+                        "duration": dur_sec,
+                        "view_count": views_val,
+                        "thumbnails": [],
+                    })
+
+                if mode == "viral":
+                    candidates.sort(key=lambda x: x.get("view_count", 0), reverse=True)
+
+                return candidates[:limit]
+            except Exception as tg_err:
+                print(f"[STREAM MONITOR] [WARN] Telegram archive/viral scan error: {tg_err}")
+
+        # 2. YouTube / Twitch Archive & Viral Stream Handling
+        try:
+            cmd = ["yt-dlp", "--flat-playlist", "--dump-json"]
+            if mode == "old_archive":
+                start_idx = offset_or_post_id if (offset_or_post_id and offset_or_post_id > 0) else 8
+                cmd.extend(["--playlist-start", str(start_idx), "--playlist-end", str(start_idx + limit + 3)])
+            else:
+                # Fetch larger window (15) to sort by highest view_count for viral mode
+                cmd.extend(["--playlist-end", str(max(limit * 4, 15))])
+            cmd.append(channel_url)
+
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+            if r.returncode != 0:
+                return self.fetch_completed_streams(channel_url, limit=limit)
+
+            candidates = []
+            for line in r.stdout.strip().split("\n"):
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    stream_id = data.get("id")
+                    if not stream_id:
+                        continue
+                    title = data.get("title", "Archived Stream")
+                    duration = float(data.get("duration") or 3600.0)
+                    views = int(data.get("view_count") or 0)
+                    webpage_url = data.get("url") or data.get("webpage_url") or f"https://www.youtube.com/watch?v={stream_id}"
+                    tag_prefix = f"🔥 [VIRAL {views:,} views]" if mode == "viral" and views else ("📜 [OLD STREAM]" if mode == "old_archive" else "")
+                    candidates.append({
+                        "stream_id": f"{stream_id}_{mode}",
+                        "title": f"{tag_prefix} {title}".strip(),
+                        "url": webpage_url,
+                        "duration": duration,
+                        "view_count": views,
+                        "thumbnails": data.get("thumbnails") or [],
+                    })
+                except Exception:
+                    continue
+
+            if mode == "viral":
+                candidates.sort(key=lambda x: x.get("view_count", 0), reverse=True)
+
+            return candidates[:limit]
+        except Exception as e:
+            print(f"[STREAM MONITOR] [ERROR] Archive/viral fetch failed: {e}")
+            return self.fetch_completed_streams(channel_url, limit=limit)
 
     def check_and_enqueue_streams(self, db_session) -> List[Dict]:
         """

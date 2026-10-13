@@ -43,6 +43,59 @@
   </form>
 </div>
 
+{% if influencers %}
+<!-- Cross-Channel Conversation / Mashup Studio -->
+<div class="glass-card" style="margin-bottom: 28px; padding: 22px; border: 1px solid rgba(99, 102, 241, 0.35);">
+  <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+    <span>🗣️</span> Cross-Channel Conversation &amp; Archive Studio
+  </div>
+  <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+    Combine <strong>past viral streams</strong>, <strong>old videos</strong>, or <strong>archived Telegram episodes</strong> between your followed channels into a back-and-forth dialogue or split-screen reaction short.
+  </p>
+  <form method="POST" action="{{ url_for('influencers.build_channel_conversation') }}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+    <div style="flex: 1.2; min-width: 190px;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Channel A (Speaker / Reactor)</label>
+      <select name="channel_a_id" class="form-input" style="width: 100%;" required>
+        {% for inf in influencers %}
+          <option value="{{ inf.id }}">{{ inf.channel_name }} ({{ inf.platform | capitalize }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex: 1.2; min-width: 190px;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Channel B (Counterpart / Episode)</label>
+      <select name="channel_b_id" class="form-input" style="width: 100%;" required>
+        {% for inf in influencers %}
+          <option value="{{ inf.id }}" {% if loop.index == 2 %}selected{% endif %}>{{ inf.channel_name }} ({{ inf.platform | capitalize }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex: 1; min-width: 165px;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Source Footage Mode</label>
+      <select name="source_mode" class="form-input" style="width: 100%;">
+        <option value="viral">🔥 Past Viral Stream / Top Video</option>
+        <option value="old_archive">📜 Old Video / Old Episode</option>
+        <option value="latest">⚡ Latest Stream / Episode</option>
+      </select>
+    </div>
+    <div style="flex: 1.1; min-width: 175px;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Conversation Style</label>
+      <select name="conversation_style" class="form-input" style="width: 100%;">
+        <option value="alternating_dialogue">🗣️ Back-and-Forth Dialogue Cut</option>
+        <option value="split_screen_reaction">📱 9:16 Split-Screen Reaction</option>
+        <option value="viral_hook_crossover">⚡ Viral Hook + Episode Crossover</option>
+      </select>
+    </div>
+    <div style="flex: 0.7; min-width: 130px;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Ep # / Offset (Opt)</label>
+      <input type="number" name="episode_offset" class="form-input" placeholder="e.g. 520 or 10" min="1" style="width: 100%;">
+    </div>
+    <div>
+      <button type="submit" class="btn-primary" style="padding: 10px 20px; white-space: nowrap;">🎬 Build Conversation</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
 <!-- Influencers Grid -->
 {% if influencers %}
   <div class="influencer-grid">
@@ -67,18 +120,35 @@
           </div>
         </div>
 
-        <div class="influencer-actions">
-          <!-- Manual Scan Button -->
+        <div class="influencer-actions" style="flex-wrap: wrap; gap: 6px;">
+          <!-- Latest Scan -->
           <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
+            <input type="hidden" name="scan_mode" value="latest">
             <button type="submit" class="btn-secondary" title="Scan for newly ended streams right now">
-              🔍 Scan Now
+              🔍 Latest
+            </button>
+          </form>
+
+          <!-- Viral Scan -->
+          <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
+            <input type="hidden" name="scan_mode" value="viral">
+            <button type="submit" class="btn-secondary" title="Pull highest-viewed viral streams/videos">
+              🔥 Viral
+            </button>
+          </form>
+
+          <!-- Old Archive Scan -->
+          <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
+            <input type="hidden" name="scan_mode" value="old_archive">
+            <button type="submit" class="btn-secondary" title="Pull older archived videos or past episodes">
+              📜 Old Ep
             </button>
           </form>
 
           <!-- Toggle Active / Pause -->
           <form method="POST" action="{{ url_for('influencers.toggle_influencer', influencer_id=inf.id) }}" style="display:inline;">
             <button type="submit" class="btn-secondary">
-              {{ '⏸️ Pause' if inf.is_active else '▶️ Resume' }}
+              {{ '⏸️' if inf.is_active else '▶️' }}
             </button>
           </form>
 
