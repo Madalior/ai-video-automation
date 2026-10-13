@@ -1,22 +1,292 @@
 {% extends "base.html" %}
 
-{% block title %}Followed Creators — Going Merry{% endblock %}
+{% block title %}Followed Creators & Autonomous Dispatch — Going Merry{% endblock %}
 
 {% block content %}
+<style>
+/* Industrial Tech & Cyberpunk Glass Cards */
+.conversational-console {
+  background: linear-gradient(180deg, rgba(16, 24, 39, 0.95) 0%, rgba(10, 15, 26, 0.98) 100%);
+  border: 1px solid rgba(76, 230, 22, 0.35);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 28px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 20px rgba(76, 230, 22, 0.08);
+}
+
+.console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 12px;
+}
+
+.console-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-michroma, 'JetBrains Mono', monospace);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+.led-status {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4CE616;
+  box-shadow: 0 0 10px #4CE616;
+}
+
+.chat-feed-box {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chat-msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.chat-bubble {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  color: #e2e8f0;
+  line-height: 1.5;
+  font-family: var(--font-mono, monospace);
+  max-width: 85%;
+}
+
+.chat-bubble.user {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #e0e7ff;
+  margin-left: auto;
+}
+
+.chat-bubble.bot {
+  background: rgba(76, 230, 22, 0.08);
+  border-color: rgba(76, 230, 22, 0.25);
+  color: #f1f5f9;
+}
+
+.command-pills-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.cmd-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cmd-pill:hover {
+  background: rgba(76, 230, 22, 0.15);
+  border-color: #4CE616;
+  color: #4CE616;
+  transform: translateY(-1px);
+}
+
+.chat-input-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Influencer Grid & Cards */
+.influencer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 20px;
+  margin-bottom: 36px;
+}
+
+.influencer-card {
+  background: rgba(18, 24, 38, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.influencer-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(76, 230, 22, 0.4);
+}
+
+.influencer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.influencer-name {
+  font-family: var(--font-michroma, 'JetBrains Mono', monospace);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.influencer-handle {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.82rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.badge-active {
+  background: rgba(76, 230, 22, 0.15);
+  color: #4CE616;
+  border: 1px solid rgba(76, 230, 22, 0.4);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.5px;
+}
+
+.badge-paused {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+
+.influencer-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  font-family: var(--font-mono, monospace);
+  margin-bottom: 16px;
+}
+
+.influencer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
   <div>
-    <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 4px;">Followed Influencers</h1>
+    <h1 style="font-family: var(--font-michroma, sans-serif); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; color: #fff;">
+      Followed Creators &amp; Channels
+    </h1>
     <p style="color: var(--text-muted); font-size: 0.95rem;">
-      Going Merry scans these creators daily and automatically produces viral shorts from ended livestreams.
+      Going Merry monitors these creators and Telegram channels to autonomously harvest viral reels &amp; shorts.
     </p>
   </div>
-  <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Advanced Clip Studio</a>
+  <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Advanced Studio</a>
+</div>
+
+<!-- Conversational AI Assistant Console -->
+<div class="conversational-console">
+  <div class="console-header">
+    <div class="console-title">
+      <span class="led-status"></span>
+      <span>GOING MERRY FLEET DIRECTOR // CONVERSATIONAL COMMAND</span>
+    </div>
+    <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; background: rgba(76, 230, 22, 0.12); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(76, 230, 22, 0.3);">
+      READY • COMMAND ACTIVE
+    </span>
+  </div>
+
+  <!-- Interactive Chat Stream -->
+  <div class="chat-feed-box" id="aiChatFeed">
+    <div class="chat-msg">
+      <span style="font-size: 1.2rem;">🤖</span>
+      <div class="chat-bubble bot">
+        <strong>Fleet Director Online!</strong> How can I help you today? You can type natural commands like:
+        <br>• <strong>"download ep1"</strong> — pulls Episode 1 from your Telegram channel
+        <br>• <strong>"look for high viewed stream"</strong> — discovers viral streams with millions of views
+        <br>• <strong>"scan latest streams"</strong> — checks for newly finished broadcasts
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Command Pills -->
+  <div class="command-pills-row">
+    <button type="button" class="cmd-pill" onclick="sendQuickCommand('download ep1')">
+      📥 "download ep1"
+    </button>
+    <button type="button" class="cmd-pill" onclick="sendQuickCommand('look for high viewed stream')">
+      🔥 "look for high viewed stream"
+    </button>
+    <button type="button" class="cmd-pill" onclick="sendQuickCommand('download ep 500')">
+      📜 "download ep 500"
+    </button>
+    <button type="button" class="cmd-pill" onclick="sendQuickCommand('scan latest livestreams')">
+      ⚡ "scan latest streams"
+    </button>
+  </div>
+
+  <!-- Conversational Input Bar -->
+  <form id="aiChatForm" onsubmit="submitAiChat(event)" class="chat-input-bar">
+    <input 
+      type="text" 
+      id="aiChatPrompt" 
+      class="form-input" 
+      placeholder="Type a command... (e.g. 'download ep1' or 'look for high viewed stream')" 
+      required 
+      style="flex: 1; padding: 12px 16px; font-size: 0.95rem; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff;"
+      autocomplete="off"
+    >
+    <button type="submit" id="aiChatSubmitBtn" class="btn-primary" style="padding: 12px 24px; white-space: nowrap; font-weight: 700; letter-spacing: 0.5px;">
+      SEND ↵
+    </button>
+  </form>
 </div>
 
 <!-- Quick Follow Form -->
-<div class="glass-card" style="margin-bottom: 28px; padding: 22px;">
-  <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-    <span>📡</span> Follow Creator Stream or Telegram Channel
+<div class="glass-card" style="margin-bottom: 28px; padding: 22px; background: rgba(18, 24, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;">
+  <div style="font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: #fff;">
+    <span>📡</span> Follow New Creator or Telegram Channel
   </div>
   <form method="POST" action="{{ url_for('influencers.add_influencer') }}" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;">
     <div style="flex: 2; min-width: 280px;">
@@ -43,59 +313,6 @@
   </form>
 </div>
 
-{% if influencers %}
-<!-- Cross-Channel Conversation / Mashup Studio -->
-<div class="glass-card" style="margin-bottom: 28px; padding: 22px; border: 1px solid rgba(99, 102, 241, 0.35);">
-  <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-    <span>🗣️</span> Cross-Channel Conversation &amp; Archive Studio
-  </div>
-  <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
-    Combine <strong>past viral streams</strong>, <strong>old videos</strong>, or <strong>archived Telegram episodes</strong> between your followed channels into a back-and-forth dialogue or split-screen reaction short.
-  </p>
-  <form method="POST" action="{{ url_for('influencers.build_channel_conversation') }}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
-    <div style="flex: 1.2; min-width: 190px;">
-      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Channel A (Speaker / Reactor)</label>
-      <select name="channel_a_id" class="form-input" style="width: 100%;" required>
-        {% for inf in influencers %}
-          <option value="{{ inf.id }}">{{ inf.channel_name }} ({{ inf.platform | capitalize }})</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div style="flex: 1.2; min-width: 190px;">
-      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Channel B (Counterpart / Episode)</label>
-      <select name="channel_b_id" class="form-input" style="width: 100%;" required>
-        {% for inf in influencers %}
-          <option value="{{ inf.id }}" {% if loop.index == 2 %}selected{% endif %}>{{ inf.channel_name }} ({{ inf.platform | capitalize }})</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div style="flex: 1; min-width: 165px;">
-      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Source Footage Mode</label>
-      <select name="source_mode" class="form-input" style="width: 100%;">
-        <option value="viral">🔥 Past Viral Stream / Top Video</option>
-        <option value="old_archive">📜 Old Video / Old Episode</option>
-        <option value="latest">⚡ Latest Stream / Episode</option>
-      </select>
-    </div>
-    <div style="flex: 1.1; min-width: 175px;">
-      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Conversation Style</label>
-      <select name="conversation_style" class="form-input" style="width: 100%;">
-        <option value="alternating_dialogue">🗣️ Back-and-Forth Dialogue Cut</option>
-        <option value="split_screen_reaction">📱 9:16 Split-Screen Reaction</option>
-        <option value="viral_hook_crossover">⚡ Viral Hook + Episode Crossover</option>
-      </select>
-    </div>
-    <div style="flex: 0.7; min-width: 130px;">
-      <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Ep # / Offset (Opt)</label>
-      <input type="number" name="episode_offset" class="form-input" placeholder="e.g. 520 or 10" min="1" style="width: 100%;">
-    </div>
-    <div>
-      <button type="submit" class="btn-primary" style="padding: 10px 20px; white-space: nowrap;">🎬 Build Conversation</button>
-    </div>
-  </form>
-</div>
-{% endif %}
-
 <!-- Influencers Grid -->
 {% if influencers %}
   <div class="influencer-grid">
@@ -108,19 +325,19 @@
               <div class="influencer-handle">{{ inf.channel_handle or inf.channel_url }}</div>
             </div>
             <span class="badge {{ 'badge-active' if inf.is_active else 'badge-paused' }}">
-              {{ 'Monitoring' if inf.is_active else 'Paused' }}
+              {{ 'MONITORING' if inf.is_active else 'PAUSED' }}
             </span>
           </div>
 
-          <div style="margin-top: 16px; font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px;">
-            <div><strong>Platform:</strong> {{ inf.platform | capitalize }}</div>
-            <div><strong>Clips per stream:</strong> {{ inf.num_clips }}</div>
-            <div><strong>Auto-upload:</strong> {{ 'Enabled (Postiz)' if inf.auto_upload else 'Disabled' }}</div>
-            <div><strong>Last check:</strong> {{ inf.last_checked_at.strftime('%b %d, %H:%M') if inf.last_checked_at else 'Never' }}</div>
+          <div class="influencer-meta-list">
+            <div><strong style="color: var(--text-muted);">Platform:</strong> {{ inf.platform | capitalize }}</div>
+            <div><strong style="color: var(--text-muted);">Clips per stream:</strong> {{ inf.num_clips }}</div>
+            <div><strong style="color: var(--text-muted);">Auto-upload:</strong> {{ 'Enabled (Postiz)' if inf.auto_upload else 'Disabled' }}</div>
+            <div><strong style="color: var(--text-muted);">Last check:</strong> {{ inf.last_checked_at.strftime('%b %d, %H:%M') if inf.last_checked_at else 'Never' }}</div>
           </div>
         </div>
 
-        <div class="influencer-actions" style="flex-wrap: wrap; gap: 6px;">
+        <div class="influencer-actions">
           <!-- Latest Scan -->
           <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
             <input type="hidden" name="scan_mode" value="latest">
@@ -167,7 +384,7 @@
     <div style="font-size: 3rem; margin-bottom: 12px;">📡</div>
     <h3 style="font-size: 1.3rem; margin-bottom: 8px;">No Influencers Followed Yet</h3>
     <p style="color: var(--text-muted); max-width: 460px; margin: 0 auto 24px;">
-      Add creators like IShowSpeed, Kai Cenat, or your favorite streamers to automatically slice their streams every time they go offline.
+      Add creators like IShowSpeed, Kai Cenat, or Telegram channels to automatically slice their streams.
     </p>
     <a href="{{ url_for('clips.new_clip') }}" class="btn-primary" style="display: inline-flex; width: auto;">
       Follow Your First Influencer
@@ -176,44 +393,171 @@
 {% endif %}
 
 <!-- Recent Detected Streams Table -->
-<div class="glass-card" style="margin-top: 40px;">
-  <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 16px;">Detected Livestreams History</h2>
+<div class="glass-card" style="margin-top: 40px; background: rgba(18, 24, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h2 style="font-family: var(--font-michroma); font-size: 1.15rem; font-weight: 700; color: #fff;">
+      Detected Livestreams &amp; Episodes Queue
+    </h2>
+    <span style="font-family: var(--font-mono); font-size: 0.8rem; color: #4CE616;">
+      ● LIVE WORKER INTAKE ACTIVE
+    </span>
+  </div>
   
-  {% if recent_streams %}
-    <div class="table-responsive">
-      <table>
-        <thead>
-          <tr>
-            <th>Creator</th>
-            <th>Stream Title</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th>Detected At</th>
-          </tr>
-        </thead>
-        <tbody>
+  <div class="table-responsive">
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">
+          <th style="padding: 10px 12px;">CREATOR</th>
+          <th style="padding: 10px 12px;">STREAM / EPISODE TITLE</th>
+          <th style="padding: 10px 12px;">DURATION</th>
+          <th style="padding: 10px 12px;">STATUS</th>
+          <th style="padding: 10px 12px;">DETECTED AT</th>
+        </tr>
+      </thead>
+      <tbody id="streamsTableBody">
+        {% if recent_streams %}
           {% for stream in recent_streams %}
-            <tr>
-              <td><strong>{{ stream.influencer.channel_name }}</strong></td>
-              <td>
-                <a href="{{ stream.stream_url }}" target="_blank" style="color: var(--primary); text-decoration: none;">
-                  {{ stream.stream_title[:55] }}{% if stream.stream_title | length > 55 %}...{% endif %}
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.88rem;">
+              <td style="padding: 12px;"><strong>{{ stream.influencer.channel_name }}</strong></td>
+              <td style="padding: 12px;">
+                <a href="{{ stream.stream_url }}" target="_blank" style="color: #60a5fa; text-decoration: none;">
+                  {{ stream.stream_title[:65] }}{% if stream.stream_title | length > 65 %}...{% endif %}
                 </a>
               </td>
-              <td>{{ (stream.duration / 60) | round(0) }} min</td>
-              <td>
-                <span class="badge {{ 'badge-active' if stream.status == 'completed' else 'badge-processing' }}">
+              <td style="padding: 12px; color: var(--text-muted);">{{ (stream.duration / 60) | round(0) }} min</td>
+              <td style="padding: 12px;">
+                <span class="badge {{ 'badge-active' if stream.status in ['completed', 'queued'] else 'badge-processing' }}">
                   {{ stream.status }}
                 </span>
               </td>
-              <td style="color: var(--text-dim);">{{ stream.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td style="padding: 12px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">
+                {{ stream.created_at.strftime('%Y-%m-%d %H:%M') }}
+              </td>
             </tr>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <p style="color: var(--text-dim); font-size: 0.9rem;">No completed streams detected yet. They will appear here automatically when your creators finish streaming.</p>
-  {% endif %}
+        {% else %}
+          <tr>
+            <td colspan="5" style="padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.9rem;">
+              No streams detected yet. Type a command above (e.g. <code>download ep1</code> or <code>look for high viewed stream</code>) to queue video content!
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
 </div>
+
+<script>
+function sendQuickCommand(cmd) {
+  const input = document.getElementById('aiChatPrompt');
+  if (input) {
+    input.value = cmd;
+    submitAiChat();
+  }
+}
+
+async function submitAiChat(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('aiChatPrompt');
+  const btn = document.getElementById('aiChatSubmitBtn');
+  const feed = document.getElementById('aiChatFeed');
+  const prompt = (input.value || '').trim();
+  if (!prompt) return;
+
+  // Render User Message in feed
+  const userMsgDiv = document.createElement('div');
+  userMsgDiv.className = 'chat-msg';
+  userMsgDiv.innerHTML = `
+    <span style="font-size: 1.2rem;">👤</span>
+    <div class="chat-bubble user"><strong>You:</strong> ${escapeHtml(prompt)}</div>
+  `;
+  feed.appendChild(userMsgDiv);
+
+  // Render Bot Loading indicator
+  const botLoadingDiv = document.createElement('div');
+  botLoadingDiv.className = 'chat-msg';
+  botLoadingDiv.id = 'botLoadingIndicator';
+  botLoadingDiv.innerHTML = `
+    <span style="font-size: 1.2rem;">🤖</span>
+    <div class="chat-bubble bot" style="color: #4CE616;">
+      <span class="led-status" style="margin-right: 6px;"></span> Processing command: "${escapeHtml(prompt)}"...
+    </div>
+  `;
+  feed.appendChild(botLoadingDiv);
+  feed.scrollTop = feed.scrollHeight;
+
+  input.value = '';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/influencers/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
+    const data = await res.json();
+
+    // Remove loading indicator
+    botLoadingDiv.remove();
+
+    // Render Bot Response
+    const botReplyDiv = document.createElement('div');
+    botReplyDiv.className = 'chat-msg';
+    botReplyDiv.innerHTML = `
+      <span style="font-size: 1.2rem;">🤖</span>
+      <div class="chat-bubble bot">
+        ${escapeHtml(data.reply || 'Command processed.')}
+      </div>
+    `;
+    feed.appendChild(botReplyDiv);
+    feed.scrollTop = feed.scrollHeight;
+
+    // If stream was queued, prepend to table
+    if (data.stream) {
+      const tbody = document.getElementById('streamsTableBody');
+      if (tbody) {
+        const tr = document.createElement('tr');
+        tr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.88rem; animation: fadeIn 0.4s ease-out; background: rgba(76, 230, 22, 0.06);';
+        tr.innerHTML = `
+          <td style="padding: 12px;"><strong>${escapeHtml(data.stream.creator || 'Creator')}</strong></td>
+          <td style="padding: 12px;">
+            <a href="${data.stream.url}" target="_blank" style="color: #60a5fa; text-decoration: none;">
+              ${escapeHtml(data.stream.title)}
+            </a>
+          </td>
+          <td style="padding: 12px; color: var(--text-muted);">${data.stream.duration || '3 min'}</td>
+          <td style="padding: 12px;"><span class="badge badge-active">${data.stream.status || 'queued'}</span></td>
+          <td style="padding: 12px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">Just now</td>
+        `;
+        tbody.insertBefore(tr, tbody.firstChild);
+      }
+    }
+  } catch (err) {
+    botLoadingDiv.remove();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'chat-msg';
+    errDiv.innerHTML = `
+      <span style="font-size: 1.2rem;">⚠️</span>
+      <div class="chat-bubble" style="background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #fca5a5;">
+        Error connecting to Fleet Director: ${escapeHtml(err.message)}
+      </div>
+    `;
+    feed.appendChild(errDiv);
+    feed.scrollTop = feed.scrollHeight;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/\n/g, "<br>");
+}
+</script>
 {% endblock %}

@@ -4,7 +4,7 @@ Influencer Management Routes
 Allows users to view, toggle, configure, and scan their followed influencers.
 """
 
-from flask import Blueprint, render_template, request, flash, redirect, url_for
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from web_app.app import db
 from web_app.models import MonitoredInfluencer, ProcessedStream
@@ -214,3 +214,177 @@ def add_influencer():
         flash(f"Already monitoring {existing.channel_name}.", "info")
 
     return redirect(url_for("influencers.list_influencers"))
+
+
+@influencers_bp.route("/api/influencers/chat", methods=["POST"])
+@login_required
+def chat_command():
+    """
+    Conversational AI Assistant Endpoint for Influencer & Telegram Content
+    Handles natural language commands like:
+    - 'download ep1' / 'download episode 5'
+    - 'look for high viewed stream' / 'find viral stream of ishowspeed'
+    - 'scan latest streams'
+    """
+    from datetime import datetime
+    import re
+
+    data = request.get_json(silent=True) or request.form
+    prompt = (data.get("prompt") or data.get("message") or "").strip()
+
+    if not prompt:
+        return jsonify({"success": False, "reply": "Please type a command (e.g., 'download ep1' or 'look for high viewed stream')."}), 400
+
+    prompt_lower = prompt.lower()
+    followed = MonitoredInfluencer.query.filter_by(user_id=current_user.id, is_active=True).all()
+    if not followed:
+        return jsonify({
+            "success": False,
+            "reply": "⚠️ You haven't followed any creators or Telegram channels yet! Use the box above to follow a channel first."
+        })
+
+    monitor = StreamMonitor()
+
+    # 1. COMMAND: "download ep<N>" or "episode <N>" or "post <N>"
+    ep_match = re.search(r"(?:download|get|pull|find|cut|fetch)?\s*(?:ep|episode|post)\s*#?\s*(\d+)", prompt_lower)
+    if ep_match:
+        ep_num = int(ep_match.group(1))
+
+        # Target Telegram channel if present, or creator mentioned
+        target_channel = None
+        for inf in followed:
+            if inf.platform == "telegram":
+                target_channel = inf
+                break
+            if inf.channel_name.lower() in prompt_lower or (inf.channel_handle and inf.channel_handle.lower() in prompt_lower):
+                target_channel = inf
+                break
+
+        if not target_channel:
+            target_channel = followed[0]
+
+        streams = monitor.fetch_archive_or_viral_streams(
+            target_channel.channel_url,
+            mode="old_archive",
+            limit=1,
+            offset_or_post_id=ep_num
+        )
+
+        stream_data = streams[0] if streams else {
+            "stream_id": f"tg_ep_{ep_num}",
+            "title": f"Episode #{ep_num} ({target_channel.channel_name})",
+            "url": f"{target_channel.channel_url}/{ep_num}",
+            "duration": 180.0
+        }
+
+        existing = ProcessedStream.query.filter_by(
+            influencer_id=target_channel.id,
+            stream_id=stream_data["stream_id"]
+        ).first()
+
+        if not existing:
+            new_stream = ProcessedStream(
+                influencer_id=target_channel.id,
+                stream_id=stream_data["stream_id"],
+                stream_title=stream_data["title"],
+                stream_url=stream_data["url"],
+                duration=stream_data.get("duration", 180.0),
+                status="queued"
+            )
+            db.session.add(new_stream)
+            target_channel.last_checked_at = datetime.utcnow()
+            db.session.commit()
+
+        clean_title = stream_data["title"].replace("📜 [OLD EPISODE]", "").replace("🔥 [VIRAL TG]", "").strip()
+        return jsonify({
+            "success": True,
+            "reply": f"🎬 Discovered & queued Episode #{ep_num} from {target_channel.channel_name}: '{clean_title}'! Ready for clipping into 9:16 vertical shorts.",
+            "stream": {
+                "creator": target_channel.channel_name,
+                "title": clean_title,
+                "url": stream_data["url"],
+                "duration": f"{round(stream_data.get('duration', 180)/60)} min",
+                "status": "queued"
+            }
+        })
+
+    # 2. COMMAND: "look for high viewed stream" or "viral stream"
+    if any(k in prompt_lower for k in ["high viewed", "viral", "most viewed", "top stream", "popular", "trending", "highest view"]):
+        target_channel = None
+        for inf in followed:
+            if inf.channel_name.lower() in prompt_lower or (inf.channel_handle and inf.channel_handle.lower() in prompt_lower):
+                target_channel = inf
+                break
+        if not target_channel:
+            target_channel = next((inf for inf in followed if inf.platform == "youtube"), followed[0])
+
+        streams = monitor.fetch_archive_or_viral_streams(
+            target_channel.channel_url,
+            mode="viral",
+            limit=2
+        )
+
+        for s in streams:
+            existing = ProcessedStream.query.filter_by(
+                influencer_id=target_channel.id,
+                stream_id=s["stream_id"]
+            ).first()
+            if not existing:
+                new_stream = ProcessedStream(
+                    influencer_id=target_channel.id,
+                    stream_id=s["stream_id"],
+                    stream_title=s["title"],
+                    stream_url=s["url"],
+                    duration=s["duration"],
+                    status="queued"
+                )
+                db.session.add(new_stream)
+
+        target_channel.last_checked_at = datetime.utcnow()
+        db.session.commit()
+
+        if streams:
+            top_title = streams[0]["title"]
+            top_views = streams[0].get("view_count", 0)
+            views_str = f" ({top_views:,} views)" if top_views else ""
+            clean_title = top_title.replace("🔥", "").strip()
+            return jsonify({
+                "success": True,
+                "reply": f"🔥 Found high-viewed viral stream for {target_channel.channel_name}: '{clean_title}'{views_str}! Queued for AI highlight extraction.",
+                "stream": {
+                    "creator": target_channel.channel_name,
+                    "title": clean_title,
+                    "url": streams[0]["url"],
+                    "duration": f"{round(streams[0].get('duration', 300)/60)} min",
+                    "status": "queued"
+                }
+            })
+
+    # 3. COMMAND: "scan" or "latest" or "check"
+    if any(k in prompt_lower for k in ["scan", "latest", "new", "check"]):
+        new_count = 0
+        for inf in followed:
+            st = monitor.fetch_completed_streams(inf.channel_url, limit=2)
+            for s in st:
+                if not ProcessedStream.query.filter_by(influencer_id=inf.id, stream_id=s["stream_id"]).first():
+                    db.session.add(ProcessedStream(
+                        influencer_id=inf.id,
+                        stream_id=s["stream_id"],
+                        stream_title=s["title"],
+                        stream_url=s["url"],
+                        duration=s["duration"],
+                        status="queued"
+                    ))
+                    new_count += 1
+            inf.last_checked_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "reply": f"⚡ Scanned all followed channels. Found {new_count} newly finished stream(s) queued for clipping!"
+        })
+
+    # 4. GENERAL CONVERSATIONAL RESPONSE
+    return jsonify({
+        "success": True,
+        "reply": f"🤖 Fleet Director active! You can say:\n• 'download ep1' (pulls Episode 1 from your Telegram channel)\n• 'look for high viewed stream' (scans viral streams with millions of views)\n• 'scan latest streams' (checks for recent streams)"
+    })
