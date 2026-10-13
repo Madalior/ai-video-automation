@@ -180,10 +180,12 @@ class YouTubeStudioUploader:
         not_for_kids = self.page.locator("tp-yt-paper-radio-button[name='VIDEO_MADE_FOR_KIDS_NOT_MFK'], [name='VIDEO_MADE_FOR_KIDS_NOT_MFK']").first
         if not not_for_kids.is_visible():
             not_for_kids = self.page.locator("tp-yt-paper-radio-button").filter(has_text="not made for kids").first
-        if not_for_kids.is_visible():
-            not_for_kids.scroll_into_view_if_needed()
-            not_for_kids.click()
-            self.page.wait_for_timeout(800)
+        try:
+            not_for_kids.scroll_into_view_if_needed(timeout=5000)
+            not_for_kids.click(force=True)
+            self.page.wait_for_timeout(1000)
+        except Exception as k_err:
+            print(f"[YOUTUBE_BOT] Note selecting not made for kids: {k_err}")
 
         # 9. Grab the Video URL while in details screen
         video_url = ""
@@ -191,44 +193,57 @@ class YouTubeStudioUploader:
             url_elem = self.page.locator("a.ytcp-video-info, .video-url-fadeable a, a[href*='youtu.be']").first
             if url_elem.is_visible():
                 video_url = url_elem.get_attribute("href") or url_elem.inner_text().strip()
-                print(f"[YOUTUBE_BOT] 🔗 Video Link Captured: {video_url}")
+                print(f"[YOUTUBE_BOT] Video Link Captured: {video_url}")
         except Exception:
             pass
 
-        # 10. Advance dynamically to the Visibility screen
+        # 10. Advance dynamically through wizard steps to the Visibility screen
         priv_upper = privacy.strip().upper()
-        if priv_upper not in ("PUBLIC", "UNLISTED", "PRIVATE"):
+        if priv_upper not in ("PUBLIC", "UNLISTED", "PRIVATE"): 
             priv_upper = "PUBLIC"
 
-        vis_selector = "tp-yt-paper-radio-button[name='PUBLIC'], tp-yt-paper-radio-button[name='UNLISTED'], tp-yt-paper-radio-button[name='PRIVATE'], [name='PUBLIC'], [name='UNLISTED'], [name='PRIVATE']"
-        
-        max_steps = 6
-        step = 0
-        while step < max_steps:
-            if self.page.locator(vis_selector).count() > 0 and self.page.locator(vis_selector).first.is_visible():
-                print(f"[YOUTUBE_BOT] Reached Visibility screen!")
+        for step_idx in range(5):
+            self.page.wait_for_timeout(1000)
+
+            # Check if we reached Visibility screen
+            done_btn = self.page.locator("#done-button:not([hidden]), ytcp-button#done-button:not([hidden])").first
+            vis_radio = self.page.locator(f"tp-yt-paper-radio-button[name='{priv_upper}']").first
+            if (done_btn.count() > 0 and done_btn.is_visible()) or (vis_radio.count() > 0 and vis_radio.is_visible()):
+                print(f"[YOUTUBE_BOT] Reached Visibility screen (step {step_idx + 1})!")
                 break
 
             # Handle possible monetization screen
             monetization_off = self.page.locator("tp-yt-paper-radio-button[name='OFF'], [name='OFF']").first
-            if monetization_off.is_visible():
+            if monetization_off.count() > 0 and monetization_off.is_visible():
                 try:
-                    monetization_off.click()
+                    monetization_off.click(force=True)
                     self.page.wait_for_timeout(500)
                     save_mon = self.page.locator("ytcp-button:has-text('Save'), #save-button").first
-                    if save_mon.is_visible(): save_mon.click()
+                    if save_mon.is_visible(): save_mon.click(force=True)
                 except Exception:
                     pass
 
-            next_button = self.page.locator("#next-button").first
-            if next_button.is_visible() and next_button.is_enabled():
-                step += 1
-                print(f"[YOUTUBE_BOT] Advancing step {step}/{max_steps}...")
-                next_button.click()
-                self.page.wait_for_timeout(2000)
-            else:
+            # Find visible Next button
+            next_button = self.page.locator("#next-button:not([hidden]), ytcp-button#next-button:not([hidden])").first
+            if next_button.count() == 0 or not next_button.is_visible():
+                print(f"[YOUTUBE_BOT] Next button no longer visible; reached final step.")
+                break
+
+            # Wait for next button to enable
+            print(f"[YOUTUBE_BOT] Waiting for Next button to be enabled (step {step_idx + 1})...")
+            for _ in range(20):
+                is_disabled = (
+                    next_button.get_attribute("aria-disabled") == "true" or
+                    next_button.get_attribute("disabled") is not None
+                )
+                if not is_disabled:
+                    break
                 self.page.wait_for_timeout(1000)
-                step += 1
+
+            print(f"[YOUTUBE_BOT] Clicking Next button (step {step_idx + 1})...")
+            next_button.scroll_into_view_if_needed()
+            next_button.click(force=True)
+            self.page.wait_for_timeout(2000)
 
         self.page.wait_for_timeout(1500)
 
@@ -239,20 +254,32 @@ class YouTubeStudioUploader:
             vis_radio = self.page.locator("tp-yt-paper-radio-button").filter(has_text=priv_upper.capitalize()).first
         if vis_radio.is_visible():
             vis_radio.scroll_into_view_if_needed()
-            vis_radio.click()
+            vis_radio.click(force=True)
             self.page.wait_for_timeout(1000)
         else:
             pub = self.page.locator("tp-yt-paper-radio-button[name='PUBLIC'], [name='PUBLIC']").first
             if pub.is_visible():
                 pub.scroll_into_view_if_needed()
-                pub.click()
+                pub.click(force=True)
                 self.page.wait_for_timeout(1000)
 
         # 12. Click Save / Publish
         print("[YOUTUBE_BOT] Clicking Publish / Save...")
-        done_button = self.page.locator("#done-button").first
-        done_button.wait_for(state="visible", timeout=20000)
-        done_button.click()
+        done_button = self.page.locator("#done-button:not([hidden]), ytcp-button#done-button:not([hidden]), #done-button").first
+        done_button.wait_for(state="attached", timeout=25000)
+        for _ in range(25):
+            if done_button.is_visible():
+                is_disabled = (
+                    done_button.get_attribute("aria-disabled") == "true" or
+                    done_button.get_attribute("disabled") is not None
+                )
+                if not is_disabled:
+                    break
+            self.page.wait_for_timeout(1000)
+
+        done_button.scroll_into_view_if_needed()
+        done_button.click(force=True)
+        print("[YOUTUBE_BOT] Clicked Save/Publish button successfully!")
 
         # Wait for confirmation modal or dialog close
         self.page.wait_for_timeout(6000)
