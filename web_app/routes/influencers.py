@@ -40,6 +40,7 @@ def toggle_influencer(influencer_id):
 @influencers_bp.route("/influencers/<int:influencer_id>/scan", methods=["POST"])
 @login_required
 def scan_influencer(influencer_id):
+    from datetime import datetime
     influencer = MonitoredInfluencer.query.filter_by(id=influencer_id, user_id=current_user.id).first_or_404()
     monitor = StreamMonitor()
     streams = monitor.fetch_completed_streams(influencer.channel_url, limit=3)
@@ -63,11 +64,12 @@ def scan_influencer(influencer_id):
             db.session.add(new_stream)
             new_found += 1
 
+    influencer.last_checked_at = datetime.utcnow()
     db.session.commit()
     if new_found > 0:
-        flash(f"🎉 Discovered {new_found} new completed stream(s) for {influencer.channel_name}! Queued for clipping.", "success")
+        flash(f"🎉 Discovered {new_found} new completed stream(s)/episode(s) for {influencer.channel_name}! Queued for clipping.", "success")
     else:
-        flash(f"No new completed streams found for {influencer.channel_name}.", "info")
+        flash(f"Scan complete for {influencer.channel_name} (up to date).", "info")
 
     return redirect(url_for("influencers.list_influencers"))
 
@@ -86,6 +88,7 @@ def delete_influencer(influencer_id):
 @influencers_bp.route("/influencers/add", methods=["POST"])
 @login_required
 def add_influencer():
+    from datetime import datetime
     channel_url = request.form.get("channel_url", "").strip()
     if not channel_url:
         flash("Please enter a valid creator or channel URL.", "error")
@@ -109,11 +112,29 @@ def add_influencer():
             num_clips=int(request.form.get("num_clips", 5)),
             target_platform=request.form.get("target_platform", "all"),
             auto_upload=True,
-            is_active=True
+            is_active=True,
+            last_checked_at=datetime.utcnow()
         )
         db.session.add(influencer)
         db.session.commit()
-        flash(f"Started monitoring {meta['channel_name']} ({meta['platform'].title()})!", "success")
+
+        # Perform immediate initial scan so streams/episodes appear right away
+        streams = monitor.fetch_completed_streams(influencer.channel_url, limit=3)
+        new_found = 0
+        for s in streams:
+            new_stream = ProcessedStream(
+                influencer_id=influencer.id,
+                stream_id=s["stream_id"],
+                stream_title=s["title"],
+                stream_url=s["url"],
+                duration=s["duration"],
+                status="queued"
+            )
+            db.session.add(new_stream)
+            new_found += 1
+        db.session.commit()
+
+        flash(f"Started monitoring {meta['channel_name']} ({meta['platform'].title()}) — discovered & queued {new_found} recent video(s)!", "success")
     else:
         flash(f"Already monitoring {existing.channel_name}.", "info")
 

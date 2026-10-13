@@ -123,9 +123,30 @@ class StreamMonitor:
 
     def resolve_channel_metadata(self, url: str) -> Dict[str, str]:
         """
-        Queries yt-dlp for channel title and handle if not readily obvious from URL.
+        Queries channel title and handle via fast Telegram web preview or yt-dlp.
         """
         info = self.normalize_channel_url(url)
+
+        # Fast path for Telegram public channel web feed (~0.2s)
+        if info["platform"] == "telegram":
+            try:
+                import urllib.request
+                import html as html_lib
+                req = urllib.request.Request(info["channel_url"], headers={"User-Agent": "Mozilla/5.0"})
+                page_html = urllib.request.urlopen(req, timeout=8).read().decode("utf-8", errors="replace")
+                title_m = re.search(r'<meta property="og:title" content="([^"]+)"', page_html)
+                if title_m:
+                    tg_title = html_lib.unescape(title_m.group(1)).strip()
+                    if tg_title and "Telegram: Contact" not in tg_title:
+                        return {
+                            "platform": "telegram",
+                            "channel_name": tg_title,
+                            "channel_handle": info.get("handle") or tg_title,
+                            "channel_url": info["channel_url"]
+                        }
+            except Exception as tg_err:
+                print(f"[STREAM MONITOR] [WARN] Fast Telegram metadata check fallback: {tg_err}")
+
         try:
             cmd = [
                 "yt-dlp",
@@ -140,12 +161,12 @@ class StreamMonitor:
                 data = json.loads(first_line)
                 
                 channel_title = (
-                    data.get("playlist_title") or
-                    data.get("playlist") or
                     data.get("playlist_uploader") or 
                     data.get("playlist_channel") or 
                     data.get("uploader") or 
                     data.get("channel") or
+                    data.get("playlist_title") or
+                    data.get("playlist") or
                     info.get("handle") or
                     "Creator"
                 )
@@ -169,13 +190,57 @@ class StreamMonitor:
 
     def fetch_completed_streams(self, channel_url: str, limit: int = 5) -> List[Dict]:
         """
-        Scans a creator's stream tab and returns list of COMPLETED livestreams.
+        Scans a creator's stream tab or Telegram channel and returns list of COMPLETED streams/episodes.
         
         Filters for:
+        - Telegram: Video/media episode posts from `https://t.me/s/<channel>`
         - YouTube: `was_live: True` or `live_status == 'was_live'`
         - Twitch: Past Broadcasts VODs
         """
         completed = []
+
+        # Fast path for Public Telegram Channels (~0.2s)
+        if "t.me/" in channel_url or "telegram.me/" in channel_url:
+            try:
+                import urllib.request
+                import html as html_lib
+                norm = self.normalize_channel_url(channel_url)
+                preview_url = norm["channel_url"]
+                req = urllib.request.Request(preview_url, headers={"User-Agent": "Mozilla/5.0"})
+                page_html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="replace")
+                blocks = page_html.split('data-post="')[1:]
+                for b in reversed(blocks):
+                    post_id = b.split('"')[0]  # e.g. "durov/552"
+                    has_video = ("<video" in b or "tgme_widget_message_video" in b or "tgme_widget_message_document" in b)
+                    if not has_video:
+                        continue
+                    dur_m = re.search(r'tgme_widget_message_video_duration[^>]*>([^<]+)<', b)
+                    dur_sec = 180.0
+                    if dur_m:
+                        parts = [int(x) for x in dur_m.group(1).strip().split(":") if x.isdigit()]
+                        if len(parts) == 2:
+                            dur_sec = float(parts[0] * 60 + parts[1])
+                        elif len(parts) == 3:
+                            dur_sec = float(parts[0] * 3600 + parts[1] * 60 + parts[2])
+                    text_m = re.search(r'tgme_widget_message_text[^>]*>(.*?)</div>', b, re.DOTALL)
+                    raw_text = re.sub(r'<[^>]+>', ' ', text_m.group(1)).strip() if text_m else ""
+                    clean_title = html_lib.unescape(re.sub(r'\s+', ' ', raw_text))[:80] or f"Telegram Episode #{post_id.split('/')[-1]}"
+                    vid_m = re.search(r'<video[^>]+src="([^"]+)"', b)
+                    media_url = vid_m.group(1) if vid_m else f"https://t.me/{post_id}"
+                    completed.append({
+                        "stream_id": post_id.replace("/", "_"),
+                        "title": clean_title,
+                        "url": media_url,
+                        "duration": dur_sec,
+                        "thumbnails": [],
+                    })
+                    if len(completed) >= limit:
+                        break
+                if completed:
+                    return completed
+            except Exception as tg_err:
+                print(f"[STREAM MONITOR] [WARN] Fast Telegram stream scan fallback: {tg_err}")
+
         try:
             cmd = [
                 "yt-dlp",
