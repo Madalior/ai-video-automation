@@ -312,7 +312,7 @@ def chat_command():
         followed = base_query.all()
 
     if not followed:
-        node_msg = f" for @{active_persona.username}" if active_persona else ""
+        node_msg = f" for @{active_persona.username.lstrip('@')}" if active_persona else ""
         return jsonify({
             "success": False,
             "reply": f"⚠️ No active creators or Telegram channels assigned{node_msg} yet! Use the box above to link a channel."
@@ -374,7 +374,7 @@ def chat_command():
             db.session.commit()
 
         clean_title = stream_data["title"].replace("📜 [OLD EPISODE]", "").replace("🔥 [VIRAL TG]", "").strip()
-        node_tag = f" for @{active_persona.username}" if active_persona else ""
+        node_tag = f" for @{active_persona.username.lstrip('@')}" if active_persona else ""
         return jsonify({
             "success": True,
             "reply": f"🎬 Discovered & queued Episode #{ep_num}{node_tag} from {target_channel.channel_name}: '{clean_title}'! Ready for clipping into 9:16 vertical shorts.",
@@ -429,7 +429,7 @@ def chat_command():
             top_views = streams[0].get("view_count", 0)
             views_str = f" ({top_views:,} views)" if top_views else ""
             clean_title = top_title.replace("🔥", "").strip()
-            node_tag = f" for @{active_persona.username}" if active_persona else ""
+            node_tag = f" for @{active_persona.username.lstrip('@')}" if active_persona else ""
             return jsonify({
                 "success": True,
                 "reply": f"🔥 Found high-viewed viral stream{node_tag} from {target_channel.channel_name}: '{clean_title}'{views_str}! Queued for AI highlight extraction.",
@@ -462,14 +462,14 @@ def chat_command():
                     new_count += 1
             inf.last_checked_at = datetime.utcnow()
         db.session.commit()
-        node_tag = f" for @{active_persona.username}" if active_persona else ""
+        node_tag = f" for @{active_persona.username.lstrip('@')}" if active_persona else ""
         return jsonify({
             "success": True,
             "reply": f"⚡ Scanned feeds{node_tag}. Found {new_count} newly finished stream(s) queued for clipping!"
         })
 
     # 4. GENERAL CONVERSATIONAL RESPONSE
-    target_info = f"locked to node @{active_persona.username}" if active_persona else "active for all nodes"
+    target_info = f"locked to node @{active_persona.username.lstrip('@')}" if active_persona else "active for all nodes"
     return jsonify({
         "success": True,
         "reply": f"🤖 Fleet Director ({target_info})! You can say:\n• 'download ep1' (pulls Episode 1 from your Telegram channel)\n• 'look for high viewed stream' (scans viral streams with millions of views)\n• 'scan latest streams' (checks for recent streams)"

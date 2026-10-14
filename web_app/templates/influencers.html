@@ -239,7 +239,7 @@
         <div style="font-family: var(--font-michroma); font-size: 1.05rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <span>UPLOAD NODE LOCKED:</span>
           <span style="color: #4CE616; background: rgba(76, 230, 22, 0.15); padding: 2px 10px; border-radius: 6px; border: 1px solid rgba(76, 230, 22, 0.4);">
-            @{{ active_persona.username }}
+            @{{ active_persona.username.lstrip('@') }}
           </span>
           <span style="font-size: 0.72rem; font-family: var(--font-mono); background: rgba(255,255,255,0.08); padding: 3px 8px; border-radius: 4px; color: #cbd5e1;">
             {{ active_persona.content_type.replace('_', ' ').upper() }}
@@ -254,10 +254,10 @@
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <!-- Switch Node Dropdown -->
       <select onchange="if(this.value){ window.location.href='{{ url_for('influencers.list_influencers') }}?persona_id=' + this.value; } else { window.location.href='{{ url_for('influencers.list_influencers') }}'; }" style="padding: 9px 14px; font-family: var(--font-mono); font-size: 0.8rem; background: #0a0f1d; border: 1px solid #4CE616; color: #fff; border-radius: 6px; cursor: pointer;">
-        <option value="{{ active_persona.id }}">Selected: @{{ active_persona.username }}</option>
+        <option value="{{ active_persona.id }}">Selected: @{{ active_persona.username.lstrip('@') }}</option>
         {% for p in personas %}
           {% if p.id != active_persona.id %}
-            <option value="{{ p.id }}">Switch to @{{ p.username }} ({{ p.content_type.replace('_', ' ') }})</option>
+            <option value="{{ p.id }}">Switch to @{{ p.username.lstrip('@') }} ({{ p.content_type.replace('_', ' ') }})</option>
           {% endif %}
         {% endfor %}
         <option value="">Show All Nodes (Unfiltered)</option>
@@ -280,7 +280,7 @@
       </a>
       {% for p in personas %}
         <a href="{{ url_for('influencers.list_influencers', persona_id=p.id) }}" class="cmd-pill" style="text-decoration: none;">
-          🎯 @{{ p.username }} ({{ p.monitored_influencers|length }})
+          🎯 @{{ p.username.lstrip('@') }} ({{ p.monitored_influencers|length }})
         </a>
       {% endfor %}
     </div>
@@ -295,10 +295,10 @@
   <div class="console-header">
     <div class="console-title">
       <span class="led-status"></span>
-      <span>GOING MERRY FLEET DIRECTOR // {% if active_persona %}DISPATCH TARGET: @{{ active_persona.username }}{% else %}GLOBAL FLEET CONSOLE{% endif %}</span>
+      <span>GOING MERRY FLEET DIRECTOR // {% if active_persona %}DISPATCH TARGET: @{{ active_persona.username.lstrip('@') }}{% else %}GLOBAL FLEET CONSOLE{% endif %}</span>
     </div>
     <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; background: rgba(76, 230, 22, 0.12); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(76, 230, 22, 0.3);">
-      {% if active_persona %}TARGET LOCKED • @{{ active_persona.username }}{% else %}READY • ALL NODES ACTIVE{% endif %}
+      {% if active_persona %}TARGET LOCKED • @{{ active_persona.username.lstrip('@') }}{% else %}READY • ALL NODES ACTIVE{% endif %}
     </span>
   </div>
 
@@ -308,7 +308,7 @@
       <span style="font-size: 1.2rem;">🤖</span>
       <div class="chat-bubble bot">
         {% if active_persona %}
-          <strong>Fleet Director locked to @{{ active_persona.username }}!</strong> All clips harvested from commands will automatically dispatch to this account's YouTube, Instagram, and TikTok channels.
+          <strong>Fleet Director locked to @{{ active_persona.username.lstrip('@') }}!</strong> All clips harvested from commands will automatically dispatch to this account's YouTube, Instagram, and TikTok channels.
         {% else %}
           <strong>Fleet Director Online!</strong> How can I help you today? You can type natural commands like:
         {% endif %}
@@ -384,7 +384,7 @@
     </div>
     <div>
       <button type="submit" class="btn-primary" style="padding: 10px 22px; white-space: nowrap;">
-        {% if active_persona %}+ Follow for @{{ active_persona.username }}{% else %}+ Follow &amp; Monitor{% endif %}
+        {% if active_persona %}+ Follow for @{{ active_persona.username.lstrip('@') }}{% else %}+ Follow &amp; Monitor{% endif %}
       </button>
     </div>
   </form>
@@ -399,7 +399,7 @@
           {% if active_persona and inf.account_persona_id == active_persona.id %}
             <div style="margin-bottom: 6px;">
               <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #4CE616; background: rgba(76, 230, 22, 0.15); border: 1px solid #4CE616; padding: 2px 7px; border-radius: 4px; font-weight: 700;">
-                🎯 LINKED TO @{{ active_persona.username }}
+                🎯 LINKED TO @{{ active_persona.username.lstrip('@') }}
               </span>
             </div>
           {% endif %}
