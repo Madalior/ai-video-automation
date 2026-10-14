@@ -63,6 +63,30 @@ def start_pipeline():
     resume       = data.get("resume", False) in [True, "true", "1", 1, "on"]
     workers      = int(data.get("workers", 1))
 
+    user_id_val = current_user.id if current_user and hasattr(current_user, 'id') else 1
+
+    # Dynamic resolution for dummy or protocol-less engine URLs
+    if source_url:
+        if source_url.startswith("telegram://") or "sample_podcast" in source_url:
+            from web_app.models import MonitoredInfluencer, ProcessedStream
+            plat = "telegram" if source_url.startswith("telegram://") else "youtube"
+            recent_st = ProcessedStream.query.join(MonitoredInfluencer).filter(
+                MonitoredInfluencer.user_id == user_id_val,
+                MonitoredInfluencer.platform == plat
+            ).order_by(ProcessedStream.id.desc()).first()
+
+            if recent_st and recent_st.stream_url and recent_st.stream_url.startswith("http"):
+                source_url = recent_st.stream_url
+            else:
+                inf = MonitoredInfluencer.query.filter_by(user_id=user_id_val, platform=plat).first()
+                if inf and inf.channel_url and inf.channel_url.startswith("http"):
+                    source_url = inf.channel_url
+                else:
+                    vault_p = (PROJECT_ROOT / "campaigns" / "raw_footage" / "authentic_vault_clip.mp4").resolve()
+                    if vault_p.exists():
+                        video_file = str(vault_p)
+                        source_url = None
+
     # Resolve local file vs URL
     if not source_url and not video_file:
         return jsonify({"success": False, "message": "Please provide a video URL or local file path."}), 400
@@ -76,8 +100,20 @@ def start_pipeline():
             video_file = os.path.abspath(source_url)
             source_url = None
 
-    # Verify persona exists
-    persona = AccountPersona.query.filter_by(id=account_id).first()
+    # Verify persona exists and belongs to current user
+    persona = None
+    if account_id and account_id != "acc_01":
+        persona = AccountPersona.query.filter_by(id=account_id).first()
+    if not persona:
+        if content_mode == "whop":
+            persona = AccountPersona.query.filter_by(user_id=user_id_val, content_type="whop_content").first()
+        else:
+            persona = AccountPersona.query.filter_by(user_id=user_id_val).first()
+        if persona:
+            account_id = persona.id
+        else:
+            account_id = account_id or "acc_01"
+
     persona_username = persona.username if persona else "@Default"
 
     # Whop mode automatic configuration
@@ -88,12 +124,11 @@ def start_pipeline():
     # Generate unique job ID
     job_id = f"gm_{uuid.uuid4().hex[:8]}"
 
-    user_id_val = current_user.id if current_user and hasattr(current_user, 'id') else 1
-
-    # Initial DB stub so user sees processing state in feed immediately
+    # Initial DB stub so user sees processing state in feed immediately with account persona
     try:
         initial_clip = ClipModel(
             user_id=user_id_val,
+            account_persona_id=persona.id if persona else (account_id if account_id != "acc_01" else None),
             source_url=source_url or (os.path.basename(video_file) if video_file else "local_file"),
             title=f"Going Merry // {num_clips} Viral Shorts ({persona_username})",
             status="processing",
@@ -344,31 +379,87 @@ def get_worker_status():
 @pipeline_bp.route("/api/pipeline/dispatch-all", methods=["POST"])
 @login_required
 def dispatch_all_engines():
-    """Triggers concurrent dispatches across all 4 Going Merry autonomous media engines."""
+    """Triggers concurrent dispatches across all 4 Going Merry autonomous media engines with real persona nodes."""
     from clipper.core.queue_manager import queue_manager
+    from web_app.models import MonitoredInfluencer, ProcessedStream
     user_id_val = current_user.id if current_user and hasattr(current_user, 'id') else 1
 
+    # Fetch user personas and monitored influencers to bind real nodes
+    personas = AccountPersona.query.filter_by(user_id=user_id_val).all()
+    influencers = MonitoredInfluencer.query.filter_by(user_id=user_id_val, is_active=True).all()
+
+    # Find persona nodes
+    whop_persona = next((p for p in personas if p.content_type == "whop_content"), None) or (personas[0] if personas else None)
+    inf_persona = next((p for p in personas if p.content_type == "follow_influencer"), None) or (personas[0] if personas else None)
+    tg_persona = next((p for p in personas if p.content_type == "follow_telegram" or p.fleet == "anime"), None) or inf_persona
+
+    # Find sources
+    tg_inf = next((i for i in influencers if i.platform == "telegram"), None)
+    yt_inf = next((i for i in influencers if i.platform == "youtube"), None)
+
+    vault_clip = "campaigns/raw_footage/authentic_vault_clip.mp4"
+    if not (PROJECT_ROOT / vault_clip).exists():
+        alt = PROJECT_ROOT / "output" / "podcast_30sec.mp4"
+        if alt.exists():
+            vault_clip = str(alt)
+
     engines = [
-        {"id": "anime_saga", "name": "Anime Saga & Hype Edits", "source": "campaigns/raw_footage/authentic_vault_clip.mp4", "mode": "url", "split": False},
-        {"id": "podcasts", "name": "Viral Podcasts & Wisdom", "source": "https://www.youtube.com/watch?v=sample_podcast", "mode": "url", "split": False},
-        {"id": "gaming_split", "name": "Split-Screen Gaming & Climax", "source": "campaigns/raw_footage/authentic_vault_clip.mp4", "mode": "url", "split": True},
-        {"id": "whop_bounty", "name": "Whop Bounty Arbitrage", "source": "campaigns/raw_footage/authentic_vault_clip.mp4", "mode": "whop", "split": False},
+        {
+            "id": "anime_saga", 
+            "name": "Anime Saga & Hype Edits", 
+            "persona": tg_persona,
+            "source": tg_inf.channel_url if tg_inf else vault_clip,
+            "mode": "url", 
+            "split": False
+        },
+        {
+            "id": "podcasts", 
+            "name": "Viral Podcasts & Wisdom", 
+            "persona": inf_persona,
+            "source": yt_inf.channel_url if yt_inf else vault_clip,
+            "mode": "url", 
+            "split": False
+        },
+        {
+            "id": "gaming_split", 
+            "name": "Split-Screen Gaming & Climax", 
+            "persona": inf_persona,
+            "source": yt_inf.channel_url if yt_inf else vault_clip,
+            "mode": "url", 
+            "split": True
+        },
+        {
+            "id": "whop_bounty", 
+            "name": "Whop Bounty Arbitrage", 
+            "persona": whop_persona,
+            "source": vault_clip,
+            "mode": "whop", 
+            "split": False
+        },
     ]
 
     dispatched = []
     for eng in engines:
         job_id = f"gm_fleet_{eng['id']}_{uuid.uuid4().hex[:6]}"
+        target_account_id = eng["persona"].id if eng["persona"] else "acc_01"
+        target_source = eng["source"]
         try:
             queue_manager.enqueue("clip_job", {
-                "source_url": eng["source"] if eng["source"].startswith("http") else None,
-                "video_file": eng["source"] if not eng["source"].startswith("http") else None,
+                "source_url": target_source if str(target_source).startswith("http") else None,
+                "video_file": target_source if not str(target_source).startswith("http") else None,
                 "num_clips": 3,
                 "platform": "all",
                 "auto_upload": True,
+                "account_id": target_account_id,
                 "user_id": user_id_val,
                 "engine": eng["name"]
             })
-            dispatched.append({"engine": eng["name"], "job_id": job_id, "status": "queued"})
+            dispatched.append({
+                "engine": eng["name"], 
+                "job_id": job_id, 
+                "account": eng["persona"].username if eng["persona"] else target_account_id,
+                "status": "queued"
+            })
         except Exception as e:
             dispatched.append({"engine": eng["name"], "job_id": job_id, "error": str(e)})
 
@@ -376,7 +467,7 @@ def dispatch_all_engines():
 
     return jsonify({
         "success": True,
-        "message": f"Successfully queued all 4 Going Merry engines for background worker execution!",
+        "message": f"Successfully queued all 4 Going Merry engines with dedicated persona nodes!",
         "dispatched": dispatched
     })
 

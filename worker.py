@@ -50,8 +50,9 @@ def process_clip_job(payload: dict) -> dict:
     preview      = bool(payload.get("preview", False))
     user_id      = payload.get("user_id", 1)
     clip_id      = payload.get("clip_id")
+    account_id   = payload.get("account_id")
 
-    print(f"\n[WORKER] 🚀 Processing clip job: url={source_url or video_file} | clips={num_clips} | upload={auto_upload}")
+    print(f"\n[WORKER] 🚀 Processing clip job: url={source_url or video_file} | clips={num_clips} | upload={auto_upload} | account={account_id}")
 
     generated_clips = sail(
         url          = source_url,
@@ -62,6 +63,7 @@ def process_clip_job(payload: dict) -> dict:
         preview      = preview,
         user_id      = user_id,
         clip_id      = clip_id,
+        account_id   = account_id or "acc_01",
     )
 
     return {
@@ -83,6 +85,7 @@ def process_stream_job(payload: dict) -> dict:
     channel_name  = payload.get("channel_name", "Influencer")
     num_clips     = int(payload.get("num_clips", 3))
     platform      = payload.get("target_platform", "all")
+    auto_upload   = bool(payload.get("auto_upload", True))
     account_id    = payload.get("account_id") or payload.get("account_persona_id")
 
     print(f"\n[WORKER] 📡 Processing detected stream for '{channel_name}': {stream_url} (ID: {stream_id}) | Account: [{account_id or 'default'}]")

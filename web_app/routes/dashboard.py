@@ -23,7 +23,9 @@ dash_bp = Blueprint("dash", __name__)
 def dashboard():
     # 1. Fetch user system settings (viral threshold & Telegram config)
     # 1. Fetch system settings (viral threshold & Telegram config)
-    settings_rows = SystemSetting.query.all()
+    settings_rows = SystemSetting.query.filter_by(user_id=current_user.id).all()
+    if not settings_rows:
+        settings_rows = SystemSetting.query.all()
     settings = {s.key: s.value for s in settings_rows}
     
     # Criteria views threshold
@@ -33,29 +35,29 @@ def dashboard():
     except (ValueError, TypeError):
         criteria_views = 1000
 
-    # 2. Fetch Unified 30+ Account Fleet
-    personas = AccountPersona.query.order_by(AccountPersona.created_at.desc()).all()
+    # 2. Fetch Unified Account Fleet for current user
+    personas = AccountPersona.query.filter_by(user_id=current_user.id).order_by(AccountPersona.created_at.desc()).all()
     whop_count = sum(1 for p in personas if getattr(p, 'content_type', 'whop_content') == 'whop_content')
     upload_count = sum(1 for p in personas if getattr(p, 'content_type', 'whop_content') == 'upload_based')
 
-    # 3. Fetch Clips and Viral Clips across Fleet
-    clips = Clip.query.order_by(Clip.created_at.desc()).limit(50).all()
-    viral_clips = Clip.query.filter(
+    # 3. Fetch Clips and Viral Clips across Fleet for current user
+    clips = Clip.query.filter_by(user_id=current_user.id).order_by(Clip.created_at.desc()).limit(50).all()
+    viral_clips = Clip.query.filter_by(user_id=current_user.id).filter(
         (Clip.is_viral == True) | (Clip.views >= criteria_views)
     ).order_by(Clip.views.desc()).all()
 
     # 4. Aggregated Statistics
-    total_clips     = Clip.query.count()
-    posted_clips    = Clip.query.filter_by(status="posted").count()
-    pending_clips   = Clip.query.filter_by(status="ready").count()
-    monitoring_clips= Clip.query.filter_by(status="monitoring").count()
+    total_clips     = Clip.query.filter_by(user_id=current_user.id).count()
+    posted_clips    = Clip.query.filter_by(user_id=current_user.id, status="posted").count()
+    pending_clips   = Clip.query.filter_by(user_id=current_user.id, status="ready").count()
+    monitoring_clips= Clip.query.filter_by(user_id=current_user.id, status="monitoring").count()
     total_views     = sum((c.views or 0) for c in clips)
     
     # Calculate estimated bounty earned from viral videos ($5.00 Whop CPM rate)
     est_viral_bounty = sum(((c.views or 0) / 1000.0) * 5.0 for c in viral_clips)
 
-    followed_creators = MonitoredInfluencer.query.filter_by(is_active=True).count()
-    auto_detected_streams = ProcessedStream.query.count()
+    followed_creators = MonitoredInfluencer.query.filter_by(user_id=current_user.id, is_active=True).count()
+    auto_detected_streams = ProcessedStream.query.join(MonitoredInfluencer).filter(MonitoredInfluencer.user_id == current_user.id).count()
 
     stats = {
         "total_accounts": len(personas),

@@ -624,6 +624,11 @@
   </div>
 
   <!-- Engines Grid (Postiz-Style Channel Cards) -->
+  {% set anime_p = personas | selectattr('fleet', 'equalto', 'anime') | first or personas | selectattr('content_type', 'equalto', 'follow_telegram') | first or (personas[0] if personas else None) %}
+  {% set podcast_p = personas | selectattr('niche', 'equalto', 'podcasts') | first or personas | selectattr('fleet', 'equalto', 'podcasts') | first or (personas[0] if personas else None) %}
+  {% set gaming_p = personas | selectattr('fleet', 'equalto', 'gaming') | first or personas | selectattr('content_type', 'equalto', 'follow_influencer') | first or (personas[0] if personas else None) %}
+  {% set whop_p = personas | selectattr('content_type', 'equalto', 'whop_content') | first or (personas[0] if personas else None) %}
+
   <div style="display: flex; flex-direction: column; gap: 24px;" id="engineFleetContainer">
 
     <!-- ─────────────────────────────────────────────────────────────
@@ -642,6 +647,11 @@
               <span style="background: var(--color-brand-accent); color: var(--color-brand-black); font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px;">
                 ONE PIECE DAILY FLEET
               </span>
+              {% if anime_p %}
+              <span style="background: #000; color: #4CE616; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px; border: 1px solid #4CE616;">
+                NODE: @{{ anime_p.username.lstrip('@') }}
+              </span>
+              {% endif %}
             </div>
             <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 3px;">
               TARGET NICHE: 1,100+ EPISODE SERIALIZED RETENTION • PHONK / SLOWED+REVERB BEATS • CLIMAX CUTS
@@ -649,7 +659,7 @@
           </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="nav-btn-primary" onclick="runSingleEngine('anime_saga', 'ANIME SAGA')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
+          <button class="nav-btn-primary" onclick="runSingleEngine('anime_saga', 'ANIME SAGA', '{{ anime_p.id if anime_p else '' }}')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
             🚀 POST / DISPATCH NOW
           </button>
           <button class="btn-secondary" onclick="openEngineScheduleModal('Anime Saga', '3 Shorts/Day: 10:00 AM, 03:00 PM, 08:00 PM')" style="padding: 7px 12px; font-size: 0.74rem;">
@@ -775,6 +785,11 @@
               <span style="background: var(--color-brand-accent); color: var(--color-brand-black); font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px;">
                 MINDSET FLEET
               </span>
+              {% if podcast_p %}
+              <span style="background: #000; color: #4CE616; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px; border: 1px solid #4CE616;">
+                NODE: @{{ podcast_p.username.lstrip('@') }}
+              </span>
+              {% endif %}
             </div>
             <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 3px;">
               TARGET NICHE: ANDREW HUBERMAN / JOE ROGAN / STOIC PHILOSOPHY • HIGH RETENTION REFLECTIONS
@@ -782,7 +797,7 @@
           </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="nav-btn-primary" onclick="runSingleEngine('stoic_wisdom', 'STOIC WISDOM')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
+          <button class="nav-btn-primary" onclick="runSingleEngine('stoic_wisdom', 'STOIC WISDOM', '{{ podcast_p.id if podcast_p else '' }}')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
             🚀 POST / DISPATCH NOW
           </button>
           <button class="btn-secondary" onclick="openEngineScheduleModal('Stoic Wisdom', '2 Shorts/Day: 09:00 AM, 06:00 PM')" style="padding: 7px 12px; font-size: 0.74rem;">
@@ -908,6 +923,11 @@
               <span style="background: var(--color-brand-accent); color: var(--color-brand-black); font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px;">
                 RETENTION FLEET
               </span>
+              {% if gaming_p %}
+              <span style="background: #000; color: #4CE616; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px; border: 1px solid #4CE616;">
+                NODE: @{{ gaming_p.username.lstrip('@') }}
+              </span>
+              {% endif %}
             </div>
             <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 3px;">
               TARGET NICHE: 50/50 SPLIT SCREEN • GTA 5 / MINECRAFT CLIPS UNDER STREAMER CLIMAXES
@@ -915,7 +935,7 @@
           </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="nav-btn-primary" onclick="runSingleEngine('gaming_split', 'GAMING SPLIT')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
+          <button class="nav-btn-primary" onclick="runSingleEngine('gaming_split', 'GAMING SPLIT', '{{ gaming_p.id if gaming_p else '' }}')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
             🚀 POST / DISPATCH NOW
           </button>
           <button class="btn-secondary" onclick="openEngineScheduleModal('Split Gaming', '3 Shorts/Day: 11:00 AM, 04:00 PM, 09:00 PM')" style="padding: 7px 12px; font-size: 0.74rem;">
@@ -1041,6 +1061,11 @@
               <span style="background: var(--color-brand-accent); color: var(--color-brand-black); font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px;">
                 BOUNTY HARVESTER ($5 CPM)
               </span>
+              {% if whop_p %}
+              <span style="background: #000; color: #4CE616; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 2px; border: 1px solid #4CE616;">
+                NODE: @{{ whop_p.username.lstrip('@') }}
+              </span>
+              {% endif %}
             </div>
             <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-muted); margin-top: 3px;">
               TARGET NICHE: FUNDINGPIPS / FOREX / FINTECH CLIPS • AUTO-PAYOUT CLAIM ON ≥1,000 VIEWS
@@ -1048,7 +1073,7 @@
           </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button class="nav-btn-primary" onclick="runSingleEngine('whop_bounty', 'WHOP BOUNTY')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
+          <button class="nav-btn-primary" onclick="runSingleEngine('whop_bounty', 'WHOP BOUNTY', '{{ whop_p.id if whop_p else '' }}')" style="padding: 7px 14px; font-size: 0.74rem; cursor: pointer;">
             🚀 POST / DISPATCH NOW
           </button>
           <button class="btn-secondary" onclick="openEngineScheduleModal('Whop Bounty', 'Event-Driven: Instant Submission upon ≥1,000 Verified Views')" style="padding: 7px 12px; font-size: 0.74rem;">
@@ -1961,24 +1986,33 @@ function useSampleVideoClip() {
 }
 
 async function launchGoingMerryPipeline(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
 
-  const sourceUrl = document.getElementById("gmSourceUrl").value.trim();
-  const accountId = document.getElementById("gmAccountId").value;
-  const numClips = parseInt(document.getElementById("gmNumClips").value);
-  const platform = document.getElementById("gmPlatform").value;
-  const mode = document.getElementById("gmContentMode").value;
-  const campaign = document.getElementById("gmCampaign").value;
+  const sourceUrlEl = document.getElementById("gmSourceUrl");
+  const accountIdEl = document.getElementById("gmAccountId");
+  const numClipsEl = document.getElementById("gmNumClips");
+  const platformEl = document.getElementById("gmPlatform");
+  const modeEl = document.getElementById("gmContentMode");
+  const campaignEl = document.getElementById("gmCampaign");
 
-  const splitScreen = document.getElementById("gmSplitScreen").checked;
-  const captions = document.getElementById("gmCaptions").checked;
-  const music = document.getElementById("gmMusic").checked;
-  const autoUpload = document.getElementById("gmAutoUpload").checked;
-  const preview = document.getElementById("gmPreview").checked;
+  const sourceUrl = sourceUrlEl ? sourceUrlEl.value.trim() : "";
+  const accountId = accountIdEl ? accountIdEl.value : "";
+  const numClips = numClipsEl ? parseInt(numClipsEl.value) : 3;
+  const platform = platformEl ? platformEl.value : "all";
+  const mode = modeEl ? modeEl.value : "url";
+  const campaign = campaignEl ? campaignEl.value : "";
+
+  const splitScreen = document.getElementById("gmSplitScreen") ? document.getElementById("gmSplitScreen").checked : true;
+  const captions = document.getElementById("gmCaptions") ? document.getElementById("gmCaptions").checked : true;
+  const music = document.getElementById("gmMusic") ? document.getElementById("gmMusic").checked : true;
+  const autoUpload = document.getElementById("gmAutoUpload") ? document.getElementById("gmAutoUpload").checked : true;
+  const preview = document.getElementById("gmPreview") ? document.getElementById("gmPreview").checked : false;
 
   const btn = document.getElementById("btnLaunchGoingMerry");
-  btn.disabled = true;
-  btn.innerHTML = `<span class="led-pulse"></span> LAUNCHING FACTORY...`;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="led-pulse"></span> LAUNCHING FACTORY...`;
+  }
 
   try {
     const res = await fetch("/api/pipeline/start", {
@@ -2252,10 +2286,11 @@ function filterEngineCategory(category) {
   });
 }
 
-async function runSingleEngine(engineId, engineName) {
+async function runSingleEngine(engineId, engineName, personaId) {
   const confirmed = confirm(
     `🚀 CONFIRM IMMEDIATE DISPATCH\n\n` +
     `Engine: ${engineName}\n` +
+    `Persona Node: ${personaId ? personaId : 'Auto-Assigned Fleet Node'}\n` +
     `Routing: Residential SOCKS5 Proxy Guard (Port 1080)\n` +
     `Platforms: All connected channels (YT Shorts, IG Reels, TikTok, FB)\n\n` +
     `Initiate autonomous clip slice, karaoke subtitling, and multi-channel publication now?`
@@ -2263,11 +2298,13 @@ async function runSingleEngine(engineId, engineName) {
   if (!confirmed) return;
 
   try {
+    const isWhop = (engineId === "whop_bounty");
     const payload = {
-      mode: engineId === "whop_bounty" ? "whop" : "url",
+      mode: isWhop ? "whop" : "url",
+      account_id: personaId || undefined,
       source_url: engineId === "anime_saga" 
         ? "telegram://onepiece/daily_episode" 
-        : (engineId === "podcasts" ? "https://www.youtube.com/watch?v=sample_podcast" : "campaigns/raw_footage/authentic_vault_clip.mp4"),
+        : ((engineId === "podcasts" || engineId === "stoic_wisdom") ? "https://www.youtube.com/watch?v=sample_podcast" : "campaigns/raw_footage/authentic_vault_clip.mp4"),
       num_clips: 3,
       platform: "all",
       auto_upload: true,
@@ -2283,7 +2320,7 @@ async function runSingleEngine(engineId, engineName) {
     });
     const data = await res.json();
     if (data.success) {
-      alert(`⚡ [DISPATCHED] ${engineName} engine engaged!\nJob ID: ${data.job_id}\n\n3 Viral clips are rendering in the background and will be published via your SOCKS5 proxy.`);
+      alert(`⚡ [DISPATCHED] ${engineName} engine engaged!\nJob ID: ${data.job_id}\nTarget Node: ${data.persona || personaId || 'Auto Fleet'}\n\n3 Viral clips are rendering in the background and will be published via your SOCKS5 proxy.`);
       window.location.reload();
     } else {
       alert(`⚠️ Engine Dispatch Notice: ${data.message || 'Queued for background worker.'}`);
