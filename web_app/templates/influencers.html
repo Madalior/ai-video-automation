@@ -223,7 +223,7 @@
     </p>
   </div>
   <div style="display: flex; gap: 10px; align-items: center;">
-    <a href="{{ url_for('dashboard.dashboard') }}" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; font-size: 0.85rem; text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff;">
+    <a href="{{ url_for('dash.dashboard') }}" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; font-size: 0.85rem; text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff;">
       ← Fleet Dashboard
     </a>
     <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Advanced Studio</a>
@@ -347,7 +347,7 @@
                 🎯 ASSIGNED UPLOAD NODE
               </span>
               {% if inf.account_persona %}
-                <a href="{{ url_for('dashboard.dashboard') }}" style="font-family: var(--font-mono); font-size: 0.72rem; color: #60a5fa; text-decoration: none;" title="Go to Dashboard">
+                <a href="{{ url_for('dash.dashboard') }}" style="font-family: var(--font-mono); font-size: 0.72rem; color: #60a5fa; text-decoration: none;" title="Go to Dashboard">
                   Dashboard &rarr;
                 </a>
               {% endif %}
