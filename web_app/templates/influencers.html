@@ -525,20 +525,34 @@
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">
           <th style="padding: 10px 12px;">CREATOR</th>
           <th style="padding: 10px 12px;">STREAM / EPISODE TITLE</th>
+          <th style="padding: 10px 12px;">UPLOAD NODE</th>
           <th style="padding: 10px 12px;">DURATION</th>
           <th style="padding: 10px 12px;">STATUS</th>
           <th style="padding: 10px 12px;">DETECTED AT</th>
+          <th style="padding: 10px 12px; text-align: right;">ACTION</th>
         </tr>
       </thead>
       <tbody id="streamsTableBody">
         {% if recent_streams %}
           {% for stream in recent_streams %}
+            {% set p_bound = stream.account_persona_id or stream.influencer.account_persona_id %}
             <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.88rem;">
               <td style="padding: 12px;"><strong>{{ stream.influencer.channel_name }}</strong></td>
               <td style="padding: 12px;">
                 <a href="{{ stream.stream_url }}" target="_blank" style="color: #60a5fa; text-decoration: none;">
-                  {{ stream.stream_title[:65] }}{% if stream.stream_title | length > 65 %}...{% endif %}
+                  {{ stream.stream_title[:60] }}{% if stream.stream_title | length > 60 %}...{% endif %}
                 </a>
+              </td>
+              <td style="padding: 12px;">
+                {% if p_bound %}
+                  <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; background: rgba(76, 230, 22, 0.12); border: 1px solid rgba(76, 230, 22, 0.3); padding: 2px 7px; border-radius: 4px; font-weight: 700;">
+                    🎯 {{ p_bound }}
+                  </span>
+                {% else %}
+                  <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim);">
+                    🌐 Fleet Default
+                  </span>
+                {% endif %}
               </td>
               <td style="padding: 12px; color: var(--text-muted);">{{ (stream.duration / 60) | round(0) }} min</td>
               <td style="padding: 12px;">
@@ -549,11 +563,33 @@
               <td style="padding: 12px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">
                 {{ stream.created_at.strftime('%Y-%m-%d %H:%M') }}
               </td>
+              <td style="padding: 12px; text-align: right;">
+                <form method="POST" action="{{ url_for('influencers.dispatch_stream', stream_id=stream.id) }}" style="display:inline;">
+                  <input type="hidden" name="persona_id" value="{{ active_persona.id if active_persona else '' }}">
+                  {% if stream.status == 'queued' %}
+                    <button type="submit" class="btn-primary" style="padding: 5px 12px; font-size: 0.74rem; font-weight: 700; white-space: nowrap;">
+                      🚀 Dispatch Now
+                    </button>
+                  {% elif stream.status == 'processing' %}
+                    <span style="font-family: var(--font-mono); font-size: 0.74rem; color: #60a5fa;">
+                      ⚡ In Pipeline...
+                    </span>
+                  {% elif stream.status == 'completed' %}
+                    <span style="font-family: var(--font-mono); font-size: 0.74rem; color: #4CE616;">
+                      ✅ Done ({{ stream.clip_count }} clips)
+                    </span>
+                  {% else %}
+                    <button type="submit" class="btn-secondary" style="padding: 4px 10px; font-size: 0.72rem;">
+                      🔄 Retry
+                    </button>
+                  {% endif %}
+                </form>
+              </td>
             </tr>
           {% endfor %}
         {% else %}
           <tr>
-            <td colspan="5" style="padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.9rem;">
+            <td colspan="7" style="padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.9rem;">
               No streams detected yet. Type a command above (e.g. <code>download ep1</code> or <code>look for high viewed stream</code>) to queue video content!
             </td>
           </tr>
@@ -637,6 +673,7 @@ async function submitAiChat(e) {
       if (tbody) {
         const tr = document.createElement('tr');
         tr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.88rem; animation: fadeIn 0.4s ease-out; background: rgba(76, 230, 22, 0.06);';
+        const activeNodeTag = '{{ active_persona.id if active_persona else "" }}';
         tr.innerHTML = `
           <td style="padding: 12px;"><strong>${escapeHtml(data.stream.creator || 'Creator')}</strong></td>
           <td style="padding: 12px;">
@@ -644,9 +681,19 @@ async function submitAiChat(e) {
               ${escapeHtml(data.stream.title)}
             </a>
           </td>
+          <td style="padding: 12px;">
+            <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; background: rgba(76, 230, 22, 0.12); border: 1px solid rgba(76, 230, 22, 0.3); padding: 2px 7px; border-radius: 4px; font-weight: 700;">
+              🎯 ${escapeHtml(activeNodeTag || 'Fleet Default')}
+            </span>
+          </td>
           <td style="padding: 12px; color: var(--text-muted);">${data.stream.duration || '3 min'}</td>
           <td style="padding: 12px;"><span class="badge badge-active">${data.stream.status || 'queued'}</span></td>
           <td style="padding: 12px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">Just now</td>
+          <td style="padding: 12px; text-align: right;">
+            <span style="font-family: var(--font-mono); font-size: 0.74rem; color: #4CE616;">
+              🚀 Dispatched
+            </span>
+          </td>
         `;
         tbody.insertBefore(tr, tbody.firstChild);
       }

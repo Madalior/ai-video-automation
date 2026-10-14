@@ -278,6 +278,37 @@ def assign_persona(influencer_id):
     return redirect(url_for("influencers.list_influencers", persona_id=return_persona_id or persona_id))
 
 
+@influencers_bp.route("/influencers/stream/<int:stream_id>/dispatch", methods=["POST"])
+@login_required
+def dispatch_stream(stream_id):
+    stream = ProcessedStream.query.get_or_404(stream_id)
+    inf = MonitoredInfluencer.query.filter_by(id=stream.influencer_id, user_id=current_user.id).first_or_404()
+    persona_id = request.form.get("persona_id") or stream.account_persona_id or inf.account_persona_id
+
+    from clipper.core.queue_manager import queue_manager
+    job_payload = {
+        "stream_id": stream.stream_id,
+        "stream_url": stream.stream_url,
+        "stream_title": stream.stream_title,
+        "influencer_id": inf.id,
+        "channel_name": inf.channel_name,
+        "user_id": current_user.id,
+        "num_clips": inf.num_clips or 5,
+        "target_platform": inf.target_platform or "all",
+        "auto_upload": inf.auto_upload,
+        "account_id": persona_id,
+    }
+    stream.status = "queued"
+    db.session.commit()
+    try:
+        queue_manager.enqueue("stream_job", job_payload)
+        flash(f"🚀 Dispatched '{stream.stream_title[:45]}' to Going Merry clipping pipeline for @{inf.account_persona.username.lstrip('@') if inf.account_persona else 'fleet'}!", "success")
+    except Exception as e:
+        flash(f"Error dispatching stream: {e}", "danger")
+
+    return redirect(url_for("influencers.list_influencers", persona_id=persona_id))
+
+
 
 @influencers_bp.route("/api/influencers/chat", methods=["POST"])
 @login_required
@@ -375,9 +406,28 @@ def chat_command():
 
         clean_title = stream_data["title"].replace("📜 [OLD EPISODE]", "").replace("🔥 [VIRAL TG]", "").strip()
         node_tag = f" for @{active_persona.username.lstrip('@')}" if active_persona else ""
+
+        # Dispatch to Background Queue Worker
+        from clipper.core.queue_manager import queue_manager
+        try:
+            queue_manager.enqueue("stream_job", {
+                "influencer_id": target_channel.id,
+                "user_id": current_user.id,
+                "channel_name": target_channel.channel_name,
+                "stream_id": stream_data["stream_id"],
+                "stream_url": stream_data["url"],
+                "stream_title": clean_title,
+                "num_clips": target_channel.num_clips or 5,
+                "target_platform": target_channel.target_platform or "all",
+                "auto_upload": target_channel.auto_upload,
+                "account_id": dest_persona_id or target_channel.account_persona_id
+            })
+        except Exception as q_err:
+            print(f"[CHAT] [WARN] Could not enqueue stream_job: {q_err}")
+
         return jsonify({
             "success": True,
-            "reply": f"🎬 Discovered & queued Episode #{ep_num}{node_tag} from {target_channel.channel_name}: '{clean_title}'! Ready for clipping into 9:16 vertical shorts.",
+            "reply": f"🎬 Discovered & dispatched Episode #{ep_num}{node_tag} from {target_channel.channel_name}: '{clean_title}' to the clipping pipeline! Whisper transcription and 9:16 vertical shorts extraction initiated.",
             "stream": {
                 "creator": target_channel.channel_name,
                 "title": clean_title,
@@ -430,9 +480,28 @@ def chat_command():
             views_str = f" ({top_views:,} views)" if top_views else ""
             clean_title = top_title.replace("🔥", "").strip()
             node_tag = f" for @{active_persona.username.lstrip('@')}" if active_persona else ""
+
+            # Dispatch to Background Queue Worker
+            from clipper.core.queue_manager import queue_manager
+            try:
+                queue_manager.enqueue("stream_job", {
+                    "influencer_id": target_channel.id,
+                    "user_id": current_user.id,
+                    "channel_name": target_channel.channel_name,
+                    "stream_id": streams[0]["stream_id"],
+                    "stream_url": streams[0]["url"],
+                    "stream_title": clean_title,
+                    "num_clips": target_channel.num_clips or 5,
+                    "target_platform": target_channel.target_platform or "all",
+                    "auto_upload": target_channel.auto_upload,
+                    "account_id": dest_persona_id or target_channel.account_persona_id
+                })
+            except Exception as q_err:
+                print(f"[CHAT] [WARN] Could not enqueue stream_job: {q_err}")
+
             return jsonify({
                 "success": True,
-                "reply": f"🔥 Found high-viewed viral stream{node_tag} from {target_channel.channel_name}: '{clean_title}'{views_str}! Queued for AI highlight extraction.",
+                "reply": f"🔥 Found high-viewed viral stream{node_tag} from {target_channel.channel_name}: '{clean_title}'{views_str}! Dispatched to Going Merry pipeline for AI highlight clipping.",
                 "stream": {
                     "creator": target_channel.channel_name,
                     "title": clean_title,
@@ -460,6 +529,22 @@ def chat_command():
                         status="queued"
                     ))
                     new_count += 1
+                    try:
+                        from clipper.core.queue_manager import queue_manager
+                        queue_manager.enqueue("stream_job", {
+                            "influencer_id": inf.id,
+                            "user_id": current_user.id,
+                            "channel_name": inf.channel_name,
+                            "stream_id": s["stream_id"],
+                            "stream_url": s["url"],
+                            "stream_title": s["title"],
+                            "num_clips": inf.num_clips or 5,
+                            "target_platform": inf.target_platform or "all",
+                            "auto_upload": inf.auto_upload,
+                            "account_id": dest_persona_id or inf.account_persona_id
+                        })
+                    except Exception:
+                        pass
             inf.last_checked_at = datetime.utcnow()
         db.session.commit()
         node_tag = f" for @{active_persona.username.lstrip('@')}" if active_persona else ""

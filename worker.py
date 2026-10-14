@@ -83,14 +83,16 @@ def process_stream_job(payload: dict) -> dict:
     channel_name  = payload.get("channel_name", "Influencer")
     num_clips     = int(payload.get("num_clips", 3))
     platform      = payload.get("target_platform", "all")
-    auto_upload   = bool(payload.get("auto_upload", True))
+    account_id    = payload.get("account_id") or payload.get("account_persona_id")
 
-    print(f"\n[WORKER] 📡 Processing detected stream for '{channel_name}': {stream_url} (ID: {stream_id})")
+    print(f"\n[WORKER] 📡 Processing detected stream for '{channel_name}': {stream_url} (ID: {stream_id}) | Account: [{account_id or 'default'}]")
 
     with app.app_context():
         stream_rec = ProcessedStream.query.filter_by(stream_id=stream_id).first()
         if stream_rec:
             stream_rec.status = "processing"
+            if not account_id and stream_rec.account_persona_id:
+                account_id = stream_rec.account_persona_id
             db.session.commit()
 
     try:
@@ -101,6 +103,7 @@ def process_stream_job(payload: dict) -> dict:
             upload       = auto_upload,
             split_screen = True,  # autonomous smart reframing
             add_blur_bg  = True,
+            account_id   = account_id or "acc_01",
         )
 
         with app.app_context():

@@ -754,9 +754,12 @@ def process_single_clip(
                     target_rec.score = score_val
                     target_rec.duration = duration_val
                     target_rec.status = "posted" if upload else "ready"
+                    if account_id:
+                        target_rec.account_persona_id = account_id
                 else:
                     new_clip_rec = ClipModel(
                         user_id=user_id or 1,
+                        account_persona_id=account_id or None,
                         source_url=url or (video_file or "local_file"),
                         clip_path=final,
                         title=title_val,
