@@ -247,7 +247,7 @@ class Downloader:
 
         cmd = [
             "yt-dlp",
-            "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b",
+            "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
             "--download-sections", section,
             "--force-keyframes-at-cuts",
             "--merge-output-format", "mp4",
@@ -257,8 +257,8 @@ class Downloader:
         ]
 
         try:
-            # Short timeout for network ffmpeg slicing because it often hangs
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            # Network ffmpeg slicing for remote sections
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
             if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                 size = os.path.getsize(output_path) / (1024*1024)
                 print(f"[DOWNLOADER] Sniped chunk: {os.path.basename(output_path)} ({size:.1f} MB)")

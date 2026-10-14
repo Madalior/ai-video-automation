@@ -104,7 +104,11 @@ Clip Duration Rules: Minimum {min_duration:.0f}s, Maximum {max_duration:.0f}s.
 
 Segments:
 """
-            sample_segments = segments[:70] if len(segments) > 70 else segments
+            if len(segments) > 90:
+                step = max(1, len(segments) // 80)
+                sample_segments = segments[::step][:80]
+            else:
+                sample_segments = segments
             for s in sample_segments:
                 text = getattr(s, "text", str(s))
                 start = getattr(s, "start", 0)
