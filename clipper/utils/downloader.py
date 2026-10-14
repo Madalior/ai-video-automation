@@ -91,8 +91,8 @@ class Downloader:
         """Fetch video metadata without downloading."""
         try:
             r = subprocess.run(
-                ["yt-dlp", "--dump-json", "--no-download",
-                 "--no-warnings", "--quiet", url],
+                ["yt-dlp", "--extractor-args", "youtube:player_client=android,ios,web",
+                 "--dump-json", "--no-download", "--no-warnings", url],
                 capture_output=True, text=True, timeout=30
             )
             if r.returncode == 0 and r.stdout.strip():
@@ -211,10 +211,12 @@ class Downloader:
         print(f"[DOWNLOADER] Downloading Audio Only: {url[:80]}")
 
         cmd = [
-            "yt-dlp", url,
+            "yt-dlp",
+            "--extractor-args", "youtube:player_client=android,ios,web",
+            url,
             "-f", "ba[ext=m4a]/ba",
             "-o", output_path,
-            "--no-warnings", "--quiet",
+            "--no-warnings",
         ]
 
         try:
@@ -247,13 +249,14 @@ class Downloader:
 
         cmd = [
             "yt-dlp",
+            "--extractor-args", "youtube:player_client=android,ios,web",
             "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
             "--download-sections", section,
             "--force-keyframes-at-cuts",
             "--merge-output-format", "mp4",
             "-o", output_path,
             url,
-            "--no-warnings", "--quiet",
+            "--no-warnings",
         ]
 
         try:
