@@ -410,56 +410,104 @@
             {% endif %}
           </div>
 
-          <!-- Ingestion Source / Linked Monitored Influencer -->
-          <div style="background: #111827; border: 1px solid rgba(76, 230, 22, 0.4); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; color: #fff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #4CE616; font-weight: 700; letter-spacing: 0.5px;">
-                🎯 INGESTION SOURCE
-              </span>
-              <button type="button" onclick="openLinkInfluencerModal('{{ persona.id }}', '{{ persona.username }}')" style="background: rgba(76, 230, 22, 0.15); border: 1px solid #4CE616; color: #4CE616; border-radius: 4px; padding: 2px 7px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700; cursor: pointer;">
-                + LINK
-              </button>
-            </div>
-            
-            {% if persona.monitored_influencers %}
-              <div style="display: flex; flex-direction: column; gap: 5px;">
-                {% for inf in persona.monitored_influencers %}
-                  <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.05); padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.1);">
-                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
-                      <span style="font-size: 0.85rem;">{% if inf.platform == 'telegram' %}📱{% else %}🎙️{% endif %}</span>
-                      <span style="font-size: 0.76rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; color: #fff;" title="{{ inf.channel_name }}">
-                        {{ inf.channel_name }}
-                      </span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="font-family: var(--font-mono); font-size: 0.65rem; color: {{ '#4CE616' if inf.is_active else '#ef4444' }};">
-                        ● {{ 'ACTIVE' if inf.is_active else 'OFF' }}
-                      </span>
-                      <button type="button" onclick="unlinkInfluencer('{{ persona.id }}', {{ inf.id }})" style="background: transparent; border: none; color: #94a3b8; font-size: 0.85rem; cursor: pointer; padding: 0 2px;" title="Unlink Creator">
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                {% endfor %}
+          {% if persona.content_type in ['follow_influencer', 'follow_telegram'] %}
+            <!-- Ingestion Source / Linked Monitored Influencer -->
+            <div style="background: #111827; border: 1px solid rgba(76, 230, 22, 0.4); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; color: #fff;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #4CE616; font-weight: 700; letter-spacing: 0.5px;">
+                  🎯 INGESTION SOURCE
+                </span>
+                <button type="button" onclick="openLinkInfluencerModal('{{ persona.id }}', '{{ persona.username.lstrip('@') }}')" style="background: rgba(76, 230, 22, 0.15); border: 1px solid #4CE616; color: #4CE616; border-radius: 4px; padding: 2px 7px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700; cursor: pointer;">
+                  + LINK
+                </button>
               </div>
-            {% else %}
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 4px;">
-                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #94a3b8;">No creator connected</span>
-                <a href="javascript:void(0)" onclick="openLinkInfluencerModal('{{ persona.id }}', '{{ persona.username }}')" style="font-family: var(--font-mono); font-size: 0.7rem; color: #60a5fa; text-decoration: none;">
-                  Assign &rarr;
+              
+              {% if persona.monitored_influencers %}
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                  {% for inf in persona.monitored_influencers %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.05); padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                      <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                        <span style="font-size: 0.85rem;">{% if inf.platform == 'telegram' %}📱{% else %}🎙️{% endif %}</span>
+                        <span style="font-size: 0.76rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; color: #fff;" title="{{ inf.channel_name }}">
+                          {{ inf.channel_name }}
+                        </span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-family: var(--font-mono); font-size: 0.65rem; color: {{ '#4CE616' if inf.is_active else '#ef4444' }};">
+                          ● {{ 'ACTIVE' if inf.is_active else 'OFF' }}
+                        </span>
+                        <button type="button" onclick="unlinkInfluencer('{{ persona.id }}', {{ inf.id }})" style="background: transparent; border: none; color: #94a3b8; font-size: 0.85rem; cursor: pointer; padding: 0 2px;" title="Unlink Creator">
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 4px;">
+                  <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #94a3b8;">No creator connected</span>
+                  <a href="javascript:void(0)" onclick="openLinkInfluencerModal('{{ persona.id }}', '{{ persona.username.lstrip('@') }}')" style="font-family: var(--font-mono); font-size: 0.7rem; color: #60a5fa; text-decoration: none;">
+                    Assign &rarr;
+                  </a>
+                </div>
+              {% endif %}
+              
+              <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #94a3b8;">
+                  Feeds: {{ persona.monitored_influencers|length }}
+                </span>
+                <a href="{{ url_for('influencers.list_influencers', persona_id=persona.id) }}" style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; text-decoration: none; font-weight: 700; background: rgba(76, 230, 22, 0.12); border: 1px solid rgba(76, 230, 22, 0.35); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                  Manage Ingestion for @{{ persona.username.lstrip('@') }} &rarr;
                 </a>
               </div>
-            {% endif %}
-            
-            <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;">
-              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #94a3b8;">
-                Feeds: {{ persona.monitored_influencers|length }}
-              </span>
-              <a href="{{ url_for('influencers.list_influencers', persona_id=persona.id) }}" style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; text-decoration: none; font-weight: 700; background: rgba(76, 230, 22, 0.12); border: 1px solid rgba(76, 230, 22, 0.35); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
-                Manage Ingestion for @{{ persona.username.lstrip('@') }} &rarr;
-              </a>
             </div>
-          </div>
+          {% elif persona.content_type == 'whop_content' %}
+            <!-- Whop Content Rewards & Bounty Status -->
+            <div style="background: #111827; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; color: #fff;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #f59e0b; font-weight: 700; letter-spacing: 0.5px;">
+                  🏆 WHOP BOUNTY PIPELINE
+                </span>
+                <span style="font-family: var(--font-mono); font-size: 0.65rem; color: #10b981; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; padding: 1px 6px; border-radius: 3px;">
+                  $5.00 / 1K CPM
+                </span>
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #cbd5e1; line-height: 1.4; margin-bottom: 8px;">
+                Automated bounty campaigns. Videos dispatched for this node are monitored and submitted to Whop for views cashout.
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #94a3b8;">
+                  Status: Bounty Tracking
+                </span>
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #f59e0b; font-weight: 700;">
+                  Active Node
+                </span>
+              </div>
+            </div>
+          {% elif persona.content_type == 'upload_based' %}
+            <!-- Telegram Bot Direct Ingestion -->
+            <div style="background: #111827; border: 1px solid rgba(96, 165, 250, 0.4); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; color: #fff;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #60a5fa; font-weight: 700; letter-spacing: 0.5px;">
+                  📤 TELEGRAM BOT DROP
+                </span>
+                <span style="font-family: var(--font-mono); font-size: 0.65rem; color: #60a5fa; background: rgba(96, 165, 250, 0.15); border: 1px solid #60a5fa; padding: 1px 6px; border-radius: 3px;">
+                  MANUAL UPLOAD
+                </span>
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #cbd5e1; line-height: 1.4; margin-bottom: 8px;">
+                Send video files directly to the Telegram Bot. AWS automatically catches media and dispatches to this node's channels.
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;">
+                <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #94a3b8;">
+                  Bot Ingestion: Active
+                </span>
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #60a5fa; font-weight: 600;">
+                  Listening
+                </span>
+              </div>
+            </div>
+          {% endif %}
 
           <!-- Platform Status Strip (Compact Indicator Pills) -->
           <div style="background: #FAF9F6; border: 1px solid var(--color-border); border-radius: 4px; padding: 10px 12px; margin-bottom: 14px;">

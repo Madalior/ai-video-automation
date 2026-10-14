@@ -255,7 +255,7 @@
       <!-- Switch Node Dropdown -->
       <select onchange="if(this.value){ window.location.href='{{ url_for('influencers.list_influencers') }}?persona_id=' + this.value; } else { window.location.href='{{ url_for('influencers.list_influencers') }}'; }" style="padding: 9px 14px; font-family: var(--font-mono); font-size: 0.8rem; background: #0a0f1d; border: 1px solid #4CE616; color: #fff; border-radius: 6px; cursor: pointer;">
         <option value="{{ active_persona.id }}">Selected: @{{ active_persona.username.lstrip('@') }}</option>
-        {% for p in personas %}
+        {% for p in personas if p.content_type in ['follow_influencer', 'follow_telegram'] %}
           {% if p.id != active_persona.id %}
             <option value="{{ p.id }}">Switch to @{{ p.username.lstrip('@') }} ({{ p.content_type.replace('_', ' ') }})</option>
           {% endif %}
@@ -278,7 +278,7 @@
       <a href="{{ url_for('influencers.list_influencers') }}" class="cmd-pill" style="border-color: #4CE616; color: #4CE616; background: rgba(76, 230, 22, 0.12); text-decoration: none;">
         🌐 All Nodes ({{ all_influencers_count }})
       </a>
-      {% for p in personas %}
+      {% for p in personas if p.content_type in ['follow_influencer', 'follow_telegram'] %}
         <a href="{{ url_for('influencers.list_influencers', persona_id=p.id) }}" class="cmd-pill" style="text-decoration: none;">
           🎯 @{{ p.username.lstrip('@') }} ({{ p.monitored_influencers|length }})
         </a>
@@ -375,7 +375,7 @@
         {% if not active_persona %}
           <option value="">-- None / Select Node --</option>
         {% endif %}
-        {% for p in personas %}
+        {% for p in personas if p.content_type in ['follow_influencer', 'follow_telegram'] %}
           <option value="{{ p.id }}" {% if active_persona and active_persona.id == p.id %}selected{% endif %}>
             {{ p.username }} ({{ p.content_type.replace('_', ' ') }})
           </option>
@@ -437,7 +437,7 @@
               <input type="hidden" name="return_persona_id" value="{{ active_persona.id if active_persona else '' }}">
               <select name="account_persona_id" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 0.8rem; background: rgba(15, 23, 42, 0.8); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 6px;" onchange="this.form.submit()">
                 <option value="">-- No Persona Assigned --</option>
-                {% for p in personas %}
+                {% for p in personas if p.content_type in ['follow_influencer', 'follow_telegram'] %}
                   <option value="{{ p.id }}" {% if inf.account_persona_id == p.id %}selected{% endif %}>
                     {{ p.username }} ({{ p.content_type.replace('_', ' ') }})
                   </option>
