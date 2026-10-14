@@ -16,34 +16,58 @@ influencers_bp = Blueprint("influencers", __name__)
 @influencers_bp.route("/influencers")
 @login_required
 def list_influencers():
-    followed = MonitoredInfluencer.query.filter_by(user_id=current_user.id).order_by(MonitoredInfluencer.created_at.desc()).all()
+    persona_id = request.args.get("persona_id", "").strip() or None
+    active_persona = None
+    if persona_id:
+        active_persona = AccountPersona.query.filter_by(id=persona_id, user_id=current_user.id).first()
+
+    personas = AccountPersona.query.filter_by(user_id=current_user.id).all()
+    all_influencers_count = MonitoredInfluencer.query.filter_by(user_id=current_user.id).count()
+
+    query = MonitoredInfluencer.query.filter_by(user_id=current_user.id)
+    if active_persona:
+        followed = query.filter_by(account_persona_id=active_persona.id).order_by(MonitoredInfluencer.created_at.desc()).all()
+    else:
+        followed = query.order_by(MonitoredInfluencer.created_at.desc()).all()
     
     # Calculate stream stats for each influencer
-    streams = ProcessedStream.query.join(MonitoredInfluencer).filter(
+    stream_query = ProcessedStream.query.join(MonitoredInfluencer).filter(
         MonitoredInfluencer.user_id == current_user.id
-    ).order_by(ProcessedStream.created_at.desc()).limit(15).all()
+    )
+    if active_persona:
+        stream_query = stream_query.filter(
+            (ProcessedStream.account_persona_id == active_persona.id) | (MonitoredInfluencer.account_persona_id == active_persona.id)
+        )
+    streams = stream_query.order_by(ProcessedStream.created_at.desc()).limit(15).all()
 
-    # Pass all active persona nodes for direct assignment
-    personas = AccountPersona.query.filter_by(user_id=current_user.id).all()
-
-    return render_template("influencers.html", influencers=followed, recent_streams=streams, personas=personas)
+    return render_template(
+        "influencers.html",
+        influencers=followed,
+        recent_streams=streams,
+        personas=personas,
+        active_persona=active_persona,
+        persona_id=persona_id,
+        all_influencers_count=all_influencers_count
+    )
 
 
 @influencers_bp.route("/influencers/<int:influencer_id>/toggle", methods=["POST"])
 @login_required
 def toggle_influencer(influencer_id):
+    persona_id = request.form.get("persona_id", "").strip() or request.args.get("persona_id", "").strip() or None
     influencer = MonitoredInfluencer.query.filter_by(id=influencer_id, user_id=current_user.id).first_or_404()
     influencer.is_active = not influencer.is_active
     db.session.commit()
     status_str = "Resumed monitoring" if influencer.is_active else "Paused monitoring"
     flash(f"{status_str} for {influencer.channel_name}.", "info")
-    return redirect(url_for("influencers.list_influencers"))
+    return redirect(url_for("influencers.list_influencers", persona_id=persona_id))
 
 
 @influencers_bp.route("/influencers/<int:influencer_id>/scan", methods=["POST"])
 @login_required
 def scan_influencer(influencer_id):
     from datetime import datetime
+    persona_id = request.form.get("persona_id", "").strip() or request.args.get("persona_id", "").strip() or None
     influencer = MonitoredInfluencer.query.filter_by(id=influencer_id, user_id=current_user.id).first_or_404()
     scan_mode = request.form.get("scan_mode", "latest").strip()
     offset_raw = request.form.get("offset_or_post_id", "").strip()
@@ -85,7 +109,7 @@ def scan_influencer(influencer_id):
     else:
         flash(f"Scan ({scan_mode}) complete for {influencer.channel_name}.", "info")
 
-    return redirect(url_for("influencers.list_influencers"))
+    return redirect(url_for("influencers.list_influencers", persona_id=persona_id))
 
 
 @influencers_bp.route("/influencers/conversation", methods=["POST"])
@@ -157,12 +181,13 @@ def build_channel_conversation():
 @influencers_bp.route("/influencers/<int:influencer_id>/delete", methods=["POST"])
 @login_required
 def delete_influencer(influencer_id):
+    persona_id = request.form.get("persona_id", "").strip() or request.args.get("persona_id", "").strip() or None
     influencer = MonitoredInfluencer.query.filter_by(id=influencer_id, user_id=current_user.id).first_or_404()
     channel_name = influencer.channel_name
     db.session.delete(influencer)
     db.session.commit()
     flash(f"Unfollowed and removed {channel_name}.", "warning")
-    return redirect(url_for("influencers.list_influencers"))
+    return redirect(url_for("influencers.list_influencers", persona_id=persona_id))
 
 
 @influencers_bp.route("/influencers/add", methods=["POST"])
@@ -170,11 +195,12 @@ def delete_influencer(influencer_id):
 def add_influencer():
     from datetime import datetime
     channel_url = request.form.get("channel_url", "").strip()
+    persona_id = request.form.get("persona_id", "").strip() or request.args.get("persona_id", "").strip() or None
+    account_persona_id = request.form.get("account_persona_id", "").strip() or persona_id or None
+
     if not channel_url:
         flash("Please enter a valid creator or channel URL.", "error")
-        return redirect(url_for("influencers.list_influencers"))
-
-    account_persona_id = request.form.get("account_persona_id", "").strip() or None
+        return redirect(url_for("influencers.list_influencers", persona_id=persona_id))
 
     monitor = StreamMonitor()
     meta = monitor.resolve_channel_metadata(channel_url)
@@ -227,7 +253,7 @@ def add_influencer():
         else:
             flash(f"Already monitoring {existing.channel_name}.", "info")
 
-    return redirect(url_for("influencers.list_influencers"))
+    return redirect(url_for("influencers.list_influencers", persona_id=account_persona_id or persona_id))
 
 
 @influencers_bp.route("/influencers/<int:influencer_id>/assign_persona", methods=["POST"])
@@ -235,6 +261,7 @@ def add_influencer():
 def assign_persona(influencer_id):
     influencer = MonitoredInfluencer.query.filter_by(id=influencer_id, user_id=current_user.id).first_or_404()
     persona_id = request.form.get("account_persona_id", "").strip()
+    return_persona_id = request.form.get("return_persona_id", "").strip() or None
     
     if persona_id:
         persona = AccountPersona.query.filter_by(id=persona_id, user_id=current_user.id).first()
@@ -248,7 +275,7 @@ def assign_persona(influencer_id):
         flash(f"Unassigned upload persona for {influencer.channel_name}.", "info")
 
     db.session.commit()
-    return redirect(url_for("influencers.list_influencers"))
+    return redirect(url_for("influencers.list_influencers", persona_id=return_persona_id or persona_id))
 
 
 
@@ -267,18 +294,31 @@ def chat_command():
 
     data = request.get_json(silent=True) or request.form
     prompt = (data.get("prompt") or data.get("message") or "").strip()
+    persona_id = (data.get("persona_id") or "").strip()
+    active_persona = None
+    if persona_id:
+        active_persona = AccountPersona.query.filter_by(id=persona_id, user_id=current_user.id).first()
 
     if not prompt:
         return jsonify({"success": False, "reply": "Please type a command (e.g., 'download ep1' or 'look for high viewed stream')."}), 400
 
     prompt_lower = prompt.lower()
-    followed = MonitoredInfluencer.query.filter_by(user_id=current_user.id, is_active=True).all()
+    base_query = MonitoredInfluencer.query.filter_by(user_id=current_user.id, is_active=True)
+    if active_persona:
+        followed = base_query.filter_by(account_persona_id=active_persona.id).all()
+        if not followed:
+            followed = base_query.all()
+    else:
+        followed = base_query.all()
+
     if not followed:
+        node_msg = f" for @{active_persona.username}" if active_persona else ""
         return jsonify({
             "success": False,
-            "reply": "⚠️ You haven't followed any creators or Telegram channels yet! Use the box above to follow a channel first."
+            "reply": f"⚠️ No active creators or Telegram channels assigned{node_msg} yet! Use the box above to link a channel."
         })
 
+    target_account_id = active_persona.id if active_persona else None
     monitor = StreamMonitor()
 
     # 1. COMMAND: "download ep<N>" or "episode <N>" or "post <N>"
@@ -318,10 +358,11 @@ def chat_command():
             stream_id=stream_data["stream_id"]
         ).first()
 
+        dest_persona_id = target_account_id or target_channel.account_persona_id
         if not existing:
             new_stream = ProcessedStream(
                 influencer_id=target_channel.id,
-                account_persona_id=target_channel.account_persona_id,
+                account_persona_id=dest_persona_id,
                 stream_id=stream_data["stream_id"],
                 stream_title=stream_data["title"],
                 stream_url=stream_data["url"],
@@ -333,9 +374,10 @@ def chat_command():
             db.session.commit()
 
         clean_title = stream_data["title"].replace("📜 [OLD EPISODE]", "").replace("🔥 [VIRAL TG]", "").strip()
+        node_tag = f" for @{active_persona.username}" if active_persona else ""
         return jsonify({
             "success": True,
-            "reply": f"🎬 Discovered & queued Episode #{ep_num} from {target_channel.channel_name}: '{clean_title}'! Ready for clipping into 9:16 vertical shorts.",
+            "reply": f"🎬 Discovered & queued Episode #{ep_num}{node_tag} from {target_channel.channel_name}: '{clean_title}'! Ready for clipping into 9:16 vertical shorts.",
             "stream": {
                 "creator": target_channel.channel_name,
                 "title": clean_title,
@@ -361,6 +403,7 @@ def chat_command():
             limit=2
         )
 
+        dest_persona_id = target_account_id or target_channel.account_persona_id
         for s in streams:
             existing = ProcessedStream.query.filter_by(
                 influencer_id=target_channel.id,
@@ -369,7 +412,7 @@ def chat_command():
             if not existing:
                 new_stream = ProcessedStream(
                     influencer_id=target_channel.id,
-                    account_persona_id=target_channel.account_persona_id,
+                    account_persona_id=dest_persona_id,
                     stream_id=s["stream_id"],
                     stream_title=s["title"],
                     stream_url=s["url"],
@@ -386,9 +429,10 @@ def chat_command():
             top_views = streams[0].get("view_count", 0)
             views_str = f" ({top_views:,} views)" if top_views else ""
             clean_title = top_title.replace("🔥", "").strip()
+            node_tag = f" for @{active_persona.username}" if active_persona else ""
             return jsonify({
                 "success": True,
-                "reply": f"🔥 Found high-viewed viral stream for {target_channel.channel_name}: '{clean_title}'{views_str}! Queued for AI highlight extraction.",
+                "reply": f"🔥 Found high-viewed viral stream{node_tag} from {target_channel.channel_name}: '{clean_title}'{views_str}! Queued for AI highlight extraction.",
                 "stream": {
                     "creator": target_channel.channel_name,
                     "title": clean_title,
@@ -401,13 +445,14 @@ def chat_command():
     # 3. COMMAND: "scan" or "latest" or "check"
     if any(k in prompt_lower for k in ["scan", "latest", "new", "check"]):
         new_count = 0
+        dest_persona_id = target_account_id
         for inf in followed:
             st = monitor.fetch_completed_streams(inf.channel_url, limit=2)
             for s in st:
                 if not ProcessedStream.query.filter_by(influencer_id=inf.id, stream_id=s["stream_id"]).first():
                     db.session.add(ProcessedStream(
                         influencer_id=inf.id,
-                        account_persona_id=inf.account_persona_id,
+                        account_persona_id=dest_persona_id or inf.account_persona_id,
                         stream_id=s["stream_id"],
                         stream_title=s["title"],
                         stream_url=s["url"],
@@ -417,13 +462,15 @@ def chat_command():
                     new_count += 1
             inf.last_checked_at = datetime.utcnow()
         db.session.commit()
+        node_tag = f" for @{active_persona.username}" if active_persona else ""
         return jsonify({
             "success": True,
-            "reply": f"⚡ Scanned all followed channels. Found {new_count} newly finished stream(s) queued for clipping!"
+            "reply": f"⚡ Scanned feeds{node_tag}. Found {new_count} newly finished stream(s) queued for clipping!"
         })
 
     # 4. GENERAL CONVERSATIONAL RESPONSE
+    target_info = f"locked to node @{active_persona.username}" if active_persona else "active for all nodes"
     return jsonify({
         "success": True,
-        "reply": f"🤖 Fleet Director active! You can say:\n• 'download ep1' (pulls Episode 1 from your Telegram channel)\n• 'look for high viewed stream' (scans viral streams with millions of views)\n• 'scan latest streams' (checks for recent streams)"
+        "reply": f"🤖 Fleet Director ({target_info})! You can say:\n• 'download ep1' (pulls Episode 1 from your Telegram channel)\n• 'look for high viewed stream' (scans viral streams with millions of views)\n• 'scan latest streams' (checks for recent streams)"
     })

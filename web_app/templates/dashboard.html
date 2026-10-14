@@ -451,9 +451,12 @@
               </div>
             {% endif %}
             
-            <div style="margin-top: 6px; text-align: right;">
-              <a href="{{ url_for('influencers.list_influencers') }}" style="font-family: var(--font-mono); font-size: 0.68rem; color: #93c5fd; text-decoration: none; font-weight: 600;">
-                Influencer Radar &rarr;
+            <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #94a3b8;">
+                Feeds: {{ persona.monitored_influencers|length }}
+              </span>
+              <a href="{{ url_for('influencers.list_influencers', persona_id=persona.id) }}" style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; text-decoration: none; font-weight: 700; background: rgba(76, 230, 22, 0.12); border: 1px solid rgba(76, 230, 22, 0.35); padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                Manage Ingestion for @{{ persona.username }} &rarr;
               </a>
             </div>
           </div>

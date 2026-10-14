@@ -230,15 +230,75 @@
   </div>
 </div>
 
+<!-- Active Node Context Scope Header -->
+{% if active_persona %}
+  <div style="background: linear-gradient(90deg, rgba(76, 230, 22, 0.16) 0%, rgba(16, 24, 39, 0.95) 100%); border: 2px solid #4CE616; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; box-shadow: 0 0 24px rgba(76, 230, 22, 0.2);">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <span style="font-size: 2rem;">🎯</span>
+      <div>
+        <div style="font-family: var(--font-michroma); font-size: 1.05rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <span>UPLOAD NODE LOCKED:</span>
+          <span style="color: #4CE616; background: rgba(76, 230, 22, 0.15); padding: 2px 10px; border-radius: 6px; border: 1px solid rgba(76, 230, 22, 0.4);">
+            @{{ active_persona.username }}
+          </span>
+          <span style="font-size: 0.72rem; font-family: var(--font-mono); background: rgba(255,255,255,0.08); padding: 3px 8px; border-radius: 4px; color: #cbd5e1;">
+            {{ active_persona.content_type.replace('_', ' ').upper() }}
+          </span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #cbd5e1; margin-top: 4px;">
+          📧 {{ active_persona.gmail or 'No Gmail' }} • 📁 Profile ID: <span style="color: #60a5fa;">{{ active_persona.id }}</span> • Showing <strong>{{ influencers|length }}</strong> feeds bound to this account
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <!-- Switch Node Dropdown -->
+      <select onchange="if(this.value){ window.location.href='{{ url_for('influencers.list_influencers') }}?persona_id=' + this.value; } else { window.location.href='{{ url_for('influencers.list_influencers') }}'; }" style="padding: 9px 14px; font-family: var(--font-mono); font-size: 0.8rem; background: #0a0f1d; border: 1px solid #4CE616; color: #fff; border-radius: 6px; cursor: pointer;">
+        <option value="{{ active_persona.id }}">Selected: @{{ active_persona.username }}</option>
+        {% for p in personas %}
+          {% if p.id != active_persona.id %}
+            <option value="{{ p.id }}">Switch to @{{ p.username }} ({{ p.content_type.replace('_', ' ') }})</option>
+          {% endif %}
+        {% endfor %}
+        <option value="">Show All Nodes (Unfiltered)</option>
+      </select>
+
+      <a href="{{ url_for('influencers.list_influencers') }}" class="btn-secondary" style="font-family: var(--font-mono); font-size: 0.78rem; padding: 8px 14px; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; text-decoration: none;">
+        ✕ Clear Filter (Show All)
+      </a>
+    </div>
+  </div>
+{% else %}
+  <!-- General View Persona Switcher Pills -->
+  <div style="background: rgba(18, 24, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 12px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted); font-weight: 700;">
+        FILTER BY UPLOAD NODE:
+      </span>
+      <a href="{{ url_for('influencers.list_influencers') }}" class="cmd-pill" style="border-color: #4CE616; color: #4CE616; background: rgba(76, 230, 22, 0.12); text-decoration: none;">
+        🌐 All Nodes ({{ all_influencers_count }})
+      </a>
+      {% for p in personas %}
+        <a href="{{ url_for('influencers.list_influencers', persona_id=p.id) }}" class="cmd-pill" style="text-decoration: none;">
+          🎯 @{{ p.username }} ({{ p.monitored_influencers|length }})
+        </a>
+      {% endfor %}
+    </div>
+    <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8;">
+      Click a node above to filter feeds for that specific account
+    </span>
+  </div>
+{% endif %}
+
 <!-- Conversational AI Assistant Console -->
 <div class="conversational-console">
   <div class="console-header">
     <div class="console-title">
       <span class="led-status"></span>
-      <span>GOING MERRY FLEET DIRECTOR // CONVERSATIONAL COMMAND</span>
+      <span>GOING MERRY FLEET DIRECTOR // {% if active_persona %}DISPATCH TARGET: @{{ active_persona.username }}{% else %}GLOBAL FLEET CONSOLE{% endif %}</span>
     </div>
     <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; background: rgba(76, 230, 22, 0.12); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(76, 230, 22, 0.3);">
-      READY • COMMAND ACTIVE
+      {% if active_persona %}TARGET LOCKED • @{{ active_persona.username }}{% else %}READY • ALL NODES ACTIVE{% endif %}
     </span>
   </div>
 
@@ -247,7 +307,11 @@
     <div class="chat-msg">
       <span style="font-size: 1.2rem;">🤖</span>
       <div class="chat-bubble bot">
-        <strong>Fleet Director Online!</strong> How can I help you today? You can type natural commands like:
+        {% if active_persona %}
+          <strong>Fleet Director locked to @{{ active_persona.username }}!</strong> All clips harvested from commands will automatically dispatch to this account's YouTube, Instagram, and TikTok channels.
+        {% else %}
+          <strong>Fleet Director Online!</strong> How can I help you today? You can type natural commands like:
+        {% endif %}
         <br>• <strong>"download ep1"</strong> — pulls Episode 1 from your Telegram channel
         <br>• <strong>"look for high viewed stream"</strong> — discovers viral streams with millions of views
         <br>• <strong>"scan latest streams"</strong> — checks for newly finished broadcasts
@@ -294,6 +358,7 @@
     <span>📡</span> Follow New Creator or Telegram Channel
   </div>
   <form method="POST" action="{{ url_for('influencers.add_influencer') }}" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;">
+    <input type="hidden" name="persona_id" value="{{ active_persona.id if active_persona else '' }}">
     <div style="flex: 2; min-width: 280px;">
       <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Creator Handle / Stream URL or Telegram Channel</label>
       <input type="text" name="channel_url" class="form-input" placeholder="e.g. https://www.youtube.com/@KaiCenat or https://t.me/CryptoMedia" required style="width: 100%;">
@@ -303,16 +368,24 @@
       <input type="number" name="num_clips" class="form-input" value="5" min="1" max="20" style="width: 100%;">
     </div>
     <div style="flex: 1.2; min-width: 180px;">
-      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Assign Upload Persona</label>
-      <select name="account_persona_id" class="form-input" style="width: 100%;">
-        <option value="">-- None / Select Node --</option>
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: {% if active_persona %}#4CE616{% else %}var(--text-muted){% endif %};">
+        {% if active_persona %}🎯 Auto-Assigned Upload Node{% else %}Assign Upload Persona{% endif %}
+      </label>
+      <select name="account_persona_id" class="form-input" style="width: 100%; {% if active_persona %}border-color: #4CE616; background: rgba(76, 230, 22, 0.08); font-weight: 700; color: #fff;{% endif %}">
+        {% if not active_persona %}
+          <option value="">-- None / Select Node --</option>
+        {% endif %}
         {% for p in personas %}
-          <option value="{{ p.id }}">{{ p.username }} ({{ p.content_type.replace('_', ' ') }})</option>
+          <option value="{{ p.id }}" {% if active_persona and active_persona.id == p.id %}selected{% endif %}>
+            {{ p.username }} ({{ p.content_type.replace('_', ' ') }})
+          </option>
         {% endfor %}
       </select>
     </div>
     <div>
-      <button type="submit" class="btn-primary" style="padding: 10px 22px; white-space: nowrap;">+ Follow &amp; Monitor</button>
+      <button type="submit" class="btn-primary" style="padding: 10px 22px; white-space: nowrap;">
+        {% if active_persona %}+ Follow for @{{ active_persona.username }}{% else %}+ Follow &amp; Monitor{% endif %}
+      </button>
     </div>
   </form>
 </div>
@@ -321,8 +394,15 @@
 {% if influencers %}
   <div class="influencer-grid">
     {% for inf in influencers %}
-      <div class="influencer-card">
+      <div class="influencer-card" style="{% if active_persona and inf.account_persona_id == active_persona.id %}border: 1px solid #4CE616; box-shadow: 0 0 18px rgba(76, 230, 22, 0.25); background: rgba(18, 28, 42, 0.95);{% endif %}">
         <div>
+          {% if active_persona and inf.account_persona_id == active_persona.id %}
+            <div style="margin-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #4CE616; background: rgba(76, 230, 22, 0.15); border: 1px solid #4CE616; padding: 2px 7px; border-radius: 4px; font-weight: 700;">
+                🎯 LINKED TO @{{ active_persona.username }}
+              </span>
+            </div>
+          {% endif %}
           <div class="influencer-header">
             <div>
               <div class="influencer-name">{{ inf.channel_name }}</div>
@@ -341,7 +421,7 @@
           </div>
 
           <!-- Assigned Persona Node Linkage -->
-          <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(76, 230, 22, 0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
+          <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid {% if active_persona and inf.account_persona_id == active_persona.id %}#4CE616{% else %}rgba(76, 230, 22, 0.3){% endif %}; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; font-weight: 700; letter-spacing: 0.5px;">
                 🎯 ASSIGNED UPLOAD NODE
@@ -354,6 +434,7 @@
             </div>
             
             <form method="POST" action="{{ url_for('influencers.assign_persona', influencer_id=inf.id) }}" style="display: flex; gap: 8px; align-items: center;">
+              <input type="hidden" name="return_persona_id" value="{{ active_persona.id if active_persona else '' }}">
               <select name="account_persona_id" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 0.8rem; background: rgba(15, 23, 42, 0.8); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 6px;" onchange="this.form.submit()">
                 <option value="">-- No Persona Assigned --</option>
                 {% for p in personas %}
@@ -371,6 +452,7 @@
           <!-- Latest Scan -->
           <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
             <input type="hidden" name="scan_mode" value="latest">
+            <input type="hidden" name="persona_id" value="{{ active_persona.id if active_persona else '' }}">
             <button type="submit" class="btn-secondary" title="Scan for newly ended streams right now">
               🔍 Latest
             </button>
@@ -379,6 +461,7 @@
           <!-- Viral Scan -->
           <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
             <input type="hidden" name="scan_mode" value="viral">
+            <input type="hidden" name="persona_id" value="{{ active_persona.id if active_persona else '' }}">
             <button type="submit" class="btn-secondary" title="Pull highest-viewed viral streams/videos">
               🔥 Viral
             </button>
@@ -387,6 +470,7 @@
           <!-- Old Archive Scan -->
           <form method="POST" action="{{ url_for('influencers.scan_influencer', influencer_id=inf.id) }}" style="display:inline;">
             <input type="hidden" name="scan_mode" value="old_archive">
+            <input type="hidden" name="persona_id" value="{{ active_persona.id if active_persona else '' }}">
             <button type="submit" class="btn-secondary" title="Pull older archived videos or past episodes">
               📜 Old Ep
             </button>
@@ -394,6 +478,7 @@
 
           <!-- Toggle Active / Pause -->
           <form method="POST" action="{{ url_for('influencers.toggle_influencer', influencer_id=inf.id) }}" style="display:inline;">
+            <input type="hidden" name="persona_id" value="{{ active_persona.id if active_persona else '' }}">
             <button type="submit" class="btn-secondary">
               {{ '⏸️' if inf.is_active else '▶️' }}
             </button>
@@ -401,6 +486,7 @@
 
           <!-- Delete -->
           <form method="POST" action="{{ url_for('influencers.delete_influencer', influencer_id=inf.id) }}" style="display:inline;" onsubmit="return confirm('Stop monitoring {{ inf.channel_name }}?');">
+            <input type="hidden" name="persona_id" value="{{ active_persona.id if active_persona else '' }}">
             <button type="submit" class="btn-danger" title="Unfollow">
               🗑️
             </button>
@@ -523,7 +609,10 @@ async function submitAiChat(e) {
     const res = await fetch('/api/influencers/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt })
+      body: JSON.stringify({
+        prompt: prompt,
+        persona_id: "{{ active_persona.id if active_persona else '' }}"
+      })
     });
     const data = await res.json();
 
