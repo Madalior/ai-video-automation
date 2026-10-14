@@ -212,8 +212,7 @@ class Downloader:
         cmd = [
             "yt-dlp",
             url,
-            "-f", "bestaudio/best",
-            "-x", "--audio-format", "m4a",
+            "-f", "ba[ext=m4a]/140/ba/b",
             "-o", output_path,
             "--no-warnings",
         ]
@@ -248,7 +247,7 @@ class Downloader:
 
         cmd = [
             "yt-dlp",
-            "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
+            "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/best",
             "--download-sections", section,
             "--force-keyframes-at-cuts",
             "--merge-output-format", "mp4",
