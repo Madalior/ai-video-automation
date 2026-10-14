@@ -15,7 +15,22 @@ from dataclasses import dataclass
 WHISPER_MODEL   = os.getenv("WHISPER_MODEL",        "small")
 WHISPER_DEVICE  = os.getenv("WHISPER_DEVICE",       "cpu")
 WHISPER_COMPUTE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
-
+# PyAV v19 compatibility: strip deprecated metadata_errors if not accepted
+try:
+    import av
+    _orig_av_open = av.open
+    def _safe_av_open(*args, **kwargs):
+        if "metadata_errors" in kwargs:
+            try:
+                import inspect
+                if "metadata_errors" not in inspect.signature(_orig_av_open).parameters:
+                    kwargs.pop("metadata_errors", None)
+            except Exception:
+                kwargs.pop("metadata_errors", None)
+        return _orig_av_open(*args, **kwargs)
+    av.open = _safe_av_open
+except Exception:
+    pass
 
 @dataclass
 class Word:
