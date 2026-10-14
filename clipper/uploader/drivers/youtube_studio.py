@@ -144,21 +144,19 @@ class YouTubeStudioUploader:
         print("[YOUTUBE_BOT] Verifying Upload Dialog and File Input...")
         file_input = self.page.locator("input[type='file']").first
         
-        # If file input not ready, click center Upload videos or header Create button
-        for _ in range(12):
+        # Click dashboard up-arrow upload button or center upload button if file input not yet attached
+        for _ in range(15):
             if file_input.count() > 0:
                 break
-            btn = self.page.locator("ytcp-button:has-text('Upload videos'), button:has-text('Upload videos'), #upload-button, ytcp-button:has-text('Create'), button:has-text('Create')").first
-            if btn.is_visible():
-                try:
+            btn = self.page.locator("#upload-button, [aria-label*='Upload'], ytcp-button#upload-button, ytcp-button:has-text('Upload videos'), button:has-text('Upload videos'), ytcp-button:has-text('Create'), button:has-text('Create')").first
+            try:
+                if btn.is_visible():
+                    print("[YOUTUBE_BOT] Clicking Upload button on dashboard...")
                     btn.click(force=True)
-                    self.page.wait_for_timeout(1000)
-                    menu_item = self.page.locator("tp-yt-paper-item, [test-id='upload-video-menu-item']").filter(has_text="Upload videos").first
-                    if menu_item.is_visible():
-                        menu_item.click(force=True)
-                except Exception:
-                    pass
-            self.page.wait_for_timeout(1500)
+                    self.page.wait_for_timeout(2000)
+            except Exception:
+                pass
+            self.page.wait_for_timeout(1000)
 
         # 5. Set Input Files (drag & drop upload)
         print(f"[YOUTUBE_BOT] Uploading video binary: {video_file.name} ({video_file.stat().st_size / (1024*1024):.1f} MB)...")

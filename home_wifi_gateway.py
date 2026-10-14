@@ -129,9 +129,7 @@ class Socks5Server:
             reply = struct.pack("!BBBBIH", 5, 0, 0, 1, 0, bind_port)
             client.sendall(reply)
 
-            # 4. Bidirectional streaming pipe
-            client.setblocking(False)
-            remote.setblocking(False)
+            # 4. High-throughput bidirectional streaming pipe
             self._pipe(client, remote)
 
         except Exception:
@@ -139,22 +137,32 @@ class Socks5Server:
         finally:
             try: client.close()
             except Exception: pass
+            try: remote.close()
+            except Exception: pass
 
     def _pipe(self, c_sock: socket.socket, r_sock: socket.socket):
-        sockets = [c_sock, r_sock]
-        while True:
-            r, _, _ = select.select(sockets, [], sockets, 60)
-            if not r:
-                break
-            for s in r:
-                other = r_sock if s is c_sock else c_sock
-                try:
-                    data = s.recv(16384)
+        c_sock.settimeout(120)
+        r_sock.settimeout(120)
+
+        def forward(src, dst):
+            try:
+                while True:
+                    data = src.recv(65536)
                     if not data:
-                        return
-                    other.sendall(data)
-                except Exception:
-                    return
+                        break
+                    dst.sendall(data)
+            except Exception:
+                pass
+            finally:
+                try: dst.shutdown(socket.SHUT_WR)
+                except Exception: pass
+
+        t1 = threading.Thread(target=forward, args=(c_sock, r_sock), daemon=True)
+        t2 = threading.Thread(target=forward, args=(r_sock, c_sock), daemon=True)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
 
 
 def run_reverse_tunnel(cloud_target: str, local_port: int = 1080, remote_port: int = 1080):
