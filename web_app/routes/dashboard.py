@@ -77,11 +77,14 @@ def dashboard():
     auth_mgr = PlatformAuthManager()
     fleet_platform_status = {p.id: auth_mgr.get_account_platform_status(p.id) for p in personas}
 
+    all_influencers = MonitoredInfluencer.query.filter_by(user_id=current_user.id).all()
+
     return render_template(
         "dashboard.html",
         clips=clips,
         viral_clips=viral_clips,
         personas=personas,
+        all_influencers=all_influencers,
         fleet_platform_status=fleet_platform_status,
         settings=settings,
         criteria_views=criteria_views,
@@ -305,3 +308,88 @@ def delete_account_persona(acc_id):
         pass
 
     return jsonify({"success": True, "message": f"Account {acc_id} deleted."})
+
+
+# ─── API: Link / Unlink Influencer to Persona Node ───────────────────────────
+@dash_bp.route("/api/personas/<string:persona_id>/link-influencer", methods=["POST"])
+@login_required
+def link_influencer_to_persona(persona_id):
+    persona = AccountPersona.query.filter_by(id=persona_id, user_id=current_user.id).first()
+    if not persona:
+        return jsonify({"success": False, "message": "Persona node not found"}), 404
+
+    data = request.get_json(silent=True) or request.form
+    influencer_id = data.get("influencer_id")
+    channel_url = (data.get("channel_url") or "").strip()
+
+    if influencer_id:
+        influencer = MonitoredInfluencer.query.filter_by(id=int(influencer_id), user_id=current_user.id).first()
+        if not influencer:
+            return jsonify({"success": False, "message": "Influencer not found"}), 404
+        influencer.account_persona_id = persona.id
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": f"Successfully linked {influencer.channel_name} to @{persona.username}!",
+            "influencer": influencer.to_dict()
+        })
+    elif channel_url:
+        from clipper.core.stream_monitor import StreamMonitor
+        monitor = StreamMonitor()
+        meta = monitor.resolve_channel_metadata(channel_url)
+
+        influencer = MonitoredInfluencer.query.filter_by(
+            user_id=current_user.id,
+            channel_url=meta["channel_url"]
+        ).first()
+
+        if not influencer:
+            influencer = MonitoredInfluencer(
+                user_id=current_user.id,
+                channel_name=meta["channel_name"],
+                channel_handle=meta["channel_handle"],
+                channel_url=meta["channel_url"],
+                platform=meta["platform"],
+                account_persona_id=persona.id,
+                is_active=True,
+                auto_upload=True
+            )
+            db.session.add(influencer)
+        else:
+            influencer.account_persona_id = persona.id
+
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": f"Added & linked {influencer.channel_name} to @{persona.username}!",
+            "influencer": influencer.to_dict()
+        })
+    else:
+        return jsonify({"success": False, "message": "Please specify an existing influencer or channel URL."}), 400
+
+
+@dash_bp.route("/api/personas/<string:persona_id>/unlink-influencer", methods=["POST"])
+@login_required
+def unlink_influencer_from_persona(persona_id):
+    persona = AccountPersona.query.filter_by(id=persona_id, user_id=current_user.id).first()
+    if not persona:
+        return jsonify({"success": False, "message": "Persona node not found"}), 404
+
+    data = request.get_json(silent=True) or request.form
+    influencer_id = data.get("influencer_id")
+    if not influencer_id:
+        return jsonify({"success": False, "message": "Influencer ID required"}), 400
+
+    influencer = MonitoredInfluencer.query.filter_by(id=int(influencer_id), user_id=current_user.id).first()
+    if not influencer:
+        return jsonify({"success": False, "message": "Influencer not found"}), 404
+
+    if influencer.account_persona_id == persona.id:
+        influencer.account_persona_id = None
+        db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "message": f"Unlinked {influencer.channel_name} from @{persona.username}."
+    })
+

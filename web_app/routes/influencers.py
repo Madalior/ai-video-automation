@@ -7,7 +7,7 @@ Allows users to view, toggle, configure, and scan their followed influencers.
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from web_app.app import db
-from web_app.models import MonitoredInfluencer, ProcessedStream
+from web_app.models import MonitoredInfluencer, ProcessedStream, AccountPersona
 from clipper.core.stream_monitor import StreamMonitor
 
 influencers_bp = Blueprint("influencers", __name__)
@@ -23,7 +23,10 @@ def list_influencers():
         MonitoredInfluencer.user_id == current_user.id
     ).order_by(ProcessedStream.created_at.desc()).limit(15).all()
 
-    return render_template("influencers.html", influencers=followed, recent_streams=streams)
+    # Pass all active persona nodes for direct assignment
+    personas = AccountPersona.query.filter_by(user_id=current_user.id).all()
+
+    return render_template("influencers.html", influencers=followed, recent_streams=streams, personas=personas)
 
 
 @influencers_bp.route("/influencers/<int:influencer_id>/toggle", methods=["POST"])
@@ -64,6 +67,7 @@ def scan_influencer(influencer_id):
         if not existing:
             new_stream = ProcessedStream(
                 influencer_id=influencer.id,
+                account_persona_id=influencer.account_persona_id,
                 stream_id=s["stream_id"],
                 stream_title=s["title"],
                 stream_url=s["url"],
@@ -131,6 +135,7 @@ def build_channel_conversation():
 
     conv_stream = ProcessedStream(
         influencer_id=inf_a.id,
+        account_persona_id=inf_a.account_persona_id or inf_b.account_persona_id,
         stream_id=conv_stream_id,
         stream_title=conv_title[:240],
         stream_url=clip_a["url"],
@@ -169,6 +174,8 @@ def add_influencer():
         flash("Please enter a valid creator or channel URL.", "error")
         return redirect(url_for("influencers.list_influencers"))
 
+    account_persona_id = request.form.get("account_persona_id", "").strip() or None
+
     monitor = StreamMonitor()
     meta = monitor.resolve_channel_metadata(channel_url)
 
@@ -186,6 +193,7 @@ def add_influencer():
             platform=meta["platform"],
             num_clips=int(request.form.get("num_clips", 5)),
             target_platform=request.form.get("target_platform", "all"),
+            account_persona_id=account_persona_id,
             auto_upload=True,
             is_active=True,
             last_checked_at=datetime.utcnow()
@@ -199,6 +207,7 @@ def add_influencer():
         for s in streams:
             new_stream = ProcessedStream(
                 influencer_id=influencer.id,
+                account_persona_id=influencer.account_persona_id,
                 stream_id=s["stream_id"],
                 stream_title=s["title"],
                 stream_url=s["url"],
@@ -211,9 +220,36 @@ def add_influencer():
 
         flash(f"Started monitoring {meta['channel_name']} ({meta['platform'].title()}) — discovered & queued {new_found} recent video(s)!", "success")
     else:
-        flash(f"Already monitoring {existing.channel_name}.", "info")
+        if account_persona_id and existing.account_persona_id != account_persona_id:
+            existing.account_persona_id = account_persona_id
+            db.session.commit()
+            flash(f"Updated upload persona for {existing.channel_name}.", "success")
+        else:
+            flash(f"Already monitoring {existing.channel_name}.", "info")
 
     return redirect(url_for("influencers.list_influencers"))
+
+
+@influencers_bp.route("/influencers/<int:influencer_id>/assign_persona", methods=["POST"])
+@login_required
+def assign_persona(influencer_id):
+    influencer = MonitoredInfluencer.query.filter_by(id=influencer_id, user_id=current_user.id).first_or_404()
+    persona_id = request.form.get("account_persona_id", "").strip()
+    
+    if persona_id:
+        persona = AccountPersona.query.filter_by(id=persona_id, user_id=current_user.id).first()
+        if persona:
+            influencer.account_persona_id = persona.id
+            flash(f"Assigned {influencer.channel_name} to @{persona.username} upload node.", "success")
+        else:
+            flash("Persona node not found.", "error")
+    else:
+        influencer.account_persona_id = None
+        flash(f"Unassigned upload persona for {influencer.channel_name}.", "info")
+
+    db.session.commit()
+    return redirect(url_for("influencers.list_influencers"))
+
 
 
 @influencers_bp.route("/api/influencers/chat", methods=["POST"])
@@ -285,6 +321,7 @@ def chat_command():
         if not existing:
             new_stream = ProcessedStream(
                 influencer_id=target_channel.id,
+                account_persona_id=target_channel.account_persona_id,
                 stream_id=stream_data["stream_id"],
                 stream_title=stream_data["title"],
                 stream_url=stream_data["url"],
@@ -332,6 +369,7 @@ def chat_command():
             if not existing:
                 new_stream = ProcessedStream(
                     influencer_id=target_channel.id,
+                    account_persona_id=target_channel.account_persona_id,
                     stream_id=s["stream_id"],
                     stream_title=s["title"],
                     stream_url=s["url"],
@@ -369,6 +407,7 @@ def chat_command():
                 if not ProcessedStream.query.filter_by(influencer_id=inf.id, stream_id=s["stream_id"]).first():
                     db.session.add(ProcessedStream(
                         influencer_id=inf.id,
+                        account_persona_id=inf.account_persona_id,
                         stream_id=s["stream_id"],
                         stream_title=s["title"],
                         stream_url=s["url"],

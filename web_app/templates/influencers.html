@@ -213,7 +213,7 @@
 }
 </style>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
   <div>
     <h1 style="font-family: var(--font-michroma, sans-serif); font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; color: #fff;">
       Followed Creators &amp; Channels
@@ -222,7 +222,12 @@
       Going Merry monitors these creators and Telegram channels to autonomously harvest viral reels &amp; shorts.
     </p>
   </div>
-  <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Advanced Studio</a>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <a href="{{ url_for('dashboard.dashboard') }}" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; font-size: 0.85rem; text-decoration: none; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #fff;">
+      ← Fleet Dashboard
+    </a>
+    <a href="{{ url_for('clips.new_clip') }}" class="nav-btn">+ Advanced Studio</a>
+  </div>
 </div>
 
 <!-- Conversational AI Assistant Console -->
@@ -297,14 +302,13 @@
       <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Clips to Cut</label>
       <input type="number" name="num_clips" class="form-input" value="5" min="1" max="20" style="width: 100%;">
     </div>
-    <div style="flex: 1; min-width: 160px;">
-      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Target Upload</label>
-      <select name="target_platform" class="form-input" style="width: 100%;">
-        <option value="all">All Connected (YT, IG, TT, FB)</option>
-        <option value="youtube">YouTube Shorts Only</option>
-        <option value="instagram">Instagram Reels Only</option>
-        <option value="tiktok">TikTok Only</option>
-        <option value="facebook">Facebook Only</option>
+    <div style="flex: 1.2; min-width: 180px;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">Assign Upload Persona</label>
+      <select name="account_persona_id" class="form-input" style="width: 100%;">
+        <option value="">-- None / Select Node --</option>
+        {% for p in personas %}
+          <option value="{{ p.id }}">{{ p.username }} ({{ p.content_type.replace('_', ' ') }})</option>
+        {% endfor %}
       </select>
     </div>
     <div>
@@ -334,6 +338,32 @@
             <div><strong style="color: var(--text-muted);">Clips per stream:</strong> {{ inf.num_clips }}</div>
             <div><strong style="color: var(--text-muted);">Auto-upload:</strong> {{ 'Enabled (Postiz)' if inf.auto_upload else 'Disabled' }}</div>
             <div><strong style="color: var(--text-muted);">Last check:</strong> {{ inf.last_checked_at.strftime('%b %d, %H:%M') if inf.last_checked_at else 'Never' }}</div>
+          </div>
+
+          <!-- Assigned Persona Node Linkage -->
+          <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(76, 230, 22, 0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #4CE616; font-weight: 700; letter-spacing: 0.5px;">
+                🎯 ASSIGNED UPLOAD NODE
+              </span>
+              {% if inf.account_persona %}
+                <a href="{{ url_for('dashboard.dashboard') }}" style="font-family: var(--font-mono); font-size: 0.72rem; color: #60a5fa; text-decoration: none;" title="Go to Dashboard">
+                  Dashboard &rarr;
+                </a>
+              {% endif %}
+            </div>
+            
+            <form method="POST" action="{{ url_for('influencers.assign_persona', influencer_id=inf.id) }}" style="display: flex; gap: 8px; align-items: center;">
+              <select name="account_persona_id" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 0.8rem; background: rgba(15, 23, 42, 0.8); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 6px;" onchange="this.form.submit()">
+                <option value="">-- No Persona Assigned --</option>
+                {% for p in personas %}
+                  <option value="{{ p.id }}" {% if inf.account_persona_id == p.id %}selected{% endif %}>
+                    {{ p.username }} ({{ p.content_type.replace('_', ' ') }})
+                  </option>
+                {% endfor %}
+              </select>
+              <noscript><button type="submit" class="btn-primary" style="padding: 6px 10px; font-size: 0.75rem;">Save</button></noscript>
+            </form>
           </div>
         </div>
 

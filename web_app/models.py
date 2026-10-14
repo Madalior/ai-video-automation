@@ -61,7 +61,8 @@ class AccountPersona(db.Model):
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
-    clips            = db.relationship("Clip", backref="account_persona", lazy=True)
+    clips                 = db.relationship("Clip", backref="account_persona", lazy=True)
+    monitored_influencers = db.relationship("MonitoredInfluencer", backref="account_persona", lazy=True)
 
     def __repr__(self):
         return f"<AccountPersona {self.id} ({self.username})>"
@@ -114,7 +115,17 @@ class AccountPersona(db.Model):
                 },
             },
             "is_active": self.is_active,
-            "clips_count": len(self.clips) if self.clips else 0
+            "clips_count": len(self.clips) if self.clips else 0,
+            "monitored_influencers": [
+                {
+                    "id": inf.id,
+                    "channel_name": inf.channel_name,
+                    "channel_handle": inf.channel_handle,
+                    "platform": inf.platform,
+                    "is_active": inf.is_active
+                }
+                for inf in self.monitored_influencers
+            ] if self.monitored_influencers else []
         }
 
 
@@ -169,6 +180,7 @@ class MonitoredInfluencer(db.Model):
     auto_upload     = db.Column(db.Boolean, default=True)
     last_checked_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_stream_id  = db.Column(db.String(100), default="")
+    account_persona_id = db.Column(db.String(50), db.ForeignKey("account_personas.id"), nullable=True)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -177,6 +189,24 @@ class MonitoredInfluencer(db.Model):
     def __repr__(self):
         return f"<MonitoredInfluencer {self.channel_name} ({self.platform})>"
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "channel_name": self.channel_name,
+            "channel_handle": self.channel_handle,
+            "channel_url": self.channel_url,
+            "platform": self.platform,
+            "is_active": self.is_active,
+            "num_clips": self.num_clips,
+            "target_platform": self.target_platform,
+            "auto_upload": self.auto_upload,
+            "account_persona_id": self.account_persona_id,
+            "account_persona_username": self.account_persona.username if self.account_persona else None,
+            "last_checked_at": self.last_checked_at.isoformat() if self.last_checked_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
 
 class ProcessedStream(db.Model):
     """
@@ -184,16 +214,17 @@ class ProcessedStream(db.Model):
     """
     __tablename__ = "processed_streams"
 
-    id            = db.Column(db.Integer, primary_key=True)
-    influencer_id = db.Column(db.Integer, db.ForeignKey("monitored_influencers.id"), nullable=False)
-    stream_id     = db.Column(db.String(100), nullable=False)     # YouTube video ID or Twitch VOD ID
-    stream_title  = db.Column(db.String(250), default="")
-    stream_url    = db.Column(db.Text, nullable=False)
-    duration      = db.Column(db.Float, default=0.0)
-    status        = db.Column(db.String(30), default="queued")    # queued | processing | completed | failed
-    clip_count    = db.Column(db.Integer, default=0)
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
-    completed_at  = db.Column(db.DateTime, nullable=True)
+    id                 = db.Column(db.Integer, primary_key=True)
+    influencer_id      = db.Column(db.Integer, db.ForeignKey("monitored_influencers.id"), nullable=False)
+    account_persona_id = db.Column(db.String(50), nullable=True)
+    stream_id          = db.Column(db.String(100), nullable=False)     # YouTube video ID or Twitch VOD ID
+    stream_title       = db.Column(db.String(250), default="")
+    stream_url         = db.Column(db.Text, nullable=False)
+    duration           = db.Column(db.Float, default=0.0)
+    status             = db.Column(db.String(30), default="queued")    # queued | processing | completed | failed
+    clip_count         = db.Column(db.Integer, default=0)
+    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at       = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
         return f"<ProcessedStream {self.stream_id} - {self.status}>"
@@ -422,6 +453,26 @@ def migrate_db():
             for col_name, col_def in persona_cols:
                 if col_name not in existing_persona_cols:
                     cur.execute(f"ALTER TABLE account_personas ADD COLUMN {col_name} {col_def}")
+
+            # Check monitored_influencers columns
+            cur.execute("PRAGMA table_info(monitored_influencers)")
+            existing_inf_cols = {row[1] for row in cur.fetchall()}
+            if "account_persona_id" not in existing_inf_cols:
+                cur.execute("ALTER TABLE monitored_influencers ADD COLUMN account_persona_id VARCHAR(50) DEFAULT ''")
+
+            # Check processed_streams columns
+            cur.execute("PRAGMA table_info(processed_streams)")
+            existing_ps_cols = {row[1] for row in cur.fetchall()}
+            if "account_persona_id" not in existing_ps_cols:
+                cur.execute("ALTER TABLE processed_streams ADD COLUMN account_persona_id VARCHAR(50) DEFAULT ''")
+
+            # Auto-link unassigned influencers to first follow_influencer persona if available
+            cur.execute("SELECT id FROM account_personas WHERE content_type = 'follow_influencer' LIMIT 1")
+            influencer_persona = cur.fetchone()
+            if influencer_persona:
+                persona_id_val = influencer_persona[0]
+                cur.execute("UPDATE monitored_influencers SET account_persona_id = ? WHERE account_persona_id IS NULL OR account_persona_id = ''", (persona_id_val,))
+                cur.execute("UPDATE processed_streams SET account_persona_id = ? WHERE account_persona_id IS NULL OR account_persona_id = ''", (persona_id_val,))
 
             conn.commit()
             conn.close()

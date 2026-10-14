@@ -410,6 +410,54 @@
             {% endif %}
           </div>
 
+          <!-- Ingestion Source / Linked Monitored Influencer -->
+          <div style="background: #111827; border: 1px solid rgba(76, 230, 22, 0.4); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; color: #fff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 0.68rem; color: #4CE616; font-weight: 700; letter-spacing: 0.5px;">
+                🎯 INGESTION SOURCE
+              </span>
+              <button type="button" onclick="openLinkInfluencerModal('{{ persona.id }}', '{{ persona.username }}')" style="background: rgba(76, 230, 22, 0.15); border: 1px solid #4CE616; color: #4CE616; border-radius: 4px; padding: 2px 7px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700; cursor: pointer;">
+                + LINK
+              </button>
+            </div>
+            
+            {% if persona.monitored_influencers %}
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                {% for inf in persona.monitored_influencers %}
+                  <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.05); padding: 5px 8px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                      <span style="font-size: 0.85rem;">{% if inf.platform == 'telegram' %}📱{% else %}🎙️{% endif %}</span>
+                      <span style="font-size: 0.76rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; color: #fff;" title="{{ inf.channel_name }}">
+                        {{ inf.channel_name }}
+                      </span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-family: var(--font-mono); font-size: 0.65rem; color: {{ '#4CE616' if inf.is_active else '#ef4444' }};">
+                        ● {{ 'ACTIVE' if inf.is_active else 'OFF' }}
+                      </span>
+                      <button type="button" onclick="unlinkInfluencer('{{ persona.id }}', {{ inf.id }})" style="background: transparent; border: none; color: #94a3b8; font-size: 0.85rem; cursor: pointer; padding: 0 2px;" title="Unlink Creator">
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 4px;">
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #94a3b8;">No creator connected</span>
+                <a href="javascript:void(0)" onclick="openLinkInfluencerModal('{{ persona.id }}', '{{ persona.username }}')" style="font-family: var(--font-mono); font-size: 0.7rem; color: #60a5fa; text-decoration: none;">
+                  Assign &rarr;
+                </a>
+              </div>
+            {% endif %}
+            
+            <div style="margin-top: 6px; text-align: right;">
+              <a href="{{ url_for('influencers.list_influencers') }}" style="font-family: var(--font-mono); font-size: 0.68rem; color: #93c5fd; text-decoration: none; font-weight: 600;">
+                Influencer Radar &rarr;
+              </a>
+            </div>
+          </div>
+
           <!-- Platform Status Strip (Compact Indicator Pills) -->
           <div style="background: #FAF9F6; border: 1px solid var(--color-border); border-radius: 4px; padding: 10px 12px; margin-bottom: 14px;">
             <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--color-muted); font-weight: 700; margin-bottom: 8px; display: flex; justify-content: space-between;">
@@ -2269,6 +2317,93 @@ function disconnectPlatformFromNodeModal(platform) {
   disconnectPlatform(currentManagingAccId, platform);
 }
 
+// ─── LINK INGESTION SOURCE MODAL CONTROLLER ──────────────────────────
+let currentLinkPersonaId = null;
+
+function openLinkInfluencerModal(personaId, username) {
+  currentLinkPersonaId = personaId;
+  const label = document.getElementById("linkModalPersonaLabel");
+  if (label) label.innerText = `Node: @${username} (ID: ${personaId})`;
+  const modal = document.getElementById("linkInfluencerModal");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeLinkInfluencerModal() {
+  currentLinkPersonaId = null;
+  const modal = document.getElementById("linkInfluencerModal");
+  if (modal) modal.style.display = "none";
+}
+
+async function submitLinkExistingInfluencer() {
+  if (!currentLinkPersonaId) return;
+  const sel = document.getElementById("linkExistingInfluencerSelect");
+  const infId = sel.value;
+  if (!infId) {
+    alert("Please select a creator to link.");
+    return;
+  }
+  try {
+    const res = await fetch(`/api/personas/${currentLinkPersonaId}/link-influencer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ influencer_id: infId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    alert("Failed to link creator: " + err.message);
+  }
+}
+
+async function submitLinkNewInfluencer() {
+  if (!currentLinkPersonaId) return;
+  const input = document.getElementById("linkNewChannelUrl");
+  const url = input.value.trim();
+  if (!url) {
+    alert("Please enter a creator or Telegram URL.");
+    return;
+  }
+  try {
+    const res = await fetch(`/api/personas/${currentLinkPersonaId}/link-influencer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel_url: url })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    alert("Failed to link creator: " + err.message);
+  }
+}
+
+async function unlinkInfluencer(personaId, influencerId) {
+  if (!confirm("Unlink this creator from this persona node?")) return;
+  try {
+    const res = await fetch(`/api/personas/${personaId}/unlink-influencer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ influencer_id: influencerId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    alert("Failed to unlink: " + err.message);
+  }
+}
+
+
 async function triggerConnectFromWizard(platform) {
   const gmailVal = (document.getElementById("wizGmail")?.value || "").trim();
   if (!gmailVal) {
@@ -2480,6 +2615,61 @@ async function triggerConnectFromWizard(platform) {
 
     <div style="display: flex; justify-content: flex-end;">
       <button type="button" class="btn-secondary" onclick="closeNodeManageModal()" style="padding: 8px 18px; font-family: var(--font-mono); font-size: 0.78rem;">
+        CLOSE
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Link Influencer / Ingestion Source to Persona -->
+<div id="linkInfluencerModal" class="modal-backdrop" style="display: none;">
+  <div class="modal-box" style="background: var(--color-brand-black); border: 2px solid #4CE616; box-shadow: 0 10px 40px rgba(0,0,0,0.9); border-radius: 4px; padding: 24px; max-width: 500px; width: 90%;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.5rem;">🎯</span>
+        <div>
+          <h3 id="linkModalPersonaLabel" style="font-family: var(--font-wordmark); font-size: 1.05rem; font-weight: 400; color: #FFFFFF; margin: 0; letter-spacing: 0.05em; text-transform: uppercase;">Link Ingestion Source</h3>
+          <p style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-top: 2px;">Assign Stream or Telegram Feed to Upload Node</p>
+        </div>
+      </div>
+      <button onclick="closeLinkInfluencerModal()" style="background: none; border: none; color: var(--color-muted); font-size: 1.4rem; cursor: pointer; line-height: 1;">✕</button>
+    </div>
+
+    <!-- Option 1: Pick from existing -->
+    <div style="margin-bottom: 18px;">
+      <label style="display: block; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">
+        OPTION A: SELECT EXISTING FOLLOWED CREATOR
+      </label>
+      <select id="linkExistingInfluencerSelect" class="form-input" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff;">
+        <option value="">-- Choose Creator / Telegram Channel --</option>
+        {% for inf in all_influencers %}
+          <option value="{{ inf.id }}">
+            {{ '📱' if inf.platform == 'telegram' else '🎙️' }} {{ inf.channel_name }} ({{ inf.platform | title }})
+          </option>
+        {% endfor %}
+      </select>
+      <button type="button" class="btn-primary" onclick="submitLinkExistingInfluencer()" style="width: 100%; margin-top: 8px; padding: 10px; font-size: 0.78rem;">
+        🔗 LINK SELECTED CREATOR
+      </button>
+    </div>
+
+    <div style="text-align: center; font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted); margin-bottom: 18px;">
+      ── OR ──
+    </div>
+
+    <!-- Option 2: Add New Channel URL -->
+    <div style="margin-bottom: 18px;">
+      <label style="display: block; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">
+        OPTION B: ENTER NEW CHANNEL / STREAM / TELEGRAM URL
+      </label>
+      <input type="text" id="linkNewChannelUrl" class="form-input" placeholder="e.g. https://www.youtube.com/@IShowSpeed or https://t.me/s/durov" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; margin-bottom: 8px;">
+      <button type="button" class="btn-secondary" onclick="submitLinkNewInfluencer()" style="width: 100%; padding: 10px; font-size: 0.78rem; border: 1px solid #4CE616; color: #4CE616;">
+        + FOLLOW &amp; LINK TO THIS NODE
+      </button>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="button" class="btn-secondary" onclick="closeLinkInfluencerModal()" style="padding: 8px 18px; font-family: var(--font-mono); font-size: 0.78rem;">
         CLOSE
       </button>
     </div>
