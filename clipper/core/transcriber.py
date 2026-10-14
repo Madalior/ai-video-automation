@@ -59,36 +59,55 @@ class Transcriber:
         if self._model is not None:
             return
         
-        # On Windows, add nvidia and torch pip package lib paths so CTranslate2 finds cublas64_12.dll / cudnn
-        if sys.platform == "win32":
-            try:
-                import site
-                for site_dir in site.getsitepackages():
-                    # Check nvidia package libs
-                    nvidia_dir = Path(site_dir) / "nvidia"
-                    if nvidia_dir.exists():
-                        for lib_dir in nvidia_dir.glob("*/lib"):
-                            if lib_dir.is_dir():
+        # On Windows & Linux, add nvidia and torch pip package lib paths so CTranslate2 finds cublas / cudnn
+        try:
+            import site
+            ld_paths = []
+            for site_dir in site.getsitepackages():
+                nvidia_dir = Path(site_dir) / "nvidia"
+                if nvidia_dir.exists():
+                    for lib_dir in nvidia_dir.glob("*/lib"):
+                        if lib_dir.is_dir():
+                            if sys.platform == "win32":
                                 os.add_dll_directory(str(lib_dir))
                                 os.environ["PATH"] += os.pathsep + str(lib_dir)
-                    
-                    # Check torch lib
-                    torch_lib = Path(site_dir) / "torch" / "lib"
-                    if torch_lib.exists():
+                            else:
+                                ld_paths.append(str(lib_dir))
+                
+                torch_lib = Path(site_dir) / "torch" / "lib"
+                if torch_lib.exists():
+                    if sys.platform == "win32":
                         os.add_dll_directory(str(torch_lib))
                         os.environ["PATH"] += os.pathsep + str(torch_lib)
-            except Exception:
-                pass
+                    else:
+                        ld_paths.append(str(torch_lib))
+            
+            if sys.platform != "win32":
+                if Path("/usr/local/cuda/lib64").exists():
+                    ld_paths.append("/usr/local/cuda/lib64")
+                if ld_paths:
+                    cur_ld = os.environ.get("LD_LIBRARY_PATH", "")
+                    os.environ["LD_LIBRARY_PATH"] = ":".join(ld_paths) + (":" + cur_ld if cur_ld else "")
+        except Exception:
+            pass
 
         try:
             from faster_whisper import WhisperModel
             print(f"[TRANSCRIBER] Loading Whisper {self.model_size} "
                   f"on {self.device} ({self.compute_type})...")
-            self._model = WhisperModel(
-                self.model_size,
-                device       = self.device,
-                compute_type = self.compute_type,
-            )
+            try:
+                self._model = WhisperModel(
+                    self.model_size,
+                    device       = self.device,
+                    compute_type = self.compute_type,
+                )
+            except Exception as load_err:
+                print(f"[TRANSCRIBER] ⚠️ GPU Whisper load failed: {load_err}. Falling back to CPU...")
+                self._model = WhisperModel(
+                    self.model_size,
+                    device       = "cpu",
+                    compute_type = "int8",
+                )
             print("[TRANSCRIBER] Model ready")
         except ImportError:
             print("[TRANSCRIBER] faster-whisper not installed")
