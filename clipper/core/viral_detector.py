@@ -13,6 +13,7 @@ When views exceed the user's defined criteria (e.g. >1,000 views):
 
 import os
 import sys
+import json
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from pathlib import Path
@@ -152,12 +153,13 @@ Return ONLY a valid JSON array of objects with keys:
         except Exception as e:
             print(f"[VIRAL_DETECTOR] LLM extraction notice: {e}. Using intelligent timeline slicing.")
 
-        # Fallback slice
-        clip_len = min(40.0, max(min_duration, video_duration if video_duration > 0 else 30.0))
+        # Fallback slice: skip intro/waiting screen on livestreams
+        safe_start = 300.0 if video_duration > 600 else (video_duration * 0.15 if video_duration > 120 else 0.0)
+        clip_len = min(40.0, max(min_duration, 30.0))
         return [
             Clip(
-                start=0.0,
-                end=clip_len,
+                start=safe_start,
+                end=safe_start + clip_len,
                 title="Top Highlight Moment",
                 score=90,
                 hook="Watch this unbelievable moment...",

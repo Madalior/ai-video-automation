@@ -124,7 +124,7 @@ def setup_environment():
     env_vars = {
         "LLM_1_API_KEY": _h("67736b5f6d526f62394d35685852714561526b534d5750685747647962334659544f4679537a394e3939344a454273764347556a52667662"),
         "LLM_1_BASE_URL": "https://api.groq.com/openai/v1",
-        "LLM_1_MODELS": "llama-3.3-70b-versatile,llama3-70b-8192,qwen/qwen3.8-27b,openai/gpt-oss-20b",
+        "LLM_1_MODELS": "openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.8-27b",
         "LLM_2_API_KEY": _h("736b2d6f722d76312d34663133323763313935613730663863316561393835333230373463376462353730623465303863623965336561366264633561633534613038393137633839"),
         "LLM_2_BASE_URL": "https://openrouter.ai/api/v1",
         "LLM_2_MODELS": "google/gemini-2.5-flash:free,meta-llama/llama-3.3-70b-instruct:free",
