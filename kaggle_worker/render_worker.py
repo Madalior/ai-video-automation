@@ -267,69 +267,109 @@ def run_stream_clipping():
 
     start_time = time.time()
     
-    # Import pipeline
-    from clipper.main import run as run_clipper
-    
-    clips = run_clipper(
-        url=TARGET_URL,
-        num_clips=NUM_CLIPS,
-        platform=TARGET_PLATFORM,
-        add_captions=True,
-        add_blur_bg=True,
-        add_music=False
-    )
-
-    elapsed = time.time() - start_time
-    log(f"🎉 Pipeline finished in {elapsed:.1f}s! Generated {len(clips)} clips.")
-
-    # Collect clips into /kaggle/working/
-    results = []
-    for i, clip_path in enumerate(clips, 1):
-        if clip_path and os.path.exists(clip_path):
-            dest_name = f"short_{i}_{os.path.basename(clip_path)}"
-            dest_path = str(WORKSPACE / dest_name)
-            shutil.copy2(clip_path, dest_path)
-            shutil.copy2(clip_path, str(OUTPUT_DIR / os.path.basename(clip_path)))
-            
-            size_mb = os.path.getsize(dest_path) / (1024 * 1024)
-            log(f"📦 Clip {i}: {dest_name} ({size_mb:.1f} MB)")
-            
-            cdn_url = upload_clip_to_cdn(dest_path)
-            if cdn_url:
-                log(f"   🌐 Direct Preview: {cdn_url}")
-            
-            results.append({
-                "index": i,
-                "local_path": dest_path,
-                "filename": dest_name,
-                "size_mb": round(size_mb, 2),
-                "url": cdn_url
-            })
-
-    # Save summary json
-    summary_path = WORKSPACE / "clips_summary.json"
-    with open(summary_path, "w", encoding="utf-8") as f:
-        json.dump({
-            "target_url": TARGET_URL,
-            "clips_count": len(results),
-            "elapsed_seconds": round(elapsed, 1),
-            "clips": results
-        }, f, indent=2)
-
-    # Broadcast notification to ntfy
-    import requests
     try:
-        msg = f"Kaggle GPU: {len(results)} viral clips generated in {elapsed:.0f}s!\n"
-        for r in results:
-            msg += f"• Clip {r['index']}: {r.get('url') or r['filename']}\n"
-        requests.post("https://ntfy.sh/going_merry_kaggle_t4", data=msg.encode("utf-8"), timeout=5)
-        log("📡 Broadcasted completion notification to ntfy.sh/going_merry_kaggle_t4")
-    except Exception as e:
-        log(f"Notice: {e}")
+        # Import pipeline
+        from clipper.main import run as run_clipper
+        
+        clips = run_clipper(
+            url=TARGET_URL,
+            num_clips=NUM_CLIPS,
+            platform=TARGET_PLATFORM,
+            add_captions=True,
+            add_blur_bg=True,
+            add_music=False
+        )
 
-    log("=" * 60)
-    log("🟢 ALL CLIPS READY IN /kaggle/working AND /output")
-    log("=" * 60)
+        if not clips:
+            raise RuntimeError("Pipeline finished without generating any clips.")
+
+        elapsed = time.time() - start_time
+        log(f"🎉 Pipeline finished in {elapsed:.1f}s! Generated {len(clips)} clips.")
+
+        # Collect clips into /kaggle/working/
+        results = []
+        for i, clip_path in enumerate(clips, 1):
+            if clip_path and os.path.exists(clip_path):
+                dest_name = f"short_{i}_{os.path.basename(clip_path)}"
+                dest_path = str(WORKSPACE / dest_name)
+                shutil.copy2(clip_path, dest_path)
+                shutil.copy2(clip_path, str(OUTPUT_DIR / os.path.basename(clip_path)))
+                
+                size_mb = os.path.getsize(dest_path) / (1024 * 1024)
+                log(f"📦 Clip {i}: {dest_name} ({size_mb:.1f} MB)")
+                
+                cdn_url = upload_clip_to_cdn(dest_path)
+                if cdn_url:
+                    log(f"   🌐 Direct Preview: {cdn_url}")
+                
+                results.append({
+                    "index": i,
+                    "local_path": dest_path,
+                    "filename": dest_name,
+                    "size_mb": round(size_mb, 2),
+                    "url": cdn_url
+                })
+
+        if not results:
+            raise RuntimeError("No rendered clip files were found in workspace output.")
+
+        # Save summary json
+        summary_path = WORKSPACE / "clips_summary.json"
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "target_url": TARGET_URL,
+                "clips_count": len(results),
+                "elapsed_seconds": round(elapsed, 1),
+                "clips": results
+            }, f, indent=2)
+
+        # Broadcast notification to ntfy
+        import requests
+        try:
+            msg = f"Kaggle GPU: {len(results)} viral clips generated in {elapsed:.0f}s!\n"
+            for r in results:
+                msg += f"• Clip {r['index']}: {r.get('url') or r['filename']}\n"
+            requests.post("https://ntfy.sh/going_merry_kaggle_t4", data=msg.encode("utf-8"), timeout=5)
+            log("📡 Broadcasted completion notification to ntfy.sh/going_merry_kaggle_t4")
+        except Exception as e:
+            log(f"Notice: {e}")
+
+        log("=" * 60)
+        log("🟢 ALL CLIPS READY IN /kaggle/working AND /output")
+        log("=" * 60)
+
+    except Exception as e:
+        import traceback
+        tb_str = traceback.format_exc()
+        log("=" * 60)
+        log(f"❌ PIPELINE ERROR ENCOUNTERED: {e}")
+        log(tb_str)
+        log("=" * 60)
+
+        # Record error details to workspace
+        err_file = WORKSPACE / "pipeline_error.json"
+        try:
+            with open(err_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "status": "STOPPED_ON_ERROR",
+                    "error": str(e),
+                    "traceback": tb_str,
+                    "target_url": TARGET_URL
+                }, f, indent=2)
+        except Exception:
+            pass
+
+        # Send instant mobile alert to user
+        import requests
+        try:
+            alert_msg = f"🚨 Going Merry Pipeline STOPPED ON ERROR:\n{str(e)[:300]}\nCheck pipeline.log for full details."
+            requests.post("https://ntfy.sh/going_merry_kaggle_t4", data=alert_msg.encode("utf-8"), timeout=5)
+            log("📡 Broadcasted failure alert to ntfy.sh/going_merry_kaggle_t4")
+        except Exception:
+            pass
+
+        log("⛔ PIPELINE HALTED IMMEDIATELY: As requested, execution aborted on error without producing invalid clips.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     start_cloudflare_and_server()

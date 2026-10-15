@@ -150,23 +150,10 @@ Return ONLY a valid JSON array of objects with keys:
                 ))
             if clips:
                 return clips
+            raise ValueError("LLM returned no valid viral clips from transcript.")
         except Exception as e:
-            print(f"[VIRAL_DETECTOR] LLM extraction notice: {e}. Using intelligent timeline slicing.")
-
-        # Fallback slice: skip intro/waiting screen on livestreams
-        safe_start = 300.0 if video_duration > 600 else (video_duration * 0.15 if video_duration > 120 else 0.0)
-        clip_len = min(40.0, max(min_duration, 30.0))
-        return [
-            Clip(
-                start=safe_start,
-                end=safe_start + clip_len,
-                title="Top Highlight Moment",
-                score=90,
-                hook="Watch this unbelievable moment...",
-                hashtags=required_hashtags or ["#shorts", "#viral"],
-                platform=target_platform
-            )
-        ]
+            print(f"[VIRAL_DETECTOR] [FATAL] LLM viral moment extraction failed: {e}")
+            raise RuntimeError(f"Viral moment extraction failed: {e}. Stopping pipeline.")
 
     def evaluate_clip(
         self,

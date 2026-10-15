@@ -117,14 +117,12 @@ def run(url: str = None,
     if url and not file_path:
         print("\n[1/5] Stream Sniper Mode: Downloading Audio Only...")
         source_path = downloader.download_audio_only(url)
-        if not source_path:
-            print("[ERROR] Audio download failed. Exiting.")
-            return []
+        if not source_path or not os.path.exists(source_path):
+            raise RuntimeError(f"[CLIPPER ERROR] Audio download failed for {url}. Stopping pipeline.")
         is_stream_sniper = True
 
     if not source_path or not os.path.exists(source_path):
-        print("[ERROR] No media file found. Provide --url or --file")
-        return []
+        raise RuntimeError("[CLIPPER ERROR] No media file found. Stopping pipeline.")
 
     print(f"[1/5] Source ready: {os.path.basename(source_path)}")
 
@@ -146,9 +144,8 @@ def run(url: str = None,
     transcriber = Transcriber()
     transcript  = transcriber.transcribe(source_path, language=language)
 
-    if not transcript:
-        print("[ERROR] Transcription failed. Exiting.")
-        return []
+    if not transcript or not transcript.segments:
+        raise RuntimeError("[CLIPPER ERROR] Audio transcription failed or produced empty segments. Stopping pipeline.")
         
     if is_stream_sniper:
         video_duration = transcript.segments[-1].end if transcript.segments else 0
@@ -171,8 +168,7 @@ def run(url: str = None,
     )
 
     if not clips:
-        print("[ERROR] No clips found. Check NVIDIA API key.")
-        return []
+        raise RuntimeError("[CLIPPER ERROR] ViralDetector failed to extract any viral clips. Stopping pipeline.")
 
     # ── Step 5 & 6: Snipe, Cut & Caption ─────────────────────────────────────
     print(f"\n[4/5 & 5/5] Processing {len(clips)} clips...")
@@ -190,8 +186,8 @@ def run(url: str = None,
             chunk_path = str(cache_dir / f"chunk_{i}.mp4")
             downloaded = downloader.download_video_section(url, clip.start, clip.end, chunk_path)
             
-            if not downloaded:
-                continue
+            if not downloaded or not os.path.exists(downloaded):
+                raise RuntimeError(f"[CLIPPER ERROR] Failed to download video chunk for clip {i} ({clip.start:.1f}s - {clip.end:.1f}s). Stopping pipeline.")
                 
             # 2. Reformat to 9:16 (pre-cut)
             rendered = cutter.cut_and_reformat(
@@ -207,8 +203,8 @@ def run(url: str = None,
                 is_pre_cut=False
             )
             
-        if not rendered:
-            continue
+        if not rendered or not getattr(rendered, "path", None) or not os.path.exists(rendered.path):
+            raise RuntimeError(f"[CLIPPER ERROR] Video rendering/formatting failed for clip {i} ('{clip.title}'). Stopping pipeline.")
             
         final_path = rendered.path
 
@@ -226,7 +222,9 @@ def run(url: str = None,
                 offset_sec=clip.start,
                 duration_sec=clip.end - clip.start,
             )
-            final_path = captioned or rendered.path
+            if not captioned or not os.path.exists(captioned):
+                raise RuntimeError(f"[CLIPPER ERROR] Caption burning failed for clip {i}. Stopping pipeline.")
+            final_path = captioned
             
         # Optional: Mix emotion-based trending TikTok background music
         if add_music and final_path:
@@ -238,6 +236,9 @@ def run(url: str = None,
                 final_path = mixed
 
         final_clips.append(final_path)
+
+    if not final_clips:
+        raise RuntimeError("[CLIPPER ERROR] Zero clips were successfully generated. Stopping pipeline.")
 
     # ── Summary ──────────────────────────────────────────────────────────────
     elapsed = time.time() - start_time

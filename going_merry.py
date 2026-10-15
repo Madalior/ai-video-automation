@@ -956,7 +956,7 @@ def sail(
 
     if not clips:
         bus.emit("stage.2.llm", {"job_id": job_id, "status": "starting"})
-        if video_file and (transcript.duration <= max_dur or num_clips == 1):
+        if video_file and (transcript.duration <= max_dur):
             from clipper.core.viral_detector import Clip
             clip_end = transcript.duration if transcript.duration > 0 else 40.5
             camp_name = camp_adapter.campaign_name if camp_adapter else Path(video_file).stem.replace("_", " ").title()
@@ -985,7 +985,7 @@ def sail(
 
         if not clips:
             bus.emit("pipeline.error", {"job_id": job_id, "stage": 2, "error": "No clips found"})
-            return []
+            raise RuntimeError("LLM could not extract any viral clips. Stopping pipeline.")
         checkpoint.save_step_2_clips(clips)
         bus.emit("stage.2.llm", {"job_id": job_id, "status": "completed", "count": len(clips)})
 
