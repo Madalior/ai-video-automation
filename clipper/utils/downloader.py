@@ -87,11 +87,30 @@ class Downloader:
         except Exception:
             print("[DOWNLOADER] yt-dlp not found — run: pip install yt-dlp")
 
+    def _get_cookie_args(self) -> list:
+        cookie_file = os.getenv("YTDLP_COOKIES")
+        if not cookie_file:
+            candidates = [
+                Path("cookies.txt"),
+                Path("/kaggle/working/cookies.txt"),
+                self.cache_dir / "cookies.txt",
+                Path(__file__).parent.parent.parent / "kaggle_worker" / "cookies.txt",
+                Path(__file__).parent.parent.parent / "cookies.txt"
+            ]
+            for cand in candidates:
+                if cand.exists() and cand.stat().st_size > 10:
+                    cookie_file = str(cand.resolve())
+                    break
+        if cookie_file:
+            return ["--cookies", cookie_file]
+        return []
+
     def get_info(self, url: str) -> Optional[dict]:
         """Fetch video metadata without downloading."""
         try:
+            cmd = ["yt-dlp", "--dump-json", "--no-download", "--no-warnings"] + self._get_cookie_args() + [url]
             r = subprocess.run(
-                ["yt-dlp", "--dump-json", "--no-download", "--no-warnings", url],
+                cmd,
                 capture_output=True, text=True, timeout=30
             )
             if r.returncode == 0 and r.stdout.strip():
@@ -173,13 +192,13 @@ class Downloader:
             "--merge-output-format", "mp4",
             "-o", output_path,
             "--no-warnings", "--quiet",
-        ]
+        ] + self._get_cookie_args()
         if not ffmpeg_ok:
             cmd = ["yt-dlp", url,
                    "-f", f"best[height<={max_height}][ext=mp4]/best",
                    "-o", output_path,
                    "--no-warnings", "--quiet",
-                   "--max-filesize", "500M"]
+                   "--max-filesize", "500M"] + self._get_cookie_args()
 
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
@@ -215,7 +234,7 @@ class Downloader:
             "-f", "ba[ext=m4a]/140/ba/b",
             "-o", output_path,
             "--no-warnings",
-        ]
+        ] + self._get_cookie_args()
 
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
@@ -254,7 +273,7 @@ class Downloader:
             "-o", output_path,
             url,
             "--no-warnings",
-        ]
+        ] + self._get_cookie_args()
 
         try:
             # Network ffmpeg slicing for remote sections
