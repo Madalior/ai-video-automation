@@ -266,7 +266,58 @@ def run_stream_clipping():
     os.chdir(str(REPO_DIR))
 
     start_time = time.time()
-    
+    results = []
+
+    def on_clip_completed(idx: int, clip_path: str, clip_obj):
+        """Immediately persists and uploads each completed clip in real time."""
+        if not clip_path or not os.path.exists(clip_path):
+            return
+
+        dest_name = f"short_{idx}_{os.path.basename(clip_path)}"
+        dest_path = str(WORKSPACE / dest_name)
+        shutil.copy2(clip_path, dest_path)
+        shutil.copy2(clip_path, str(OUTPUT_DIR / os.path.basename(clip_path)))
+        
+        size_mb = os.path.getsize(dest_path) / (1024 * 1024)
+        log(f"📦 [REAL-TIME] Clip {idx} Saved: {dest_name} ({size_mb:.1f} MB)")
+        
+        cdn_url = upload_clip_to_cdn(dest_path)
+        if cdn_url:
+            log(f"   🌐 Live Direct Preview: {cdn_url}")
+        
+        entry = {
+            "index": idx,
+            "local_path": dest_path,
+            "filename": dest_name,
+            "title": getattr(clip_obj, "title", f"Clip {idx}"),
+            "score": getattr(clip_obj, "score", 85),
+            "size_mb": round(size_mb, 2),
+            "url": cdn_url
+        }
+        results.append(entry)
+
+        # Update summary json in real time
+        try:
+            summary_path = WORKSPACE / "clips_summary.json"
+            with open(summary_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "target_url": TARGET_URL,
+                    "clips_count": len(results),
+                    "clips": results
+                }, f, indent=2)
+        except Exception:
+            pass
+
+        # Send instant notification to ntfy as soon as this clip finishes!
+        try:
+            import requests
+            alert_text = f"🎉 Clip {idx} Ready ({round(size_mb, 1)}MB)!\nTitle: {entry['title']}\nScore: {entry['score']}\n"
+            if cdn_url:
+                alert_text += f"Preview: {cdn_url}\n"
+            requests.post("https://ntfy.sh/going_merry_kaggle_t4", data=alert_text.encode("utf-8"), timeout=5)
+        except Exception:
+            pass
+
     try:
         # Import pipeline
         from clipper.main import run as run_clipper
@@ -277,65 +328,15 @@ def run_stream_clipping():
             platform=TARGET_PLATFORM,
             add_captions=True,
             add_blur_bg=True,
-            add_music=False
+            add_music=False,
+            on_clip_ready=on_clip_completed
         )
 
-        if not clips:
-            raise RuntimeError("Pipeline finished without generating any clips.")
-
         elapsed = time.time() - start_time
-        log(f"🎉 Pipeline finished in {elapsed:.1f}s! Generated {len(clips)} clips.")
-
-        # Collect clips into /kaggle/working/
-        results = []
-        for i, clip_path in enumerate(clips, 1):
-            if clip_path and os.path.exists(clip_path):
-                dest_name = f"short_{i}_{os.path.basename(clip_path)}"
-                dest_path = str(WORKSPACE / dest_name)
-                shutil.copy2(clip_path, dest_path)
-                shutil.copy2(clip_path, str(OUTPUT_DIR / os.path.basename(clip_path)))
-                
-                size_mb = os.path.getsize(dest_path) / (1024 * 1024)
-                log(f"📦 Clip {i}: {dest_name} ({size_mb:.1f} MB)")
-                
-                cdn_url = upload_clip_to_cdn(dest_path)
-                if cdn_url:
-                    log(f"   🌐 Direct Preview: {cdn_url}")
-                
-                results.append({
-                    "index": i,
-                    "local_path": dest_path,
-                    "filename": dest_name,
-                    "size_mb": round(size_mb, 2),
-                    "url": cdn_url
-                })
-
-        if not results:
-            raise RuntimeError("No rendered clip files were found in workspace output.")
-
-        # Save summary json
-        summary_path = WORKSPACE / "clips_summary.json"
-        with open(summary_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "target_url": TARGET_URL,
-                "clips_count": len(results),
-                "elapsed_seconds": round(elapsed, 1),
-                "clips": results
-            }, f, indent=2)
-
-        # Broadcast notification to ntfy
-        import requests
-        try:
-            msg = f"Kaggle GPU: {len(results)} viral clips generated in {elapsed:.0f}s!\n"
-            for r in results:
-                msg += f"• Clip {r['index']}: {r.get('url') or r['filename']}\n"
-            requests.post("https://ntfy.sh/going_merry_kaggle_t4", data=msg.encode("utf-8"), timeout=5)
-            log("📡 Broadcasted completion notification to ntfy.sh/going_merry_kaggle_t4")
-        except Exception as e:
-            log(f"Notice: {e}")
+        log(f"🎉 Pipeline finished in {elapsed:.1f}s! Generated {len(results)} clips.")
 
         log("=" * 60)
-        log("🟢 ALL CLIPS READY IN /kaggle/working AND /output")
+        log(f"🟢 ALL {len(results)} CLIPS SAVED IN /kaggle/working AND /output")
         log("=" * 60)
 
     except Exception as e:
@@ -354,7 +355,8 @@ def run_stream_clipping():
                     "status": "STOPPED_ON_ERROR",
                     "error": str(e),
                     "traceback": tb_str,
-                    "target_url": TARGET_URL
+                    "target_url": TARGET_URL,
+                    "saved_clips": results
                 }, f, indent=2)
         except Exception:
             pass
@@ -362,14 +364,19 @@ def run_stream_clipping():
         # Send instant mobile alert to user
         import requests
         try:
-            alert_msg = f"🚨 Going Merry Pipeline STOPPED ON ERROR:\n{str(e)[:300]}\nCheck pipeline.log for full details."
+            alert_msg = f"⚠️ Pipeline stopped on error:\n{str(e)[:250]}\nCompleted clips preserved: {len(results)}"
             requests.post("https://ntfy.sh/going_merry_kaggle_t4", data=alert_msg.encode("utf-8"), timeout=5)
             log("📡 Broadcasted failure alert to ntfy.sh/going_merry_kaggle_t4")
         except Exception:
             pass
 
-        log("⛔ PIPELINE HALTED IMMEDIATELY: As requested, execution aborted on error without producing invalid clips.")
-        sys.exit(1)
+        # If any clip was produced, exit cleanly (0) so Kaggle preserves output files!
+        if results:
+            log(f"💾 Preserving {len(results)} completed clip(s) in /kaggle/working. Exiting cleanly to commit dataset.")
+            sys.exit(0)
+        else:
+            log("⛔ Halting execution (no clips produced).")
+            sys.exit(1)
 
 if __name__ == "__main__":
     start_cloudflare_and_server()

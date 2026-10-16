@@ -90,7 +90,8 @@ def run(url: str = None,
         add_music:    bool = False,
         min_duration: float = 20.0,
         max_duration: float = 90.0,
-        language: str = None):
+        language: str = None,
+        on_clip_ready = None):
     """
     Full pipeline: Download → Transcribe → Detect → Cut → Caption → Trending Music
 
@@ -236,6 +237,12 @@ def run(url: str = None,
                 final_path = mixed
 
         final_clips.append(final_path)
+
+        if on_clip_ready and callable(on_clip_ready):
+            try:
+                on_clip_ready(i, final_path, clip)
+            except Exception as cb_err:
+                print(f"[CLIPPER] Notice: on_clip_ready handler warning: {cb_err}")
 
     if not final_clips:
         raise RuntimeError("[CLIPPER ERROR] Zero clips were successfully generated. Stopping pipeline.")

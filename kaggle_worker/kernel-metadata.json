@@ -1,6 +1,6 @@
 {
-  "id": "vibezzzak/going-merry-gpu-worker",
-  "title": "Going Merry GPU Worker",
+  "id": "vibezzzak/going-merry-gpu-runner",
+  "title": "Going Merry GPU Runner",
   "code_file": "render_worker.py",
   "language": "python",
   "kernel_type": "script",

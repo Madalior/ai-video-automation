@@ -277,7 +277,7 @@ class Downloader:
 
         try:
             # Network ffmpeg slicing for remote sections
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                 size = os.path.getsize(output_path) / (1024*1024)
                 print(f"[DOWNLOADER] Sniped chunk: {os.path.basename(output_path)} ({size:.1f} MB)")
@@ -295,21 +295,40 @@ class Downloader:
                 "yt-dlp", "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b",
                 "--merge-output-format", "mp4", "-o", full_vid, url, "--quiet"
             ]
-            subprocess.run(full_cmd, timeout=300)
+            subprocess.run(full_cmd, timeout=600)
             
         if os.path.exists(full_vid):
             print("[DOWNLOADER] Cutting locally with ffmpeg...")
+            dur = max(0.5, end_sec - start_sec)
+            # Try ultrafast stream copy first
+            copy_cmd = [
+                "ffmpeg", "-y",
+                "-ss", f"{start_sec:.3f}",
+                "-i", full_vid,
+                "-t", f"{dur:.3f}",
+                "-c", "copy",
+                "-avoid_negative_ts", "make_zero",
+                output_path
+            ]
+            try:
+                subprocess.run(copy_cmd, capture_output=True, timeout=60)
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                    return output_path
+            except Exception:
+                pass
+
+            # Fast re-encode fallback
             cut_cmd = [
                 "ffmpeg", "-y",
                 "-ss", f"{start_sec:.3f}",
-                "-to", f"{end_sec:.3f}",
                 "-i", full_vid,
-                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-t", f"{dur:.3f}",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
                 "-c:a", "aac", "-b:a", "192k",
                 "-avoid_negative_ts", "make_zero",
                 output_path
             ]
-            subprocess.run(cut_cmd, capture_output=True, timeout=60)
+            subprocess.run(cut_cmd, capture_output=True, timeout=300)
             
             if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                 return output_path
